@@ -49,9 +49,8 @@ export function DataTableView<TData, TValue>({
   exportConfig,
 }: DataTableViewProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  )
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [globalFilter, setGlobalFilter] = React.useState("")
   const [isExporting, setIsExporting] = React.useState(false)
 
   const handleExport = async (format: "csv" | "xlsx") => {
@@ -74,23 +73,31 @@ export function DataTableView<TData, TValue>({
     getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
-    state: { sorting, columnFilters },
+    onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn: "includesString",
+    state: { sorting, columnFilters, globalFilter },
   })
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        {searchKey ? (
+        {searchKey || searchPlaceholder !== "Search..." ? (
           <div className="relative max-w-sm w-full">
             <SearchIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
               placeholder={searchPlaceholder}
               value={
-                (table.getColumn(searchKey)?.getFilterValue() as string) ?? ""
+                searchKey && searchKey !== "global"
+                  ? ((table.getColumn(searchKey)?.getFilterValue() as string) ?? "")
+                  : globalFilter
               }
-              onChange={(e) =>
-                table.getColumn(searchKey)?.setFilterValue(e.target.value)
-              }
+              onChange={(e) => {
+                if (searchKey && searchKey !== "global") {
+                  table.getColumn(searchKey)?.setFilterValue(e.target.value)
+                } else {
+                  setGlobalFilter(e.target.value)
+                }
+              }}
               className="pl-9"
             />
           </div>

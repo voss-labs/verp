@@ -50,8 +50,8 @@ export function StudentsClient({ data }: { data: StudentRow[] }) {
     <DataTableView
       columns={studentsColumns}
       data={data}
-      searchKey="name"
-      searchPlaceholder="Search by name..."
+      searchKey="global"
+      searchPlaceholder="Search students..."
       exportConfig={{
         filename: "Students",
         onExport: handleExport,
