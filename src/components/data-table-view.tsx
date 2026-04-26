@@ -20,15 +20,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { SearchIcon } from "lucide-react"
+import { SearchIcon, DownloadIcon, Loader2Icon } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu"
 
 interface DataTableViewProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
   searchKey?: string
   searchPlaceholder?: string
+  exportConfig?: {
+    filename: string
+    onExport: (data: TData[], format: "csv" | "xlsx") => Promise<void>
+  }
 }
 
 export function DataTableView<TData, TValue>({
@@ -36,11 +46,24 @@ export function DataTableView<TData, TValue>({
   data,
   searchKey,
   searchPlaceholder = "Search...",
+  exportConfig,
 }: DataTableViewProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   )
+  const [isExporting, setIsExporting] = React.useState(false)
+
+  const handleExport = async (format: "csv" | "xlsx") => {
+    if (!exportConfig) return
+    setIsExporting(true)
+    try {
+      const filteredData = table.getFilteredRowModel().rows.map(r => r.original)
+      await exportConfig.onExport(filteredData, format)
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   const table = useReactTable({
     data,
@@ -56,21 +79,45 @@ export function DataTableView<TData, TValue>({
 
   return (
     <div className="space-y-4">
-      {searchKey && (
-        <div className="relative max-w-sm">
-          <SearchIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-          <Input
-            placeholder={searchPlaceholder}
-            value={
-              (table.getColumn(searchKey)?.getFilterValue() as string) ?? ""
-            }
-            onChange={(e) =>
-              table.getColumn(searchKey)?.setFilterValue(e.target.value)
-            }
-            className="pl-9"
-          />
-        </div>
-      )}
+      <div className="flex items-center justify-between">
+        {searchKey ? (
+          <div className="relative max-w-sm w-full">
+            <SearchIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+            <Input
+              placeholder={searchPlaceholder}
+              value={
+                (table.getColumn(searchKey)?.getFilterValue() as string) ?? ""
+              }
+              onChange={(e) =>
+                table.getColumn(searchKey)?.setFilterValue(e.target.value)
+              }
+              className="pl-9"
+            />
+          </div>
+        ) : (
+          <div /> // Placeholder for spacing if no search key
+        )}
+        {exportConfig && (
+          <DropdownMenu>
+            <DropdownMenuTrigger className={buttonVariants({ variant: "outline" })} disabled={isExporting}>
+              {isExporting ? (
+                <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <DownloadIcon className="mr-2 h-4 w-4" />
+              )}
+              Export
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExport("csv")}>
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport("xlsx")}>
+                Export as Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
       <div className="bg-card rounded-lg border">
         <Table>
           <TableHeader>

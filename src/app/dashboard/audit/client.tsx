@@ -11,7 +11,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { SearchIcon } from "lucide-react"
+import { SearchIcon, DownloadIcon, Loader2Icon } from "lucide-react"
+import { Button, buttonVariants } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { exportTableCsv, exportTableXlsx } from "@/lib/xlsx-export"
+import { downloadBase64File } from "@/lib/utils"
 
 type AuditLogEntry = {
   id: string
@@ -43,6 +52,7 @@ export function AuditLogClient({
 }) {
   const [search, setSearch] = useState("")
   const [filterAction, setFilterAction] = useState("all")
+  const [isExporting, setIsExporting] = useState(false)
 
   const filtered = logs.filter((log) => {
     if (filterAction !== "all" && log.action !== filterAction) return false
@@ -58,10 +68,40 @@ export function AuditLogClient({
     return true
   })
 
+  const handleExport = async (format: "csv" | "xlsx") => {
+    setIsExporting(true)
+    try {
+      const headers = ["Time", "Action", "Actor", "Target Type", "Target ID", "Details"]
+      const rows = filtered.map(log => [
+        new Date(log.createdAt).toLocaleString(),
+        log.action,
+        log.actorName,
+        log.targetType,
+        log.targetId ?? "",
+        log.details ? JSON.stringify(log.details) : "",
+      ])
+
+      const dateStr = new Date().toISOString().split("T")[0]
+      const filename = `AuditLog_${dateStr}.${format}`
+
+      let base64 = ""
+      if (format === "xlsx") {
+        base64 = await exportTableXlsx({ title: "Audit Log", headers, rows })
+        downloadBase64File(base64, filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+      } else {
+        base64 = await exportTableCsv({ headers, rows })
+        downloadBase64File(base64, filename, "text/csv")
+      }
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-3 flex-1">
         <div className="relative max-w-xs flex-1">
           <SearchIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <Input
@@ -96,6 +136,17 @@ export function AuditLogClient({
             </button>
           ))}
         </div>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger className={buttonVariants({ variant: "outline" })} disabled={isExporting}>
+            {isExporting ? <Loader2Icon className="mr-2 h-4 w-4 animate-spin" /> : <DownloadIcon className="mr-2 h-4 w-4" />}
+            Export
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleExport("csv")}>Export as CSV</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("xlsx")}>Export as Excel</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <p className="text-muted-foreground text-xs font-medium tabular-nums">
