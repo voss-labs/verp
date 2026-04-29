@@ -28,6 +28,7 @@ function runWithSpinner({
     const child = spawn(command, args, {
       stdio: ["ignore", "pipe", "pipe"],
       env: process.env,
+      shell: true,
     })
     let stderr = ""
     child.stdout?.on("data", () => {})

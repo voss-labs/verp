@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process"
+import { exec, spawn } from "node:child_process"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { color } from "@astrojs/cli-kit"
@@ -180,10 +180,14 @@ async function collectNeonCredentials() {
 
 function openInBrowser(url: string) {
   const platform = process.platform
-  const command =
-    platform === "darwin" ? "open" : platform === "win32" ? "start" : "xdg-open"
   try {
-    spawn(command, [url], { stdio: "ignore", detached: true }).unref()
+    if (platform === "win32") {
+      // 'start' is a cmd.exe built-in, not an executable — must use shell
+      exec(`start "" "${url}"`);
+    } else {
+      const command = platform === "darwin" ? "open" : "xdg-open"
+      spawn(command, [url], { stdio: "ignore", detached: true }).unref()
+    }
   } catch {
     // ignore — not all environments allow this
   }
@@ -447,7 +451,7 @@ async function offerDevServer() {
   ) as boolean
   if (!start) return
   process.stdout.write("\n")
-  spawn("npm", ["run", "dev"], { stdio: "inherit" })
+  spawn("npm", ["run", "dev"], { stdio: "inherit", shell: true })
 }
 
 function getVersion(): string {
