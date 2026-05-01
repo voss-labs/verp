@@ -30,6 +30,7 @@ export const students = pgTable(
     guardianName: text("guardian_name"),
     guardianPhone: text("guardian_phone"),
     profilePic: text("profile_pic"),
+    graduatedAt: timestamp("graduated_at", { withTimezone: true }),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

@@ -349,32 +349,32 @@ export function MarksEntryClient({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50px]">#</TableHead>
+                <TableHead className="w-12.5">#</TableHead>
                 <TableHead>Roll No.</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead className="w-[80px] text-center">
+                <TableHead className="w-20 text-center">
                   ISA ({maxIsa})
                 </TableHead>
                 {hasMse && (
                   <>
-                    <TableHead className="w-[80px] text-center">
+                    <TableHead className="w-20 text-center">
                       MSE-1 ({maxMse})
                     </TableHead>
-                    <TableHead className="w-[80px] text-center">
+                    <TableHead className="w-20 text-center">
                       MSE-2 ({maxMse})
                     </TableHead>
-                    <TableHead className="w-[80px] text-center">
+                    <TableHead className="w-20 text-center">
                       Final MSE
                     </TableHead>
                   </>
                 )}
-                <TableHead className="w-[80px] text-center">
+                <TableHead className="w-20 text-center">
                   ESE ({maxEse})
                 </TableHead>
-                <TableHead className="w-[70px] text-center">Total</TableHead>
-                <TableHead className="w-[60px] text-center">%</TableHead>
-                <TableHead className="w-[50px] text-center">GP</TableHead>
-                <TableHead className="w-[70px] text-center">Status</TableHead>
+                <TableHead className="w-17.5 text-center">Total</TableHead>
+                <TableHead className="w-15 text-center">%</TableHead>
+                <TableHead className="w-12.5 text-center">GP</TableHead>
+                <TableHead className="w-17.5 text-center">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -502,7 +502,7 @@ function MarkInput({
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
-      className="bg-background h-8 w-[70px] text-center tabular-nums"
+      className="bg-background h-8 w-17.5 text-center tabular-nums"
       placeholder="-"
     />
   )

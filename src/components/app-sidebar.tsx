@@ -51,7 +51,10 @@ const adminNav = [
     title: "Students",
     url: "/dashboard/students",
     icon: <UsersIcon />,
-    items: [{ title: "All Students", url: "/dashboard/students" }],
+    items: [
+      { title: "All Students", url: "/dashboard/students" },
+      { title: "Promote Students", url: "/dashboard/admin/promote" },
+    ],
   },
   {
     title: "Faculty",

@@ -46,6 +46,10 @@ const ACTION_STYLES: Record<string, string> = {
     "text-violet-600 dark:text-violet-400 border-violet-500/20 bg-violet-500/10",
   "batch.create": "text-blue border-blue/20 bg-blue/8",
   "batch.assign_student": "text-blue border-blue/20 bg-blue/8",
+  "students.promote":
+    "text-emerald-600 dark:text-emerald-400 border-emerald-500/20 bg-emerald-500/10",
+  "students.graduate":
+    "text-emerald-600 dark:text-emerald-400 border-emerald-500/20 bg-emerald-500/10",
 }
 
 export function AuditLogClient({
@@ -185,8 +189,8 @@ export function AuditLogClient({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[160px]">Time</TableHead>
-              <TableHead className="w-[180px]">Action</TableHead>
+              <TableHead className="w-40">Time</TableHead>
+              <TableHead className="w-45">Action</TableHead>
               <TableHead>Actor</TableHead>
               <TableHead>Target</TableHead>
               <TableHead>Details</TableHead>
@@ -229,7 +233,7 @@ export function AuditLogClient({
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="text-muted-foreground max-w-[200px] truncate font-mono text-xs">
+                  <TableCell className="text-muted-foreground max-w-50 truncate font-mono text-xs">
                     {log.details ? JSON.stringify(log.details) : "-"}
                   </TableCell>
                 </TableRow>
