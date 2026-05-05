@@ -312,7 +312,7 @@ export function CgpaClient({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[50px]">#</TableHead>
+              <TableHead className="w-12.5">#</TableHead>
               <SortableHead
                 field="rollNumber"
                 current={sortField}
@@ -329,13 +329,13 @@ export function CgpaClient({
               >
                 Name
               </SortableHead>
-              <TableHead className="w-[60px] text-center">Div</TableHead>
+              <TableHead className="w-15 text-center">Div</TableHead>
               <SortableHead
                 field="semesters"
                 current={sortField}
                 dir={sortDir}
                 onSort={handleSort}
-                className="w-[80px] text-center"
+                className="w-20 text-center"
               >
                 Sems
               </SortableHead>
@@ -344,22 +344,22 @@ export function CgpaClient({
                 current={sortField}
                 dir={sortDir}
                 onSort={handleSort}
-                className="w-[80px] text-center"
+                className="w-20 text-center"
               >
                 Credits
               </SortableHead>
-              <TableHead className="w-[80px] text-center">CGP</TableHead>
+              <TableHead className="w-20 text-center">CGP</TableHead>
               <SortableHead
                 field="cgpa"
                 current={sortField}
                 dir={sortDir}
                 onSort={handleSort}
-                className="w-[80px] text-center"
+                className="w-20 text-center"
               >
                 CGPA
               </SortableHead>
-              <TableHead className="w-[80px] text-center">Status</TableHead>
-              <TableHead className="w-[80px] text-center">Details</TableHead>
+              <TableHead className="w-20 text-center">Status</TableHead>
+              <TableHead className="w-20 text-center">Details</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -409,7 +409,7 @@ export function CgpaClient({
                     {student.computed.hasFail ? (
                       <Badge
                         variant="outline"
-                        className="text-destructive border-red-200 bg-red-50 text-xs"
+                        className="text-destructive border-destructive/20 bg-destructive/10 text-xs"
                       >
                         Fail
                       </Badge>
@@ -547,7 +547,7 @@ function StudentDetailDialog({
                   {sem.sgpi.hasFail && (
                     <Badge
                       variant="outline"
-                      className="text-destructive border-red-200 bg-red-50 text-[10px]"
+                      className="text-destructive border-destructive/20 bg-destructive/10 text-[10px]"
                     >
                       Fail
                     </Badge>

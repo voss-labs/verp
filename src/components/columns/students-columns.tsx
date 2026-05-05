@@ -11,6 +11,7 @@ export type StudentRow = {
   rollNumber: string
   email: string
   department: string
+  division: string | null
   year: string
   semester: string | null
   phoneNo: string | null

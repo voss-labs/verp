@@ -100,7 +100,7 @@ function SemesterCard({ semester }: { semester: SemesterData }) {
             {sgpi.hasFail && (
               <Badge
                 variant="outline"
-                className="text-destructive border-red-200 bg-red-50 text-xs"
+                className="text-destructive border-destructive/20 bg-destructive/10 text-xs"
               >
                 Has Fail
               </Badge>

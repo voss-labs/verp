@@ -2,6 +2,7 @@ import { exec, spawn } from "node:child_process"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { color } from "@astrojs/cli-kit"
+import open from "open"
 import {
   cancel,
   confirm,
@@ -179,18 +180,9 @@ async function collectNeonCredentials() {
 }
 
 function openInBrowser(url: string) {
-  const platform = process.platform
-  try {
-    if (platform === "win32") {
-      // 'start' is a cmd.exe built-in, not an executable — must use shell
-      exec(`start "" "${url}"`);
-    } else {
-      const command = platform === "darwin" ? "open" : "xdg-open"
-      spawn(command, [url], { stdio: "ignore", detached: true }).unref()
-    }
-  } catch {
+  open(url).catch(() => {
     // ignore — not all environments allow this
-  }
+  })
 }
 
 async function ensureDatabaseReady(directUrl: string | undefined) {
