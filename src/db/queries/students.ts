@@ -20,6 +20,7 @@ export async function getStudentByAuthUserId(authUserId: string) {
 export async function getAllStudents(filters?: {
   department?: string
   year?: string
+  division?: string
 }) {
   return db.query.students.findMany({
     where: and(
@@ -27,7 +28,8 @@ export async function getAllStudents(filters?: {
       filters?.department
         ? eq(students.department, filters.department)
         : undefined,
-      filters?.year ? eq(students.year, filters.year) : undefined
+      filters?.year ? eq(students.year, filters.year) : undefined,
+      filters?.division ? eq(students.division, filters.division) : undefined
     ),
     orderBy: (students, { asc }) => [
       asc(students.lastName),
@@ -172,4 +174,35 @@ export async function getStudentCount() {
     .from(students)
     .where(eq(students.isActive, true))
   return result.count
+}
+
+export async function getStudentCountsByDepartment() {
+  return db
+    .select({
+      department: students.department,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(students)
+    .where(eq(students.isActive, true))
+    .groupBy(students.department)
+}
+export async function getStudentCountsByYear() {
+  return db
+    .select({
+      year: students.year,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(students)
+    .where(eq(students.isActive, true))
+    .groupBy(students.year)
+}
+export async function getStudentCountsByDivision() {
+  return db
+    .select({
+      division: students.division,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(students)
+    .where(eq(students.isActive, true))
+    .groupBy(students.division)
 }
