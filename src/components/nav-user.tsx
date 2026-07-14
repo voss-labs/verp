@@ -21,6 +21,7 @@ import {
   ChevronsUpDownIcon,
   BadgeCheckIcon,
   BellIcon,
+  ExternalLinkIcon,
   LogOutIcon,
 } from "lucide-react"
 import { signOut } from "@/lib/auth-client"
@@ -95,9 +96,27 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              {/*
+                Links OUT to accounts.vosslabs.org, deliberately. VERP holds no
+                credentials and no profile — the account lives at VOSS, which is
+                also where sessions and connected apps are managed. Duplicating
+                any of it here would give students two places to change the same
+                thing, one of which is not authoritative.
+
+                Same pattern as Gmail linking out to myaccount.google.com.
+              */}
+              <DropdownMenuItem
+                render={
+                  <a
+                    href="https://accounts.vosslabs.org/account"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  />
+                }
+              >
                 <BadgeCheckIcon />
-                Account
+                Manage your VOSS account
+                <ExternalLinkIcon className="ml-auto size-3.5 opacity-50" />
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <BellIcon />
