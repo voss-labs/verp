@@ -29,6 +29,30 @@ export const auth = betterAuth({
     enabled: false,
   },
 
+  account: {
+    accountLinking: {
+      // VERP already holds user rows from the old password setup, so a VOSS login
+      // arrives at an email that already exists and better-auth refuses to link
+      // it: `account_not_linked`.
+      //
+      // That refusal is the correct DEFAULT. Auto-linking an OAuth identity to an
+      // existing account by email is an account takeover whenever the provider
+      // does not really verify the address — an attacker registers
+      // victim@vit.edu.in at a sloppy provider and inherits the victim's account.
+      //
+      // VOSS does verify: a one-time code to the real mailbox IS the login, and
+      // the @vit.edu.in gate is enforced three times over. That is exactly what
+      // trustedProviders means, and "voss" is the only entry. Adding a provider
+      // that does not verify email here would reopen the takeover.
+      enabled: true,
+      trustedProviders: ["voss"],
+
+      // Never link across differing addresses. The email is the entire basis for
+      // trusting the link; allowing a mismatch would throw that away.
+      allowDifferentEmails: false,
+    },
+  },
+
   plugins: [
     genericOAuth({
       config: [
