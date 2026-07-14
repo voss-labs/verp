@@ -5,6 +5,18 @@ import { nextCookies } from "better-auth/next-js"
 import { db } from "@/db"
 import { bindIdentity } from "@/lib/bind"
 
+/** harshal.more@vit.edu.in -> "Harshal More" */
+function deriveNameFromEmail(email: string): string {
+  const local = email?.split("@")[0] ?? ""
+  return (
+    local
+      .split(/[._-]+/)
+      .filter(Boolean)
+      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+      .join(" ") || email
+  )
+}
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -15,6 +27,30 @@ export const auth = betterAuth({
   // doors into the same account, and only one of them is being watched.
   emailAndPassword: {
     enabled: false,
+  },
+
+  account: {
+    accountLinking: {
+      // VERP already holds user rows from the old password setup, so a VOSS login
+      // arrives at an email that already exists and better-auth refuses to link
+      // it: `account_not_linked`.
+      //
+      // That refusal is the correct DEFAULT. Auto-linking an OAuth identity to an
+      // existing account by email is an account takeover whenever the provider
+      // does not really verify the address — an attacker registers
+      // victim@vit.edu.in at a sloppy provider and inherits the victim's account.
+      //
+      // VOSS does verify: a one-time code to the real mailbox IS the login, and
+      // the @vit.edu.in gate is enforced three times over. That is exactly what
+      // trustedProviders means, and "voss" is the only entry. Adding a provider
+      // that does not verify email here would reopen the takeover.
+      enabled: true,
+      trustedProviders: ["voss"],
+
+      // Never link across differing addresses. The email is the entire basis for
+      // trusting the link; allowing a mismatch would throw that away.
+      allowDifferentEmails: false,
+    },
   },
 
   plugins: [
@@ -34,6 +70,17 @@ export const auth = betterAuth({
 
           // Reject a token whose issuer is not the one discovery advertised.
           requireIssuerValidation: true,
+
+          // `name` is OPTIONAL in OIDC, but VERP stores user.name NOT NULL. When
+          // VOSS sent no name claim the insert failed with `name_is_missing` —
+          // AFTER the OAuth dance had already succeeded, so the user was bounced
+          // back to the login page with no explanation at all.
+          //
+          // A relying party must never assume an identity provider sends an
+          // optional claim. Derive one rather than reject the login.
+          mapProfileToUser: (profile) => ({
+            name: profile.name?.trim() || deriveNameFromEmail(profile.email),
+          }),
         },
       ],
     }),
