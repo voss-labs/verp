@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server"
-import { getSessionUser } from "@/lib/session"
+import { getSessionUser, isStaff } from "@/lib/session"
 import { enrollStudent, unenrollStudent, createAuditLog } from "@/db/queries"
 import { apiSuccess, apiError } from "@/lib/api-response"
 import { getErrorMessage } from "@/lib/error-utils"
@@ -15,7 +15,7 @@ export async function POST(
 ) {
   try {
     const user = await getSessionUser()
-    if (!user || user.role === "student") {
+    if (!isStaff(user)) {
       return apiError("Forbidden", 403)
     }
 
@@ -52,7 +52,7 @@ export async function DELETE(
 ) {
   try {
     const user = await getSessionUser()
-    if (!user || user.role === "student") {
+    if (!isStaff(user)) {
       return apiError("Forbidden", 403)
     }
 

@@ -143,7 +143,10 @@ export async function POST(req: NextRequest) {
       targetYear !== targetOption?.year ||
       targetSemester !== targetOption?.semester
     ) {
-      return apiError("Target year/semester must be the next valid semester", 400)
+      return apiError(
+        "Target year/semester must be the next valid semester",
+        400
+      )
     }
 
     const sourceSemesterNumber = Number.parseInt(sourceSemester, 10)

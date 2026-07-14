@@ -1,18 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldSeparator,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { signIn, signUp } from "@/lib/auth-client"
+import { authClient } from "@/lib/auth-client"
 import {
   GraduationCapIcon,
   ShieldCheckIcon,
@@ -24,46 +15,23 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const router = useRouter()
-  const [isSignUp, setIsSignUp] = useState(false)
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  // No email field, no password field, no sign-up toggle. VERP holds no
+  // credentials any more: VOSS is the only door, and it is what verifies the
+  // address really is @vit.edu.in. Open self-registration used to live here —
+  // anyone on the internet could create an account and land with a role.
+  async function signInWithVoss() {
     setError("")
     setLoading(true)
-
-    try {
-      if (isSignUp) {
-        const { error } = await signUp.email({
-          name,
-          email,
-          password,
-        })
-        if (error) {
-          setError(error.message ?? "Sign up failed")
-          return
-        }
-      } else {
-        const { error } = await signIn.email({
-          email,
-          password,
-        })
-        if (error) {
-          setError(error.message ?? "Invalid credentials")
-          return
-        }
-      }
-      router.push("/dashboard")
-      router.refresh()
-    } catch {
-      setError("Something went wrong")
-    } finally {
+    const { error } = await authClient.signIn.oauth2({
+      providerId: "voss",
+      callbackURL: "/dashboard",
+    })
+    if (error) {
       setLoading(false)
+      setError(error.message ?? "Could not reach VOSS. Try again in a moment.")
     }
   }
 
@@ -147,112 +115,36 @@ export function LoginForm({
             </div>
           </div>
 
-          <form onSubmit={handleSubmit}>
-            <FieldGroup>
-              <div className="mb-2 space-y-1.5">
-                <h2 className="text-2xl font-bold tracking-tight">
-                  {isSignUp ? "Create account" : "Welcome back"}
-                </h2>
-                <p className="text-muted-foreground text-sm">
-                  {isSignUp
-                    ? "Enter your details to get started"
-                    : "Sign in to access the dashboard"}
-                </p>
+          <div>
+            <div className="mb-6 space-y-1.5">
+              <h2 className="text-2xl font-bold tracking-tight">
+                Welcome back
+              </h2>
+              <p className="text-muted-foreground text-sm">
+                Sign in with your VOSS account to access the dashboard
+              </p>
+            </div>
+
+            {error && (
+              <div className="bg-destructive/8 text-destructive mb-4 rounded-lg px-3.5 py-2.5 text-sm font-medium">
+                {error}
               </div>
+            )}
 
-              {error && (
-                <div className="bg-destructive/8 text-destructive rounded-lg px-3.5 py-2.5 text-sm font-medium">
-                  {error}
-                </div>
-              )}
+            <Button
+              onClick={signInWithVoss}
+              disabled={loading}
+              size="lg"
+              className="h-11 w-full"
+            >
+              {loading ? "Redirecting to VOSS…" : "Continue with VOSS"}
+            </Button>
 
-              {isSignUp && (
-                <Field>
-                  <FieldLabel htmlFor="name">Full Name</FieldLabel>
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="John Doe"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                  />
-                </Field>
-              )}
-
-              <Field>
-                <FieldLabel htmlFor="email">Email</FieldLabel>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="admin@college.edu"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </Field>
-
-              <Field>
-                <div className="flex items-center">
-                  <FieldLabel htmlFor="password">Password</FieldLabel>
-                  {!isSignUp && (
-                    <a
-                      href="#"
-                      className="text-blue ml-auto text-xs font-medium underline-offset-2 hover:underline"
-                    >
-                      Forgot password?
-                    </a>
-                  )}
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
-                />
-              </Field>
-
-              <Field>
-                <Button
-                  type="submit"
-                  className="bg-blue text-blue-foreground hover:bg-blue/90 h-10 w-full font-semibold"
-                  disabled={loading}
-                >
-                  {loading
-                    ? "Please wait..."
-                    : isSignUp
-                      ? "Create Account"
-                      : "Sign In"}
-                </Button>
-              </Field>
-
-              <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
-                {isSignUp
-                  ? "Already have an account?"
-                  : "Don't have an account?"}
-              </FieldSeparator>
-
-              <Field>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    setIsSignUp(!isSignUp)
-                    setError("")
-                  }}
-                >
-                  {isSignUp ? "Sign In" : "Create Account"}
-                </Button>
-              </Field>
-
-              <FieldDescription className="text-center text-xs">
-                Contact IT admin for account access
-              </FieldDescription>
-            </FieldGroup>
-          </form>
+            <p className="text-muted-foreground mt-6 text-xs leading-relaxed">
+              One VOSS account works across VERP and vboard. Your college email
+              is verified once, at accounts.vosslabs.org.
+            </p>
+          </div>
         </div>
       </div>
     </div>

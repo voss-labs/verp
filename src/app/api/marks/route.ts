@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server"
-import { getSessionUser } from "@/lib/session"
+import { getSessionUser, isStaff } from "@/lib/session"
 import { bulkUpsertMarks, getMarksLock, createAuditLog } from "@/db/queries"
 import { apiSuccess, apiError } from "@/lib/api-response"
 import { getErrorMessage } from "@/lib/error-utils"
@@ -23,7 +23,7 @@ const marksEntrySchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const user = await getSessionUser()
-    if (!user || user.role === "student") {
+    if (!isStaff(user)) {
       return apiError("Forbidden", 403)
     }
 
