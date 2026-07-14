@@ -14,6 +14,27 @@ export async function getFacultyByAuthUserId(authUserId: string) {
   })
 }
 
+export async function getFacultyByEmail(email: string) {
+  return db.query.faculty.findFirst({
+    where: and(
+      eq(faculty.email, email.toLowerCase()),
+      eq(faculty.isActive, true)
+    ),
+  })
+}
+
+export async function linkFacultyToAuthUser(
+  facultyId: string,
+  authUserId: string
+) {
+  const [row] = await db
+    .update(faculty)
+    .set({ authUserId })
+    .where(eq(faculty.id, facultyId))
+    .returning()
+  return row
+}
+
 export async function getAllFaculty(filters?: { department?: string }) {
   return db.query.faculty.findMany({
     where: and(

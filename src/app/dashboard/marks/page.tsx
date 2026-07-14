@@ -6,7 +6,7 @@ import {
   getCourseOfferingsByFaculty,
   getCurrentSemester,
 } from "@/db/queries"
-import { getSessionUser } from "@/lib/session"
+import { getSessionUser, isStaff } from "@/lib/session"
 
 export const dynamic = "force-dynamic"
 
@@ -14,7 +14,7 @@ export default async function MarksPage() {
   const user = await getSessionUser()
   if (!user) return redirect("/login")
 
-  if (user.role === "student") {
+  if (!isStaff(user)) {
     return redirect("/dashboard/my-marks")
   }
 

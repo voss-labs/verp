@@ -17,6 +17,27 @@ export async function getStudentByAuthUserId(authUserId: string) {
   })
 }
 
+export async function getStudentByEmail(email: string) {
+  return db.query.students.findFirst({
+    where: and(
+      eq(students.email, email.toLowerCase()),
+      eq(students.isActive, true)
+    ),
+  })
+}
+
+export async function linkStudentToAuthUser(
+  studentId: string,
+  authUserId: string
+) {
+  const [row] = await db
+    .update(students)
+    .set({ authUserId })
+    .where(eq(students.id, studentId))
+    .returning()
+  return row
+}
+
 export async function getAllStudents(filters?: {
   department?: string
   year?: string
