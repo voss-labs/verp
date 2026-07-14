@@ -17,12 +17,8 @@ import {
   GraduationCapIcon,
   UsersIcon,
   BookOpenIcon,
-  CalendarIcon,
   ClipboardCheckIcon,
-  IndianRupeeIcon,
-  SettingsIcon,
   LayoutDashboardIcon,
-  ClockIcon,
   FileTextIcon,
   ClipboardListIcon,
   LayersIcon,
@@ -95,24 +91,6 @@ const adminNav = [
     icon: <ScrollTextIcon />,
     items: [{ title: "All Logs", url: "/dashboard/audit" }],
   },
-  {
-    title: "Examinations",
-    url: "#",
-    icon: <CalendarIcon />,
-    items: [
-      { title: "Schedule", url: "#" },
-      { title: "Results", url: "#" },
-    ],
-  },
-  {
-    title: "Settings",
-    url: "#",
-    icon: <SettingsIcon />,
-    items: [
-      { title: "General", url: "#" },
-      { title: "Users & Roles", url: "#" },
-    ],
-  },
 ]
 
 const facultyNav = [
@@ -159,18 +137,7 @@ const studentNav = [
   },
 ]
 
-const quickAccess = [
-  {
-    name: "Fees & Finance",
-    url: "#",
-    icon: <IndianRupeeIcon />,
-  },
-  {
-    name: "Timetable",
-    url: "#",
-    icon: <ClockIcon />,
-  },
-]
+const quickAccess: never[] = []
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession()
