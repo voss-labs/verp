@@ -50,6 +50,27 @@ export const auth = betterAuth({
       // Never link across differing addresses. The email is the entire basis for
       // trusting the link; allowing a mismatch would throw that away.
       allowDifferentEmails: false,
+
+      // trustedProviders alone is NOT enough, and this is the subtle part.
+      // better-auth also refuses when the EXISTING LOCAL account has an
+      // unverified email (link-account.mjs: `requireLocalEmailVerified &&
+      // !dbUser.user.emailVerified`), which defaults to true. Every legacy VERP
+      // row is unverified, because the old password signup verified nothing —
+      // so the link was refused on the local account, however trusted VOSS is.
+      //
+      // The attack that check exists to stop: an attacker pre-creates a local
+      // account for victim@vit.edu.in (VERP's old signup allowed exactly this —
+      // no verification, no domain check), the victim later signs in through a
+      // trusted provider, gets linked INTO the attacker's account, and the
+      // attacker's password still works.
+      //
+      // That attack requires the attacker's password to still work. It cannot:
+      // emailAndPassword is disabled above, so a legacy row confers no access to
+      // anyone. The only way into any account is a VOSS-verified mailbox.
+      //
+      // This is therefore safe ONLY while passwords stay off. Re-enable
+      // emailAndPassword and this becomes an account takeover.
+      requireLocalEmailVerified: false,
     },
   },
 
