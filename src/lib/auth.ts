@@ -5,6 +5,18 @@ import { nextCookies } from "better-auth/next-js"
 import { db } from "@/db"
 import { bindIdentity } from "@/lib/bind"
 
+/** harshal.more@vit.edu.in -> "Harshal More" */
+function deriveNameFromEmail(email: string): string {
+  const local = email?.split("@")[0] ?? ""
+  return (
+    local
+      .split(/[._-]+/)
+      .filter(Boolean)
+      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+      .join(" ") || email
+  )
+}
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -34,6 +46,17 @@ export const auth = betterAuth({
 
           // Reject a token whose issuer is not the one discovery advertised.
           requireIssuerValidation: true,
+
+          // `name` is OPTIONAL in OIDC, but VERP stores user.name NOT NULL. When
+          // VOSS sent no name claim the insert failed with `name_is_missing` —
+          // AFTER the OAuth dance had already succeeded, so the user was bounced
+          // back to the login page with no explanation at all.
+          //
+          // A relying party must never assume an identity provider sends an
+          // optional claim. Derive one rather than reject the login.
+          mapProfileToUser: (profile) => ({
+            name: profile.name?.trim() || deriveNameFromEmail(profile.email),
+          }),
         },
       ],
     }),
