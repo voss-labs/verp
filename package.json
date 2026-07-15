@@ -18,8 +18,7 @@
     "fix": "npm run lint:fix && npm run format",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
-    "db:studio": "drizzle-kit studio",
-    "seed:test": "tsx --env-file=.env.local scripts/seed-test.ts"
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
