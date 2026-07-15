@@ -20,9 +20,7 @@ export function FacultyClient({ data }: { data: FacultyRow[] }) {
       "Last Name",
       "Email",
       "Department",
-      "Designation",
-      "Qualification",
-      "Phone",
+      "Role",
       "Status",
     ]
     const rows = filteredData.map((f) => [
@@ -31,9 +29,7 @@ export function FacultyClient({ data }: { data: FacultyRow[] }) {
       f.lastName,
       f.email,
       f.department,
-      f.designation,
-      f.qualification,
-      f.phoneNo,
+      f.isAdmin ? "Admin" : "Faculty",
       f.isActive ? "Active" : "Inactive",
     ])
 

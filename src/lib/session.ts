@@ -1,6 +1,5 @@
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
-import { getUserRoles } from "@/db/queries/roles"
 import { getFacultyByAuthUserId } from "@/db/queries/faculty"
 import { getStudentByAuthUserId } from "@/db/queries/students"
 
@@ -8,10 +7,11 @@ import { getStudentByAuthUserId } from "@/db/queries/students"
  * `role` is null for an account VOSS authenticated but VERP cannot place: a real
  * VIT student whose TR has not uploaded them yet.
  *
- * It used to default to "student", which meant anyone who could create an account
- * silently received a student's access. Every guard must therefore be an
- * allowlist — "is this person staff" — and never a denylist, because a roleless
- * user is not a student and would sail straight through `role === "student"`.
+ * There is no role table. Role IS the binding: a VOSS identity linked to a
+ * faculty row is faculty (admin if that row is flagged), one linked to a student
+ * row is a student, and one linked to neither is unplaced. This is why every
+ * guard must be an allowlist — "is this person staff" — never a denylist: a
+ * roleless user is not a student and would sail through `role === "student"`.
  */
 export type SessionUser = {
   id: string
@@ -28,25 +28,21 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   if (!session?.user) return null
 
   const userId = session.user.id
-  const roles = await getUserRoles(userId)
-  const roleNames = roles.map((r) => r.roleDefinition.roleName)
 
   let role: SessionUser["role"] = null
-  if (roleNames.includes("admin")) role = "admin"
-  else if (roleNames.includes("faculty")) role = "faculty"
-  else if (roleNames.includes("student")) role = "student"
-
   let facultyId: string | null = null
   let studentId: string | null = null
 
-  if (role === "faculty" || role === "admin") {
-    const fac = await getFacultyByAuthUserId(userId)
-    facultyId = fac?.id ?? null
-  }
-
-  if (role === "student") {
+  const fac = await getFacultyByAuthUserId(userId)
+  if (fac) {
+    role = fac.isAdmin ? "admin" : "faculty"
+    facultyId = fac.id
+  } else {
     const stu = await getStudentByAuthUserId(userId)
-    studentId = stu?.id ?? null
+    if (stu) {
+      role = "student"
+      studentId = stu.id
+    }
   }
 
   return {

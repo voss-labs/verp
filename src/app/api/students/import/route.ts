@@ -20,8 +20,6 @@ const importRowSchema = z.object({
   department: z.string().min(1, "Department is required"),
   division: z.enum(["A", "B", "C"]).optional(),
   year: z.enum(["FE", "SE", "TE", "BE"]),
-  semester: z.string().optional(),
-  phoneNo: z.string().optional(),
 })
 
 const importBodySchema = z.object({
@@ -104,8 +102,6 @@ export async function POST(req: NextRequest) {
           department: r.department,
           division: r.division ?? null,
           year: r.year,
-          semester: r.semester ?? null,
-          phoneNo: r.phoneNo ?? null,
         })
       )
 
