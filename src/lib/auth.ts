@@ -109,17 +109,26 @@ export const auth = betterAuth({
   ],
 
   databaseHooks: {
-    user: {
+    session: {
       create: {
-        after: async (user) => {
-          // The session cookie is already being issued by now, so a throw here
-          // must not take the login down — it has to land the user somewhere
-          // that explains itself. getSessionUser() treats an unbound account as
-          // roleless and the dashboard sends them to /unclaimed.
+        after: async (session) => {
+          // Bind on every sign-in, not just account creation. This links a
+          // first-time user whose roster row already exists, AND re-links a user
+          // who signed in BEFORE their TR added them — the promise the pending
+          // screen makes ("sign in again and you'll be linked"). bindIdentity is
+          // idempotent: once the row carries this authUserId it is a no-op.
+          //
+          // A throw here must never take the login down — the session cookie is
+          // already issued. An unbound account is roleless and lands on the
+          // pending screen, which is a correct, self-explaining outcome.
           try {
-            await bindIdentity(user.id, user.email)
+            const u = await db.query.user.findFirst({
+              where: (user, { eq }) => eq(user.id, session.userId),
+              columns: { id: true, email: true },
+            })
+            if (u) await bindIdentity(u.id, u.email)
           } catch (error) {
-            console.error("[bind] failed for", user.email, error)
+            console.error("[bind] failed for session", session.userId, error)
           }
         },
       },

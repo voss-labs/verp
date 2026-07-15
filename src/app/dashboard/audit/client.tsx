@@ -32,7 +32,7 @@ type AuditLogEntry = {
   createdAt: string
 }
 
-// Neutral outline badges by default; orange accent reserved for notable actions
+// Neutral outline badges by default; blue accent reserved for notable actions
 // (locking marks), destructive for removals. No rainbow.
 const ACTION_STYLES: Record<string, string> = {
   "marks.lock": "text-blue border-blue/20 bg-blue/8",

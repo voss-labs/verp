@@ -35,7 +35,7 @@ export function LoginForm({
     <div className={cn("flex min-h-svh", className)} {...props}>
       {/* Left: Branding Panel */}
       <div className="bg-primary text-primary-foreground relative hidden w-[52%] overflow-hidden lg:block">
-        {/* Thin orange accent along the leading edge */}
+        {/* Thin blue accent along the leading edge */}
         <div className="bg-blue absolute inset-y-0 left-0 w-1" />
         {/* Subtle depth gradient — flat ink, no loud multi-color wash */}
         <div className="from-primary absolute inset-0 bg-gradient-to-t via-transparent to-black/20" />

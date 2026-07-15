@@ -103,8 +103,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     avatar: session?.user?.image ?? "",
   }
 
-  let navItems = adminNav
-  if (role === "faculty") navItems = facultyNav
+  // Empty for an unbound (pending) user — they see the shell, not a menu they
+  // cannot use. Never default to adminNav: role null is not an admin.
+  let navItems: typeof adminNav = []
+  if (role === "admin") navItems = adminNav
+  else if (role === "faculty") navItems = facultyNav
   else if (role === "student") navItems = studentNav
 
   return (
