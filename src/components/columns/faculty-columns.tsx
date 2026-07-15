@@ -10,10 +10,7 @@ export type FacultyRow = {
   employeeId: string
   email: string
   department: string
-  designation: string | null
-  phoneNo: string | null
-  qualification: string | null
-  specialization: string | null
+  isAdmin: boolean
   isActive: boolean
 }
 
@@ -39,19 +36,13 @@ export const facultyColumns: ColumnDef<FacultyRow>[] = [
     ),
   },
   {
-    accessorKey: "designation",
-    header: "Designation",
-    cell: ({ row }) => row.getValue("designation") ?? "-",
-  },
-  {
-    accessorKey: "qualification",
-    header: "Qualification",
-    cell: ({ row }) => row.getValue("qualification") ?? "-",
-  },
-  {
-    accessorKey: "phoneNo",
-    header: "Phone",
-    cell: ({ row }) => row.getValue("phoneNo") ?? "-",
+    accessorKey: "isAdmin",
+    header: "Role",
+    cell: ({ row }) => (
+      <Badge variant={row.getValue("isAdmin") ? "default" : "outline"}>
+        {row.getValue("isAdmin") ? "Admin" : "Faculty"}
+      </Badge>
+    ),
   },
   {
     accessorKey: "isActive",

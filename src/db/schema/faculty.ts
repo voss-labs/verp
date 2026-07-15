@@ -8,6 +8,10 @@ import {
 } from "drizzle-orm/pg-core"
 import { user } from "./auth"
 
+// Staff roster. Same claim model as students: linked to a VOSS identity on first
+// sign-in by verified email. `isAdmin` is the whole role model — a bound faculty
+// row means "faculty", isAdmin means "admin". There is no separate role table;
+// role is derived from the binding (see lib/session.ts).
 export const faculty = pgTable(
   "faculty",
   {
@@ -16,15 +20,11 @@ export const faculty = pgTable(
       .unique()
       .references(() => user.id, { onDelete: "set null" }),
     firstName: text("first_name").notNull(),
-    lastName: text("last_name").notNull(),
+    lastName: text("last_name").notNull().default(""),
     employeeId: text("employee_id").notNull().unique(),
     email: text("email").notNull().unique(),
     department: text("department").notNull(),
-    designation: text("designation"),
-    phoneNo: text("phone_no"),
-    qualification: text("qualification"),
-    specialization: text("specialization"),
-    profilePic: text("profile_pic"),
+    isAdmin: boolean("is_admin").notNull().default(false),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
