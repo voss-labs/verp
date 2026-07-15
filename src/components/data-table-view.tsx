@@ -4,6 +4,7 @@ import * as React from "react"
 import {
   ColumnDef,
   ColumnFiltersState,
+  RowSelectionState,
   SortingState,
   flexRender,
   getCoreRowModel,
@@ -12,6 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Table,
   TableBody,
@@ -40,6 +42,11 @@ interface DataTableViewProps<TData, TValue> {
     filename: string
     onExport: (data: TData[], format: "csv" | "xlsx") => Promise<void>
   }
+  // Opt-in row selection: rowId maps a row to a stable id, bulkBar renders the
+  // action toolbar for the current selection. Passing bulkBar turns on the
+  // checkbox column.
+  rowId?: (row: TData) => string
+  bulkBar?: (ids: string[], clear: () => void) => React.ReactNode
 }
 
 export function DataTableView<TData, TValue>({
@@ -49,13 +56,41 @@ export function DataTableView<TData, TValue>({
   searchPlaceholder = "Search...",
   globalSearch,
   exportConfig,
+  rowId,
+  bulkBar,
 }: DataTableViewProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   )
   const [globalFilter, setGlobalFilter] = React.useState("")
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({})
   const [isExporting, setIsExporting] = React.useState(false)
+
+  const selectable = Boolean(bulkBar)
+  const allColumns = React.useMemo<ColumnDef<TData, TValue>[]>(() => {
+    if (!selectable) return columns
+    const selectCol: ColumnDef<TData, TValue> = {
+      id: "__select",
+      enableSorting: false,
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          indeterminate={table.getIsSomePageRowsSelected()}
+          onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(v) => row.toggleSelected(!!v)}
+          aria-label="Select row"
+        />
+      ),
+    }
+    return [selectCol, ...columns]
+  }, [columns, selectable])
 
   const handleExport = async (format: "csv" | "xlsx") => {
     if (!exportConfig) return
@@ -70,19 +105,23 @@ export function DataTableView<TData, TValue>({
 
   const table = useReactTable({
     data,
-    columns,
+    columns: allColumns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    enableRowSelection: selectable,
+    getRowId: rowId,
+    onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
     globalFilterFn: "includesString",
-    state: { sorting, columnFilters, globalFilter },
+    state: { sorting, columnFilters, globalFilter, rowSelection },
   })
 
   const showSearch = Boolean(globalSearch || searchKey)
+  const selectedIds = table.getSelectedRowModel().rows.map((r) => r.id)
 
   return (
     <div className="space-y-4">
@@ -136,6 +175,16 @@ export function DataTableView<TData, TValue>({
           </DropdownMenu>
         )}
       </div>
+      {selectable && selectedIds.length > 0 && (
+        <div className="border-blue/30 bg-blue/5 flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
+          <span className="text-sm font-medium">
+            {selectedIds.length} selected
+          </span>
+          <div className="flex items-center gap-2">
+            {bulkBar?.(selectedIds, () => setRowSelection({}))}
+          </div>
+        </div>
+      )}
       <div className="bg-card rounded-lg border">
         <Table>
           <TableHeader>

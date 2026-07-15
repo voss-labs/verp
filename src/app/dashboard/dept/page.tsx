@@ -51,6 +51,7 @@ export default async function DeptPage() {
             id: f.id,
             name: `${f.firstName} ${f.lastName}`.trim(),
             department: f.department,
+            role: f.role,
           }))}
         />
       </div>
