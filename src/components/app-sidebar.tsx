@@ -18,6 +18,7 @@ import {
   ScrollTextIcon,
   ShieldIcon,
   Building2Icon,
+  UploadIcon,
 } from "lucide-react"
 import { useSession } from "@/lib/auth-client"
 import { useUserRole } from "@/hooks/use-user-role"
@@ -51,10 +52,13 @@ const adminNav = [
     title: "Students",
     url: "/dashboard/students",
     icon: <UsersIcon />,
-    items: [
-      { title: "All Students", url: "/dashboard/students" },
-      { title: "Import Roster", url: "/dashboard/students/import" },
-    ],
+    items: [{ title: "All Students", url: "/dashboard/students" }],
+  },
+  {
+    title: "Import",
+    url: "/dashboard/students/import",
+    icon: <UploadIcon />,
+    items: [{ title: "Import roster", url: "/dashboard/students/import" }],
   },
   {
     title: "Faculty",
@@ -100,10 +104,13 @@ const superAdminNav = [
     title: "Students",
     url: "/dashboard/students",
     icon: <UsersIcon />,
-    items: [
-      { title: "All Students", url: "/dashboard/students" },
-      { title: "Import Roster", url: "/dashboard/students/import" },
-    ],
+    items: [{ title: "All Students", url: "/dashboard/students" }],
+  },
+  {
+    title: "Import",
+    url: "/dashboard/students/import",
+    icon: <UploadIcon />,
+    items: [{ title: "Import roster", url: "/dashboard/students/import" }],
   },
   {
     title: "Faculty",
@@ -138,10 +145,13 @@ const facultyNav = [
     title: "Students",
     url: "/dashboard/students",
     icon: <UsersIcon />,
-    items: [
-      { title: "All Students", url: "/dashboard/students" },
-      { title: "Import Roster", url: "/dashboard/students/import" },
-    ],
+    items: [{ title: "All Students", url: "/dashboard/students" }],
+  },
+  {
+    title: "Import",
+    url: "/dashboard/students/import",
+    icon: <UploadIcon />,
+    items: [{ title: "Import roster", url: "/dashboard/students/import" }],
   },
 ]
 

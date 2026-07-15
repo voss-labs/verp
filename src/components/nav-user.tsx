@@ -23,7 +23,10 @@ import {
   BellIcon,
   ExternalLinkIcon,
   LogOutIcon,
+  SunIcon,
+  MoonIcon,
 } from "lucide-react"
+import { useTheme } from "next-themes"
 import { signOut } from "@/lib/auth-client"
 
 export function NavUser({
@@ -37,6 +40,7 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar()
   const router = useRouter()
+  const { resolvedTheme, setTheme } = useTheme()
 
   const initials = user.name
     .split(" ")
@@ -115,8 +119,17 @@ export function NavUser({
                 }
               >
                 <BadgeCheckIcon />
-                Manage your VOSS account
+                VOSS account
                 <ExternalLinkIcon className="ml-auto size-3.5 opacity-50" />
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.preventDefault()
+                  setTheme(resolvedTheme === "dark" ? "light" : "dark")
+                }}
+              >
+                {resolvedTheme === "dark" ? <SunIcon /> : <MoonIcon />}
+                {resolvedTheme === "dark" ? "Light mode" : "Dark mode"}
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <BellIcon />
