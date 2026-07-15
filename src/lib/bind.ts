@@ -1,5 +1,6 @@
 import { getFacultyByEmail, linkFacultyToAuthUser } from "@/db/queries/faculty"
 import { getStudentByEmail, linkStudentToAuthUser } from "@/db/queries/students"
+import { assignRole } from "@/db/queries/roles"
 import { createAuditLog } from "@/db/queries/audit"
 
 /**
@@ -33,6 +34,7 @@ export async function bindIdentity(authUserId: string, email: string) {
     }
     if (!faculty.authUserId) {
       await linkFacultyToAuthUser(faculty.id, authUserId)
+      await assignRole(authUserId, "faculty")
       await createAuditLog({
         action: "identity.bound",
         actorId: authUserId,
@@ -53,6 +55,7 @@ export async function bindIdentity(authUserId: string, email: string) {
     }
     if (!student.authUserId) {
       await linkStudentToAuthUser(student.id, authUserId)
+      await assignRole(authUserId, "student")
       await createAuditLog({
         action: "identity.bound",
         actorId: authUserId,

@@ -13,7 +13,9 @@ export type StudentRow = {
   department: string
   division: string | null
   year: string
-  authUserId: string | null
+  semester: string | null
+  phoneNo: string | null
+  gender: string | null
   isActive: boolean
 }
 
@@ -51,13 +53,28 @@ export const studentsColumns: ColumnDef<StudentRow>[] = [
     header: "Year",
   },
   {
-    accessorKey: "authUserId",
-    header: "Claimed",
-    cell: ({ row }) => (
-      <Badge variant={row.getValue("authUserId") ? "default" : "secondary"}>
-        {row.getValue("authUserId") ? "Claimed" : "Pending"}
-      </Badge>
-    ),
+    accessorKey: "semester",
+    header: "Semester",
+    cell: ({ row }) =>
+      row.getValue("semester") ?? (
+        <span className="text-muted-foreground">-</span>
+      ),
+  },
+  {
+    accessorKey: "phoneNo",
+    header: "Phone",
+    cell: ({ row }) =>
+      row.getValue("phoneNo") ?? (
+        <span className="text-muted-foreground">-</span>
+      ),
+  },
+  {
+    accessorKey: "gender",
+    header: "Gender",
+    cell: ({ row }) =>
+      row.getValue("gender") ?? (
+        <span className="text-muted-foreground">-</span>
+      ),
   },
   {
     accessorKey: "isActive",

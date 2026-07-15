@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { SearchIcon, DownloadIcon, Loader2Icon } from "lucide-react"
-import { buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,

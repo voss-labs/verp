@@ -156,6 +156,8 @@ export function ImportClient() {
             department: r.department,
             division: r.division || undefined,
             year: r.year,
+            semester: r.semester || undefined,
+            phoneNo: r.phoneNo || undefined,
           })),
         }),
       })

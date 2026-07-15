@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { NavMain } from "@/components/nav-main"
+import { NavProjects } from "@/components/nav-projects"
 import { NavUser } from "@/components/nav-user"
 import { TeamSwitcher } from "@/components/team-switcher"
 import {
@@ -15,7 +16,15 @@ import {
 import {
   UsersIcon,
   BookOpenIcon,
+  CalendarIcon,
+  ClipboardCheckIcon,
+  IndianRupeeIcon,
+  SettingsIcon,
   LayoutDashboardIcon,
+  ClockIcon,
+  FileTextIcon,
+  ClipboardListIcon,
+  LayersIcon,
   ScrollTextIcon,
 } from "lucide-react"
 import { useSession } from "@/lib/auth-client"
@@ -30,8 +39,6 @@ const teams = [
   },
 ]
 
-// MVP surface only: roster and identity. Marks / attendance / courses come back
-// with the features that own them, each adding its own nav.
 const adminNav = [
   {
     title: "Dashboard",
@@ -46,7 +53,7 @@ const adminNav = [
     icon: <UsersIcon />,
     items: [
       { title: "All Students", url: "/dashboard/students" },
-      { title: "Import Roster", url: "/dashboard/students/import" },
+      { title: "Promote Students", url: "/dashboard/admin/promote" },
     ],
   },
   {
@@ -56,14 +63,58 @@ const adminNav = [
     items: [{ title: "All Faculty", url: "/dashboard/faculty" }],
   },
   {
+    title: "Courses",
+    url: "/dashboard/courses",
+    icon: <FileTextIcon />,
+    items: [{ title: "All Courses", url: "/dashboard/courses" }],
+  },
+  {
+    title: "Offerings",
+    url: "/dashboard/offerings",
+    icon: <LayersIcon />,
+    items: [{ title: "Current Semester", url: "/dashboard/offerings" }],
+  },
+  {
+    title: "Marks",
+    url: "/dashboard/marks",
+    icon: <ClipboardListIcon />,
+    items: [
+      { title: "Enter Marks", url: "/dashboard/marks" },
+      { title: "CGPA Calculator", url: "/dashboard/sgpi" },
+    ],
+  },
+  {
+    title: "Attendance",
+    url: "/dashboard/attendance",
+    icon: <ClipboardCheckIcon />,
+    items: [{ title: "Records", url: "/dashboard/attendance" }],
+  },
+  {
     title: "Activity Log",
     url: "/dashboard/audit",
     icon: <ScrollTextIcon />,
     items: [{ title: "All Logs", url: "/dashboard/audit" }],
   },
+  {
+    title: "Examinations",
+    url: "#",
+    icon: <CalendarIcon />,
+    items: [
+      { title: "Schedule", url: "#" },
+      { title: "Results", url: "#" },
+    ],
+  },
+  {
+    title: "Settings",
+    url: "#",
+    icon: <SettingsIcon />,
+    items: [
+      { title: "General", url: "#" },
+      { title: "Users & Roles", url: "#" },
+    ],
+  },
 ]
 
-// TRs upload their division's roster; that is the faculty MVP.
 const facultyNav = [
   {
     title: "Dashboard",
@@ -73,13 +124,16 @@ const facultyNav = [
     items: [{ title: "Overview", url: "/dashboard" }],
   },
   {
-    title: "Students",
-    url: "/dashboard/students",
-    icon: <UsersIcon />,
-    items: [
-      { title: "All Students", url: "/dashboard/students" },
-      { title: "Import Roster", url: "/dashboard/students/import" },
-    ],
+    title: "My Courses",
+    url: "/dashboard/marks",
+    icon: <ClipboardListIcon />,
+    items: [{ title: "Enter Marks", url: "/dashboard/marks" }],
+  },
+  {
+    title: "Attendance",
+    url: "/dashboard/attendance",
+    icon: <ClipboardCheckIcon />,
+    items: [{ title: "Records", url: "/dashboard/attendance" }],
   },
 ]
 
@@ -90,6 +144,31 @@ const studentNav = [
     icon: <LayoutDashboardIcon />,
     isActive: true,
     items: [{ title: "Overview", url: "/dashboard" }],
+  },
+  {
+    title: "My Marks",
+    url: "/dashboard/my-marks",
+    icon: <ClipboardListIcon />,
+    items: [{ title: "View Marks", url: "/dashboard/my-marks" }],
+  },
+  {
+    title: "Attendance",
+    url: "/dashboard/attendance",
+    icon: <ClipboardCheckIcon />,
+    items: [{ title: "Records", url: "/dashboard/attendance" }],
+  },
+]
+
+const quickAccess = [
+  {
+    name: "Fees & Finance",
+    url: "#",
+    icon: <IndianRupeeIcon />,
+  },
+  {
+    name: "Timetable",
+    url: "#",
+    icon: <ClockIcon />,
   },
 ]
 
@@ -114,6 +193,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navItems} />
+        <NavProjects projects={quickAccess} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />

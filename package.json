@@ -16,6 +16,10 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "check": "npm run typecheck && npm run lint && npm run format:check",
     "fix": "npm run lint:fix && npm run format",
+    "setup": "tsx scripts/setup.ts",
+    "db:setup": "tsx src/db/setup.ts",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:migrate:status": "tsx src/db/migrate-status.ts",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio"

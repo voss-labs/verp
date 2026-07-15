@@ -1,5 +1,7 @@
 "use client"
 
+import * as React from "react"
+import { useRouter } from "next/navigation"
 import { DataTableView } from "@/components/data-table-view"
 import {
   studentsColumns,
@@ -8,10 +10,14 @@ import {
 import { exportTableCsv, exportTableXlsx } from "@/lib/xlsx-export"
 import { downloadBase64File } from "@/lib/utils"
 import Link from "next/link"
-import { buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { UploadIcon } from "lucide-react"
 
+/** Shape of one student row parsed from the uploaded file */
 export function StudentsClient({ data }: { data: StudentRow[] }) {
+  const router = useRouter()
+
+  // ── Existing export logic (unchanged) ─────────────────────────────────
   const handleExport = async (
     filteredData: StudentRow[],
     format: "csv" | "xlsx"
@@ -23,17 +29,21 @@ export function StudentsClient({ data }: { data: StudentRow[] }) {
       "Department",
       "Division",
       "Year",
-      "Claimed",
+      "Semester",
+      "Phone",
+      "Gender",
       "Status",
     ]
     const exportRows = filteredData.map((s) => [
       s.rollNumber,
-      `${s.firstName} ${s.lastName}`.trim(),
-      s.email ?? "-",
+      `${s.firstName} ${s.lastName}`,
+      s.email,
       s.department,
       s.division ?? "-",
       s.year,
-      s.authUserId ? "Yes" : "No",
+      s.semester ?? "-",
+      s.phoneNo ?? "-",
+      s.gender ?? "-",
       s.isActive ? "Active" : "Inactive",
     ])
     const dateStr = new Date().toISOString().split("T")[0]
@@ -54,6 +64,18 @@ export function StudentsClient({ data }: { data: StudentRow[] }) {
       downloadBase64File(base64, filename, "text/csv")
     }
   }
+
+  const PREVIEW_COLS = [
+    "#",
+    "Roll No.",
+    "First",
+    "Last",
+    "Email",
+    "Dept",
+    "Div",
+    "Year",
+    "Sem",
+  ]
 
   return (
     <>

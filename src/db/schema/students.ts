@@ -8,29 +8,29 @@ import {
 } from "drizzle-orm/pg-core"
 import { user } from "./auth"
 
-// The roll-number-keyed roster. This is the portable core another VOSS product
-// can lift: a person is identified by their VIT roll number, linked to a VOSS
-// identity (authUserId) the first time they sign in and claim it. Everything a
-// product computes itself — marks, attendance — lives elsewhere, keyed to this.
 export const students = pgTable(
   "students",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    // Set at claim time, when a verified VOSS login is bound to this roll number.
-    // Null until then: a real student the TR has imported but who hasn't signed in.
     authUserId: text("auth_user_id")
       .unique()
       .references(() => user.id, { onDelete: "set null" }),
     firstName: text("first_name").notNull(),
-    lastName: text("last_name").notNull().default(""),
-    // The lookup key. Encodes admission year, branch and division (see roll-number.ts).
+    lastName: text("last_name").notNull(),
     rollNumber: text("roll_number").notNull().unique(),
-    // Nullable: attendance rosters carry no email. It arrives at claim time from
-    // the student's verified @vit.edu.in VOSS login.
     email: text("email").unique(),
     department: text("department").notNull(),
     division: text("division"),
     year: text("year").notNull(),
+    semester: text("semester"),
+    phoneNo: text("phone_no"),
+    dateOfBirth: timestamp("date_of_birth", { withTimezone: true }),
+    gender: text("gender"),
+    address: text("address"),
+    guardianName: text("guardian_name"),
+    guardianPhone: text("guardian_phone"),
+    profilePic: text("profile_pic"),
+    graduatedAt: timestamp("graduated_at", { withTimezone: true }),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
