@@ -164,16 +164,12 @@ export function flagRow(input: RosterFields, now: Date): PreviewRow {
   if (row.rollNumber) {
     try {
       const parsed = parseRollNumber(row.rollNumber)
-      // Only fill/cross-check department when the roll's branch code is known.
-      // Unknown code -> parsed.department is null, and the TR fills it manually.
-      if (parsed.department) {
-        if (!row.department) row.department = parsed.department
-        else if (row.department.toUpperCase() !== parsed.department)
-          flags.push({
-            field: "department",
-            message: `Roll says ${parsed.department}`,
-          })
-      }
+      if (!row.department) row.department = parsed.department
+      else if (row.department.toUpperCase() !== parsed.department)
+        flags.push({
+          field: "department",
+          message: `Roll says ${parsed.department}`,
+        })
 
       if (!row.division) row.division = parsed.division
       else if (row.division !== parsed.division)
