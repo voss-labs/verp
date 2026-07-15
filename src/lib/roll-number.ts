@@ -15,6 +15,7 @@ export const BRANCH_CODES: Record<string, string> = {
   "104": "EXTC",
   "105": "BIOMED",
   "108": "EXCS",
+  "103": "EXCS", // legacy EXCS code, old-curriculum batches (pre-108)
 }
 
 // Divisions per branch. Only IT and CMPN run a third (C) division; every other
@@ -25,6 +26,7 @@ const DIVISIONS_BY_BRANCH: Record<string, readonly string[]> = {
   "104": ["A", "B"], // EXTC
   "105": ["A", "B"], // BIOMED
   "108": ["A", "B"], // EXCS
+  "103": ["A", "B"], // legacy EXCS
 }
 
 export const ALL_DIVISIONS = ["A", "B", "C"] as const
@@ -37,9 +39,10 @@ export type Year = (typeof YEAR_BY_LEVEL)[number]
 export type ParsedRoll = {
   admissionYear: number
   branchCode: string
-  department: string
+  department: string | null
   division: Division
   classNumber: number
+  isDSY: boolean
 }
 
 const ROLL_RE = /^(\d{2})(\d{3})([A-C])(\d{4})$/
@@ -58,13 +61,16 @@ export function parseRollNumber(raw: string): ParsedRoll {
   }
   const [, yy, branchCode, division, num] = m
 
-  const department = BRANCH_CODES[branchCode]
-  if (!department) {
-    throw new Error(`Unknown branch code "${branchCode}" in ${roll}`)
-  }
+  // Unknown branch code is not an error: VERP may be used college-wide and this
+  // map only covers the CS-family departments. Structurally-valid but unknown ->
+  // department null, and the TR fills it in the preview. Only malformed rolls
+  // (wrong shape) are rejected above.
+  const department = BRANCH_CODES[branchCode] ?? null
 
+  // Division rules only apply to branches we know. For an unknown branch, any
+  // A-C is accepted rather than guessed at.
   const allowed = DIVISIONS_BY_BRANCH[branchCode]
-  if (!allowed.includes(division)) {
+  if (allowed && !allowed.includes(division)) {
     throw new Error(`${department} has no division ${division} (${roll})`)
   }
 
@@ -74,6 +80,8 @@ export function parseRollNumber(raw: string): ParsedRoll {
     department,
     division: division as Division,
     classNumber: Number(num),
+    // Direct-Second-Year (diploma entry): class numbers in the 2000+ range.
+    isDSY: Number(num) >= 2000,
   }
 }
 
