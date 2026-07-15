@@ -5,11 +5,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { authClient } from "@/lib/auth-client"
 import { VossWordmark } from "@/components/voss-logo"
-import {
-  ShieldCheckIcon,
-  BarChart3Icon,
-  UsersIcon,
-} from "lucide-react"
+import { ShieldCheckIcon, BarChart3Icon, UsersIcon } from "lucide-react"
 
 export function LoginForm({
   className,
