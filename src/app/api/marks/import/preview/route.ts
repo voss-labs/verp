@@ -41,7 +41,10 @@ function guessHeaders(lines: string[][], columnCount: number): string[] {
   const cols = header
     .map((c) => c.trim())
     .filter((c) => c && !/^(sr|s)\.?\s*no|roll|name|student/i.test(c))
-  return Array.from({ length: columnCount }, (_, i) => cols[cols.length - columnCount + i] ?? "")
+  return Array.from(
+    { length: columnCount },
+    (_, i) => cols[cols.length - columnCount + i] ?? ""
+  )
 }
 
 export async function POST(req: NextRequest) {
@@ -66,14 +69,17 @@ export async function POST(req: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer())
     const isPdf =
-      file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf")
 
     let lines: string[][]
     if (isPdf) {
       lines = await pdfToLines(buffer)
     } else {
       const wb = new ExcelJS.Workbook()
-      await wb.xlsx.load(buffer as unknown as Parameters<typeof wb.xlsx.load>[0])
+      await wb.xlsx.load(
+        buffer as unknown as Parameters<typeof wb.xlsx.load>[0]
+      )
       if (wb.worksheets.length === 0)
         return apiError("The file has no sheets", 400)
       lines = wb.worksheets.flatMap((w) => xlsxToLines(w))

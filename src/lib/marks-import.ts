@@ -7,13 +7,7 @@ import { looksLikeRoll } from "@/lib/roll-number"
 // map onto them. "mse_avg" writes the same value to mse1 and mse2 so the stored
 // average round-trips — real marksheets hand us the average already, not the two
 // halves. "skip" drops the column.
-export type MarkTarget =
-  | "isa"
-  | "mse_avg"
-  | "mse1"
-  | "mse2"
-  | "ese"
-  | "skip"
+export type MarkTarget = "isa" | "mse_avg" | "mse1" | "mse2" | "ese" | "skip"
 
 export type ExtractedRow = {
   rollNumber: string
