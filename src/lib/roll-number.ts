@@ -85,6 +85,16 @@ export function parseRollNumber(raw: string): ParsedRoll {
   }
 }
 
+// Loose structural test: 2+3 digits, a division letter, 4 digits. Unlike
+// parseRollNumber it does not check branch/division rules, so a structurally
+// well-formed roll with a wrong division still "looks like" a roll — it is kept
+// in the import and flagged, not silently dropped as junk. Used to tell a real
+// student row from a separator/label ("Batch 1", a title) during import.
+const LOOSE_ROLL_RE = /^\d{5}[A-Z]\d{4}$/
+export function looksLikeRoll(raw: string): boolean {
+  return LOOSE_ROLL_RE.test(raw.replace(/\s/g, "").toUpperCase())
+}
+
 /** True if the roll number parses cleanly. */
 export function isValidRollNumber(raw: string): boolean {
   try {
