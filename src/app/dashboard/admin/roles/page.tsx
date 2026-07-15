@@ -1,8 +1,11 @@
 import { PageHeader } from "@/components/page-header"
+import { listRoleOverrides } from "@/db/queries/permissions"
+import { RolesClient } from "./client"
 
 export const dynamic = "force-dynamic"
 
-export default function AdminRolesPage() {
+export default async function AdminRolesPage() {
+  const overrides = await listRoleOverrides()
   return (
     <>
       <PageHeader
@@ -10,11 +13,14 @@ export default function AdminRolesPage() {
         parent="Administration"
         parentHref="/dashboard/admin"
       />
-      <div className="p-4 lg:p-6">
-        <p className="text-muted-foreground text-sm">
-          The capability toggle matrix over the fixed tier defaults — building
-          this next.
-        </p>
+      <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
+        <RolesClient
+          overrides={overrides.map((o) => ({
+            tier: o.tier,
+            capability: o.capability,
+            effect: o.effect,
+          }))}
+        />
       </div>
     </>
   )

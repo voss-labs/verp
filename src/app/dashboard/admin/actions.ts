@@ -2,9 +2,15 @@
 
 import { revalidatePath } from "next/cache"
 import { getSessionUser } from "@/lib/session"
-import { authorize } from "@/lib/rbac"
+import {
+  authorize,
+  ROLE_DEFAULTS,
+  type Capability,
+  type Tier,
+} from "@/lib/rbac"
 import { getErrorMessage } from "@/lib/error-utils"
 import { createAuditLog } from "@/db/queries"
+import { setRoleOverride } from "@/db/queries/permissions"
 import {
   createDepartment,
   setDepartmentActive,
@@ -187,5 +193,42 @@ export async function appointAction(input: {
     return { error: null }
   } catch (err) {
     return { error: getErrorMessage(err, "Could not appoint") }
+  }
+}
+
+// ── Roles & permissions ─────────────────────────────────────────────────
+
+type ToggleTier = Exclude<Tier, "super_admin">
+
+export async function setRoleCapabilityAction(input: {
+  tier: ToggleTier
+  capability: Capability
+  enabled: boolean
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "permission:manage")
+
+    // Store an override only when the wish diverges from the code default;
+    // matching the default clears any override (back to baseline).
+    const isDefault = ROLE_DEFAULTS[input.tier].includes(input.capability)
+    const effect =
+      input.enabled === isDefault ? null : input.enabled ? "grant" : "deny"
+
+    await setRoleOverride(input.tier, input.capability, effect, user!.id)
+    await createAuditLog({
+      action: "permission.override_set",
+      actorId: user!.id,
+      targetType: "role",
+      targetId: input.tier,
+      details: {
+        capability: input.capability,
+        effect: effect ?? "default",
+      },
+    })
+    revalidatePath("/dashboard/admin/roles")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not update permission") }
   }
 }
