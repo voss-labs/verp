@@ -17,6 +17,7 @@ import {
   BookOpenIcon,
   LayoutDashboardIcon,
   ScrollTextIcon,
+  ShieldIcon,
 } from "lucide-react"
 import { useSession } from "@/lib/auth-client"
 import { useUserRole } from "@/hooks/use-user-role"
@@ -39,6 +40,49 @@ const adminNav = [
     icon: <LayoutDashboardIcon />,
     isActive: true,
     items: [{ title: "Overview", url: "/dashboard" }],
+  },
+  {
+    title: "Students",
+    url: "/dashboard/students",
+    icon: <UsersIcon />,
+    items: [
+      { title: "All Students", url: "/dashboard/students" },
+      { title: "Import Roster", url: "/dashboard/students/import" },
+    ],
+  },
+  {
+    title: "Faculty",
+    url: "/dashboard/faculty",
+    icon: <BookOpenIcon />,
+    items: [{ title: "All Faculty", url: "/dashboard/faculty" }],
+  },
+  {
+    title: "Activity Log",
+    url: "/dashboard/audit",
+    icon: <ScrollTextIcon />,
+    items: [{ title: "All Logs", url: "/dashboard/audit" }],
+  },
+]
+
+// Super-admin also gets the console — the door to every CRUD.
+const superAdminNav = [
+  {
+    title: "Dashboard",
+    url: "/dashboard",
+    icon: <LayoutDashboardIcon />,
+    isActive: true,
+    items: [{ title: "Overview", url: "/dashboard" }],
+  },
+  {
+    title: "Administration",
+    url: "/dashboard/admin",
+    icon: <ShieldIcon />,
+    items: [
+      { title: "Console", url: "/dashboard/admin" },
+      { title: "Departments", url: "/dashboard/admin/departments" },
+      { title: "Faculty", url: "/dashboard/admin/faculty" },
+      { title: "Roles & permissions", url: "/dashboard/admin/roles" },
+    ],
   },
   {
     title: "Students",
@@ -107,7 +151,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // cannot use. Never default to adminNav: tier null is not an admin. (HOD shares
   // the admin nav for now; a dedicated dept nav arrives with the HOD dashboard.)
   let navItems: typeof adminNav = []
-  if (tier === "super_admin" || tier === "hod") navItems = adminNav
+  if (tier === "super_admin") navItems = superAdminNav
+  else if (tier === "hod") navItems = adminNav
   else if (tier === "faculty") navItems = facultyNav
   else if (tier === "student") navItems = studentNav
 
