@@ -3,11 +3,7 @@
 import { useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import {
-  UploadCloudIcon,
-  FileSpreadsheetIcon,
-  CheckCircle2Icon,
-} from "lucide-react"
+import { UploadCloudIcon, FileSpreadsheetIcon, CheckCircle2Icon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -139,11 +135,7 @@ export function ImportClient() {
           const next = [...prev]
           for (const e of errors) {
             const i = e.row - 1
-            if (next[i])
-              next[i] = {
-                ...next[i],
-                flags: [{ field: "rollNumber", message: e.message }],
-              }
+            if (next[i]) next[i] = { ...next[i], flags: [{ field: "rollNumber", message: e.message }] }
           }
           return next
         })
@@ -246,7 +238,7 @@ export function ImportClient() {
       <p className="text-muted-foreground text-xs leading-relaxed">
         Red cells disagree with the roll number (which encodes branch and
         division) or are missing. Edit any cell to fix it — the flag clears when
-        it is resolved.
+        it's resolved.
       </p>
 
       <div className="border-border max-h-[65vh] overflow-auto rounded-lg border">
@@ -279,7 +271,7 @@ export function ImportClient() {
                           onChange={(e) => editCell(i, c.key, e.target.value)}
                           title={flag?.message}
                           className={cn(
-                            "focus-visible:border-input h-8 border-transparent bg-transparent px-2 text-xs shadow-none",
+                            "h-8 border-transparent bg-transparent px-2 text-xs shadow-none focus-visible:border-input",
                             flag &&
                               "border-destructive/40 bg-destructive/5 text-destructive"
                           )}
