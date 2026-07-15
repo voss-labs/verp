@@ -3,6 +3,9 @@ import { sql } from "drizzle-orm"
 import { PageHeader } from "@/components/page-header"
 import { getSessionUser } from "@/lib/session"
 import { getAttendanceSummaryForStudent } from "@/db/queries/attendance"
+import { getMarksForStudent } from "@/db/queries/marks"
+import { computeMarks, computeSgpi } from "@/lib/sgpi"
+import { Badge } from "@/components/ui/badge"
 import { db } from "@/db"
 import * as schema from "@/db/schema"
 
@@ -55,6 +58,19 @@ export default async function DashboardPage() {
   const attPct =
     att && att.total > 0 ? Math.round((att.present / att.total) * 100) : null
 
+  // A student's marks across every subject, with per-subject grade and SGPI.
+  const marksRows =
+    user.tier === "student" && user.studentId
+      ? await getMarksForStudent(user.studentId)
+      : []
+  const marks = marksRows.map((m) => {
+    const course = m.courseOffering.course
+    return { mark: m, course, computed: computeMarks(m, course) }
+  })
+  const sgpi = computeSgpi(
+    marks.map(({ mark, course }) => ({ marks: mark, course }))
+  )
+
   return (
     <>
       <PageHeader title="Dashboard" />
@@ -106,11 +122,66 @@ export default async function DashboardPage() {
               )}
             </div>
             <div className="border-border bg-card rounded border p-5">
-              <p className="text-muted-foreground text-sm">Marks</p>
-              <p className="text-muted-foreground mt-2 text-sm">
-                Appear here once your coordinator records them.
-              </p>
+              <p className="text-muted-foreground text-sm">SGPI</p>
+              {sgpi.sgpi === null ? (
+                <p className="text-muted-foreground mt-2 text-sm">
+                  Appears once your marks are recorded.
+                </p>
+              ) : (
+                <>
+                  <p className="mt-2 text-3xl font-bold tracking-tight">
+                    {sgpi.hasFail ? "—" : sgpi.sgpi.toFixed(2)}
+                  </p>
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {sgpi.hasFail
+                      ? "Held — clear all subjects to compute"
+                      : `${sgpi.totalCredits} credits`}
+                  </p>
+                </>
+              )}
             </div>
+          </div>
+        )}
+
+        {user.tier === "student" && marks.length > 0 && (
+          <div className="border-border bg-card overflow-x-auto rounded border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-muted-foreground text-xs">
+                <tr className="[&>th]:px-4 [&>th]:py-2.5 [&>th]:text-left [&>th]:font-medium">
+                  <th>Code</th>
+                  <th>Subject</th>
+                  <th className="w-16">Total</th>
+                  <th className="w-16">%</th>
+                  <th className="w-16">Grade</th>
+                </tr>
+              </thead>
+              <tbody className="divide-border divide-y">
+                {marks.map(({ mark, course, computed }) => (
+                  <tr
+                    key={mark.id}
+                    className="[&>td]:px-4 [&>td]:py-2.5"
+                  >
+                    <td className="font-mono text-xs">{course.courseCode}</td>
+                    <td>{course.courseName}</td>
+                    <td className="tabular-nums">
+                      {computed.total} / {course.maxTotal}
+                    </td>
+                    <td className="text-muted-foreground tabular-nums">
+                      {computed.percentage ?? "—"}
+                    </td>
+                    <td>
+                      {computed.gradePoint == null ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : computed.gradePoint === "Fail" ? (
+                        <Badge variant="destructive">Fail</Badge>
+                      ) : (
+                        <Badge variant="outline">{computed.gradePoint}</Badge>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
