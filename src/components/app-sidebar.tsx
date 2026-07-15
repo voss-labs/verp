@@ -3,7 +3,6 @@
 import * as React from "react"
 
 import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
 import { NavUser } from "@/components/nav-user"
 import { TeamSwitcher } from "@/components/team-switcher"
 import {
@@ -16,12 +15,8 @@ import {
 import {
   UsersIcon,
   BookOpenIcon,
-  CalendarIcon,
   ClipboardCheckIcon,
-  IndianRupeeIcon,
-  SettingsIcon,
   LayoutDashboardIcon,
-  ClockIcon,
   FileTextIcon,
   ClipboardListIcon,
   LayersIcon,
@@ -95,24 +90,8 @@ const adminNav = [
     icon: <ScrollTextIcon />,
     items: [{ title: "All Logs", url: "/dashboard/audit" }],
   },
-  {
-    title: "Examinations",
-    url: "#",
-    icon: <CalendarIcon />,
-    items: [
-      { title: "Schedule", url: "#" },
-      { title: "Results", url: "#" },
-    ],
-  },
-  {
-    title: "Settings",
-    url: "#",
-    icon: <SettingsIcon />,
-    items: [
-      { title: "General", url: "#" },
-      { title: "Users & Roles", url: "#" },
-    ],
-  },
+  // Examinations and Settings were dead "#" links — removed until they exist.
+  // Central role/user management lives in the vauth console, not here.
 ]
 
 const facultyNav = [
@@ -159,19 +138,6 @@ const studentNav = [
   },
 ]
 
-const quickAccess = [
-  {
-    name: "Fees & Finance",
-    url: "#",
-    icon: <IndianRupeeIcon />,
-  },
-  {
-    name: "Timetable",
-    url: "#",
-    icon: <ClockIcon />,
-  },
-]
-
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession()
   const { role } = useUserRole()
@@ -193,7 +159,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navItems} />
-        <NavProjects projects={quickAccess} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />
