@@ -2,7 +2,7 @@ import { NextRequest } from "next/server"
 import { z } from "zod"
 import { apiError, apiSuccess } from "@/lib/api-response"
 import { getErrorMessage } from "@/lib/error-utils"
-import { getSessionUser } from "@/lib/session"
+import { getSessionUser, isStaff } from "@/lib/session"
 import { createStudent, createAuditLog } from "@/db/queries"
 import { db } from "@/db"
 import { students } from "@/db/schema"
@@ -17,9 +17,10 @@ const importRowSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email format"),
   department: z.string().min(1, "Department is required"),
-  division: z.enum(["A", "B"]).optional(),
+  division: z.enum(["A", "B", "C"]).optional(),
   year: z.enum(["FE", "SE", "TE", "BE"]),
   semester: z.string().optional(),
+  phoneNo: z.string().optional(),
 })
 
 const importBodySchema = z.object({
@@ -29,9 +30,8 @@ const importBodySchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const user = await getSessionUser()
-    if (!user || user.role !== "admin") {
-      return apiError("Forbidden", 403)
-    }
+    // Faculty (TRs) commit their roster, not just admins.
+    if (!isStaff(user)) return apiError("Forbidden", 403)
 
     const body = await req.json()
     const parsed = importBodySchema.safeParse(body)
@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
           division: r.division ?? null,
           year: r.year,
           semester: r.semester ?? null,
+          phoneNo: r.phoneNo ?? null,
         })
       )
 
