@@ -1,6 +1,8 @@
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { PageHeader } from "@/components/page-header"
 import { getStudentById } from "@/db/queries/students"
+import { getSessionUser } from "@/lib/session"
+import { can } from "@/lib/rbac"
 import { Badge } from "@/components/ui/badge"
 
 export const dynamic = "force-dynamic"
@@ -11,8 +13,20 @@ export default async function StudentDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  const user = await getSessionUser()
+  if (!user) redirect("/login")
+  if (!can(user, "student:read")) redirect("/dashboard")
+
   const student = await getStudentById(id)
   if (!student) return notFound()
+
+  // Scope: the record must be within the viewer's reach — their class (coordinator)
+  // or department (HOD); super_admin sees any.
+  const inScope =
+    user.tier === "super_admin" ||
+    (user.tier === "hod" && user.deptCodes.includes(student.department)) ||
+    (!!student.classId && user.classIds.includes(student.classId))
+  if (!inScope) redirect("/dashboard/students")
 
   const studentName = `${student.firstName} ${student.lastName}`.trim()
   const claimed = student.authUserId !== null

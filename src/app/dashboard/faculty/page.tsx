@@ -1,11 +1,23 @@
+import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/page-header"
 import { FacultyClient } from "./client"
-import { getAllFaculty } from "@/db/queries"
+import { getSessionUser } from "@/lib/session"
+import { can } from "@/lib/rbac"
+import { getAllFaculty, getFacultyByDepartments } from "@/db/queries/faculty"
 
 export const dynamic = "force-dynamic"
 
 export default async function FacultyPage() {
-  const data = await getAllFaculty()
+  const user = await getSessionUser()
+  if (!user) redirect("/login")
+  // Only HOD (own dept) and super_admin (all) read the faculty roster; a plain
+  // coordinator or a student cannot, by URL or nav.
+  if (!can(user, "faculty:read")) redirect("/dashboard")
+
+  const data =
+    user.tier === "super_admin"
+      ? await getAllFaculty()
+      : await getFacultyByDepartments(user.deptCodes)
 
   return (
     <>
