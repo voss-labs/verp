@@ -120,7 +120,7 @@ const superAdminNav = [
   },
 ]
 
-// TRs upload their division's roster; that is the faculty MVP.
+// Coordinators/TRs own their classes: approve enrolments, manage the roster.
 const facultyNav = [
   {
     title: "Dashboard",
@@ -128,6 +128,12 @@ const facultyNav = [
     icon: <LayoutDashboardIcon />,
     isActive: true,
     items: [{ title: "Overview", url: "/dashboard" }],
+  },
+  {
+    title: "My Classes",
+    url: "/dashboard/class",
+    icon: <Building2Icon />,
+    items: [{ title: "Classes & requests", url: "/dashboard/class" }],
   },
   {
     title: "Students",

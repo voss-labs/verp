@@ -1,22 +1,27 @@
 import { redirect } from "next/navigation"
-import { ClockIcon } from "lucide-react"
+import { ClockIcon, AlertTriangleIcon } from "lucide-react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { getSessionUser, isUnbound } from "@/lib/session"
+import { getLatestRequestForUser } from "@/db/queries/onboarding"
+import { RegisterForm } from "./register-form"
 
 export const dynamic = "force-dynamic"
 
 /**
- * The pending state for a real VIT student VOSS authenticated but not yet in the
- * roster. It renders inside the app shell — the account IS in, it just has no
- * record to act on yet — rather than bouncing them to a bare dead-end page. The
- * dashboard layout still redirects unbound users here, so no data route is ever
- * reachable without a role; this is the one screen they can see.
+ * The student's entry point. An unbound account either self-registers here (roll
+ * + name; the email is the verified session, not typed) or, once submitted, sees
+ * the status of that request. Rendered inside the app shell — they ARE in, just
+ * not yet placed. The dashboard layout redirects unbound users here, so no data
+ * route is reachable without a role.
  */
 export default async function UnclaimedPage() {
   const user = await getSessionUser()
   if (!user) redirect("/login")
   if (!isUnbound(user)) redirect("/dashboard")
+
+  const req = await getLatestRequestForUser(user.id)
+  const showForm = !req || req.status === "rejected"
 
   return (
     <SidebarProvider>
@@ -24,33 +29,52 @@ export default async function UnclaimedPage() {
       <SidebarInset>
         <div className="flex min-h-svh items-center justify-center p-6">
           <div className="w-full max-w-md">
-            <div className="bg-muted text-muted-foreground flex size-11 items-center justify-center rounded-full">
-              <ClockIcon className="size-5" />
-            </div>
-
-            <h1 className="mt-5 text-2xl font-bold tracking-tight">
-              Access pending
-            </h1>
-
-            <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
-              You&rsquo;re signed in and verified as{" "}
-              <span className="text-foreground font-mono">{user.email}</span> —
-              we&rsquo;re just waiting for your record to be added to VERP.
-            </p>
-
-            <p className="text-muted-foreground mt-4 text-sm leading-relaxed">
-              Ask your TR to add you to the roster. The moment they do, your
-              next sign-in links you automatically — there is nothing else for
-              you to do.
-            </p>
-
-            <p className="text-muted-foreground/70 mt-8 text-xs leading-relaxed">
-              Already listed? The email on your record may differ from the one
-              you signed in with. Your TR can correct it.
-            </p>
+            {showForm ? (
+              <RegisterForm
+                email={user.email}
+                name={user.name}
+                rejection={
+                  req?.status === "rejected" ? req.rejectionReason : null
+                }
+              />
+            ) : req.status === "pending" ? (
+              <Status
+                icon={<ClockIcon className="size-5" />}
+                title="Waiting for approval"
+                body={`Your request for ${req.rollNumber} is with your class coordinator. You'll be linked automatically the moment they approve it.`}
+              />
+            ) : (
+              <Status
+                icon={<AlertTriangleIcon className="size-5" />}
+                title="Your class isn't set up yet"
+                body={`We have your details for ${req.rollNumber}, but your class has not been created in VERP yet. You'll be routed to your coordinator's queue automatically once it is — nothing more to do.`}
+              />
+            )}
           </div>
         </div>
       </SidebarInset>
     </SidebarProvider>
+  )
+}
+
+function Status({
+  icon,
+  title,
+  body,
+}: {
+  icon: React.ReactNode
+  title: string
+  body: string
+}) {
+  return (
+    <>
+      <div className="bg-muted text-muted-foreground flex size-11 items-center justify-center rounded-full">
+        {icon}
+      </div>
+      <h1 className="mt-5 text-2xl font-bold tracking-tight">{title}</h1>
+      <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+        {body}
+      </p>
+    </>
   )
 }

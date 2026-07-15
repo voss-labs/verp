@@ -17,6 +17,12 @@ export async function getStudentByAuthUserId(authUserId: string) {
   })
 }
 
+export async function getStudentByRollNumber(rollNumber: string) {
+  return db.query.students.findFirst({
+    where: eq(students.rollNumber, rollNumber.toUpperCase()),
+  })
+}
+
 export async function getStudentByEmail(email: string) {
   return db.query.students.findFirst({
     where: and(
