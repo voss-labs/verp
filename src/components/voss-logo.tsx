@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 
-// The VOSS lockup: heavy wordmark plus an orange square. Reproduced in type, not
+// The VOSS lockup: heavy wordmark plus a blue square. Reproduced in type, not
 // shipped as an image — one less asset, and it inherits the current text color.
 // `product` names the app that sits under the VOSS umbrella (VERP, vboard...).
 export function VossWordmark({
@@ -15,7 +15,7 @@ export function VossWordmark({
       <span className="text-lg leading-none font-black tracking-[-0.03em] select-none">
         VOSS
       </span>
-      <span aria-hidden className="size-[7px] shrink-0 bg-[#FB7A3C]" />
+      <span aria-hidden className="bg-blue size-[7px] shrink-0" />
       {product && (
         <span className="text-muted-foreground ml-1 text-sm font-medium">
           {product}
@@ -25,7 +25,7 @@ export function VossWordmark({
   )
 }
 
-// Compact mark for square tiles (the sidebar header). "V" plus the orange square.
+// Compact mark for square tiles (the sidebar header). "V" plus the blue square.
 export function VossMark({ className }: { className?: string }) {
   return (
     <span
@@ -37,7 +37,7 @@ export function VossMark({ className }: { className?: string }) {
       V
       <span
         aria-hidden
-        className="absolute right-[3px] bottom-[5px] size-[5px] bg-[#FB7A3C]"
+        className="bg-blue absolute right-[3px] bottom-[5px] size-[5px]"
       />
     </span>
   )
