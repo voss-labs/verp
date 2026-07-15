@@ -17,7 +17,8 @@ import { BRANCH_CODE_BY_DEPT, divisionsForBranch } from "@/lib/roll-number"
 import {
   createClassAction,
   setClassActiveAction,
-  assignCoordinatorAction,
+  assignClassRoleAction,
+  createDeptFacultyAction,
 } from "./actions"
 
 type Dept = { code: string; name: string }
@@ -73,6 +74,8 @@ export function DeptClient({
     staff.find(
       (s) => s.classId === classId && s.role === "academic_coordinator"
     )
+  const trOf = (classId: string) =>
+    staff.find((s) => s.classId === classId && s.role === "tr")
 
   if (departments.length === 0) {
     return (
@@ -100,7 +103,14 @@ export function DeptClient({
               <h3 className="text-sm font-medium">{d.name}</h3>
             </div>
 
-            <CreateClass deptCode={d.code} disabled={pending} onDone={run} />
+            <div className="flex flex-wrap gap-2">
+              <CreateClass deptCode={d.code} disabled={pending} onDone={run} />
+              <AddDeptFaculty
+                deptCode={d.code}
+                disabled={pending}
+                onDone={run}
+              />
+            </div>
 
             <div className="border-border overflow-hidden rounded-lg border">
               {deptClasses.length === 0 ? (
@@ -110,7 +120,44 @@ export function DeptClient({
               ) : (
                 <ul className="divide-border divide-y">
                   {deptClasses.map((c) => {
-                    const coord = coordinatorOf(c.id)
+                    const facultyItems = deptFaculty.map((f) => ({
+                      value: f.id,
+                      label: f.name,
+                    }))
+                    const rolePicker = (
+                      role: "academic_coordinator" | "tr",
+                      current: string | undefined,
+                      placeholder: string
+                    ) => (
+                      <Select
+                        value={current ?? ""}
+                        items={facultyItems}
+                        disabled={pending || deptFaculty.length === 0}
+                        onValueChange={(v) =>
+                          v &&
+                          run(
+                            () =>
+                              assignClassRoleAction({
+                                classId: c.id,
+                                facultyId: v,
+                                role,
+                              }),
+                            "Assigned"
+                          )
+                        }
+                      >
+                        <SelectTrigger className="w-44">
+                          <SelectValue placeholder={placeholder} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {deptFaculty.map((f) => (
+                            <SelectItem key={f.id} value={f.id}>
+                              {f.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )
                     return (
                       <li
                         key={c.id}
@@ -123,37 +170,13 @@ export function DeptClient({
                             {!c.isActive && " · inactive"}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Select
-                            value={coord?.facultyId ?? ""}
-                            items={deptFaculty.map((f) => ({
-                              value: f.id,
-                              label: f.name,
-                            }))}
-                            disabled={pending || deptFaculty.length === 0}
-                            onValueChange={(v) =>
-                              v &&
-                              run(
-                                () =>
-                                  assignCoordinatorAction({
-                                    classId: c.id,
-                                    facultyId: v,
-                                  }),
-                                "Coordinator assigned"
-                              )
-                            }
-                          >
-                            <SelectTrigger size="sm" className="w-52">
-                              <SelectValue placeholder="Assign coordinator…" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {deptFaculty.map((f) => (
-                                <SelectItem key={f.id} value={f.id}>
-                                  {f.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {rolePicker(
+                            "academic_coordinator",
+                            coordinatorOf(c.id)?.facultyId,
+                            "Coordinator…"
+                          )}
+                          {rolePicker("tr", trOf(c.id)?.facultyId, "TR…")}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -242,6 +265,68 @@ function CreateClass({
         }
       >
         Add class
+      </Button>
+    </div>
+  )
+}
+
+function AddDeptFaculty({
+  deptCode,
+  disabled,
+  onDone,
+}: {
+  deptCode: string
+  disabled: boolean
+  onDone: (fn: () => Promise<{ error: string | null }>, ok?: string) => void
+}) {
+  const empty = { firstName: "", lastName: "", employeeId: "", email: "" }
+  const [f, setF] = useState(empty)
+  const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }))
+  const ready = f.firstName.trim() && f.employeeId.trim() && f.email.trim()
+
+  return (
+    <div className="border-border bg-muted/30 flex flex-wrap items-end gap-2 rounded-xl border p-3">
+      <div className="grid gap-1.5">
+        <label className="text-muted-foreground text-xs">Add faculty</label>
+        <div className="flex flex-wrap gap-2">
+          <Input
+            placeholder="First name"
+            value={f.firstName}
+            onChange={(e) => set("firstName", e.target.value)}
+            className="h-9 w-28"
+          />
+          <Input
+            placeholder="Last name"
+            value={f.lastName}
+            onChange={(e) => set("lastName", e.target.value)}
+            className="h-9 w-28"
+          />
+          <Input
+            placeholder="Employee ID"
+            value={f.employeeId}
+            onChange={(e) => set("employeeId", e.target.value)}
+            className="h-9 w-32"
+          />
+          <Input
+            placeholder="name@vit.edu.in"
+            value={f.email}
+            onChange={(e) => set("email", e.target.value)}
+            className="h-9 w-44"
+          />
+        </div>
+      </div>
+      <Button
+        className="h-9"
+        disabled={disabled || !ready}
+        onClick={() =>
+          onDone(async () => {
+            const res = await createDeptFacultyAction({ deptCode, ...f })
+            if (!res.error) setF(empty)
+            return res
+          }, "Faculty added")
+        }
+      >
+        Add
       </Button>
     </div>
   )
