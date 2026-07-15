@@ -10,8 +10,14 @@ export type FacultyRow = {
   employeeId: string
   email: string
   department: string
-  isAdmin: boolean
+  role: "super_admin" | "hod" | "faculty"
   isActive: boolean
+}
+
+const ROLE_LABEL: Record<FacultyRow["role"], string> = {
+  super_admin: "Super-admin",
+  hod: "HOD",
+  faculty: "Faculty",
 }
 
 export const facultyColumns: ColumnDef<FacultyRow>[] = [
@@ -36,13 +42,16 @@ export const facultyColumns: ColumnDef<FacultyRow>[] = [
     ),
   },
   {
-    accessorKey: "isAdmin",
+    accessorKey: "role",
     header: "Role",
-    cell: ({ row }) => (
-      <Badge variant={row.getValue("isAdmin") ? "default" : "outline"}>
-        {row.getValue("isAdmin") ? "Admin" : "Faculty"}
-      </Badge>
-    ),
+    cell: ({ row }) => {
+      const role = row.getValue("role") as FacultyRow["role"]
+      return (
+        <Badge variant={role === "faculty" ? "outline" : "default"}>
+          {ROLE_LABEL[role]}
+        </Badge>
+      )
+    },
   },
   {
     accessorKey: "isActive",
