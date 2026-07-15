@@ -9,7 +9,7 @@ export type StudentRow = {
   firstName: string
   lastName: string
   rollNumber: string
-  email: string | null
+  email: string
   department: string
   division: string | null
   year: string
