@@ -10,6 +10,13 @@ import {
   setDepartmentActive,
   getDepartment,
 } from "@/db/queries/departments"
+import {
+  createFaculty,
+  updateFaculty,
+  deactivateFaculty,
+  getFacultyByEmail,
+} from "@/db/queries/faculty"
+import { appointHod, appointCoordinator } from "@/db/queries/appointments"
 
 type Result = { error: string | null }
 
@@ -64,5 +71,121 @@ export async function setDepartmentActiveAction(input: {
     return { error: null }
   } catch (err) {
     return { error: getErrorMessage(err, "Could not update department") }
+  }
+}
+
+// ── Faculty ─────────────────────────────────────────────────────────────
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
+export async function createFacultyAction(input: {
+  firstName: string
+  lastName: string
+  employeeId: string
+  email: string
+  department: string
+  role: "faculty" | "hod"
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "faculty:create")
+
+    const email = input.email.trim().toLowerCase()
+    if (!input.firstName.trim()) return { error: "First name is required." }
+    if (!input.employeeId.trim()) return { error: "Employee ID is required." }
+    if (!EMAIL_RE.test(email)) return { error: "A valid email is required." }
+    if (!input.department) return { error: "Department is required." }
+    if (await getFacultyByEmail(email))
+      return { error: `A faculty with ${email} already exists.` }
+
+    const row = await createFaculty({
+      firstName: input.firstName.trim(),
+      lastName: input.lastName.trim(),
+      employeeId: input.employeeId.trim(),
+      email,
+      department: input.department,
+      role: input.role,
+    })
+    await createAuditLog({
+      action: "faculty.created",
+      actorId: user!.id,
+      targetType: "faculty",
+      targetId: row.id,
+      details: { email, department: input.department, role: input.role },
+    })
+    revalidatePath("/dashboard/admin/faculty")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not add faculty") }
+  }
+}
+
+export async function setFacultyRoleAction(input: {
+  facultyId: string
+  role: "faculty" | "hod"
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "faculty:setRole")
+    const row = await updateFaculty(input.facultyId, { role: input.role })
+    if (!row) return { error: "No such faculty." }
+    await createAuditLog({
+      action: "faculty.role_changed",
+      actorId: user!.id,
+      targetType: "faculty",
+      targetId: input.facultyId,
+      details: { role: input.role },
+    })
+    revalidatePath("/dashboard/admin/faculty")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not change tier") }
+  }
+}
+
+export async function deactivateFacultyAction(input: {
+  facultyId: string
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "faculty:update")
+    await deactivateFaculty(input.facultyId)
+    await createAuditLog({
+      action: "faculty.deactivated",
+      actorId: user!.id,
+      targetType: "faculty",
+      targetId: input.facultyId,
+    })
+    revalidatePath("/dashboard/admin/faculty")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not deactivate faculty") }
+  }
+}
+
+export async function appointAction(input: {
+  deptCode: string
+  facultyId: string
+  appointment: "hod" | "coordinator"
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "hod:appoint")
+    if (input.appointment === "hod") {
+      await appointHod(input.deptCode, input.facultyId, user!.facultyId)
+    } else {
+      await appointCoordinator(input.deptCode, input.facultyId, user!.facultyId)
+    }
+    await createAuditLog({
+      action: `dept.${input.appointment}_appointed`,
+      actorId: user!.id,
+      targetType: "department",
+      targetId: input.deptCode,
+      details: { facultyId: input.facultyId },
+    })
+    revalidatePath("/dashboard/admin/faculty")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not appoint") }
   }
 }
