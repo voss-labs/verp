@@ -16,8 +16,55 @@ import {
   routeRequestsToClass,
 } from "@/db/queries/classes"
 import { assignClassRole } from "@/db/queries/class-staff"
+import { createFaculty, getFacultyByEmail } from "@/db/queries/faculty"
 
 type Result = { error: string | null }
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
+// An HOD adds a teaching faculty to their own department. Role is always the plain
+// faculty tier — an HOD cannot mint another HOD or an admin (that stays super_admin).
+export async function createDeptFacultyAction(input: {
+  deptCode: string
+  firstName: string
+  lastName: string
+  employeeId: string
+  email: string
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "faculty:create")
+    if (!inDeptScope(user!, input.deptCode))
+      return { error: "That department is not in your scope." }
+
+    const email = input.email.trim().toLowerCase()
+    if (!input.firstName.trim()) return { error: "First name is required." }
+    if (!input.employeeId.trim()) return { error: "Employee ID is required." }
+    if (!EMAIL_RE.test(email)) return { error: "A valid email is required." }
+    if (await getFacultyByEmail(email))
+      return { error: `A faculty with ${email} already exists.` }
+
+    const row = await createFaculty({
+      firstName: input.firstName.trim(),
+      lastName: input.lastName.trim(),
+      employeeId: input.employeeId.trim(),
+      email,
+      department: input.deptCode,
+      role: "faculty",
+    })
+    await createAuditLog({
+      action: "faculty.created",
+      actorId: user!.id,
+      targetType: "faculty",
+      targetId: row.id,
+      details: { email, department: input.deptCode, by: "hod" },
+    })
+    revalidatePath("/dashboard/dept")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not add faculty") }
+  }
+}
 
 // A dept is in scope if the caller is super_admin (all) or an HOD of it.
 function inDeptScope(user: SessionUser, deptCode: string): boolean {
@@ -104,9 +151,10 @@ export async function setClassActiveAction(input: {
   }
 }
 
-export async function assignCoordinatorAction(input: {
+export async function assignClassRoleAction(input: {
   classId: string
   facultyId: string
+  role: "academic_coordinator" | "tr"
 }): Promise<Result> {
   try {
     const user = await getSessionUser()
@@ -119,11 +167,14 @@ export async function assignCoordinatorAction(input: {
     await assignClassRole(
       input.classId,
       input.facultyId,
-      "academic_coordinator",
+      input.role,
       user!.facultyId
     )
     await createAuditLog({
-      action: "class.coordinator_assigned",
+      action:
+        input.role === "academic_coordinator"
+          ? "class.coordinator_assigned"
+          : "class.tr_assigned",
       actorId: user!.id,
       targetType: "class",
       targetId: input.classId,
@@ -132,6 +183,6 @@ export async function assignCoordinatorAction(input: {
     revalidatePath("/dashboard/dept")
     return { error: null }
   } catch (err) {
-    return { error: getErrorMessage(err, "Could not assign coordinator") }
+    return { error: getErrorMessage(err, "Could not assign") }
   }
 }

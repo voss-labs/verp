@@ -158,6 +158,8 @@ export const ROLE_DEFAULTS: Record<
   hod: [
     "dept:read",
     "faculty:read",
+    "faculty:create",
+    "faculty:update",
     "class:read",
     "class:create",
     "class:update",
@@ -177,7 +179,6 @@ export const ROLE_DEFAULTS: Record<
     "onboarding:read",
     "attendance:read",
     "marks:read",
-    "audit:read",
   ],
   faculty: [
     "class:read",
