@@ -7,10 +7,16 @@ import { getErrorMessage } from "@/lib/error-utils"
 import { parseRollNumber, expectedYear } from "@/lib/roll-number"
 import { createAuditLog } from "@/db/queries"
 import { getClassById } from "@/db/queries/classes"
-import { createStudent, getStudentByRollNumber } from "@/db/queries/students"
+import {
+  createStudent,
+  getStudentByRollNumber,
+  getStudentsByClassIds,
+} from "@/db/queries/students"
 import { getRequestById, updateRequest } from "@/db/queries/onboarding"
+import { upsertAttendance } from "@/db/queries/attendance"
 
 type Result = { error: string | null }
+type AttStatus = "present" | "absent" | "late" | "excused"
 
 // A class is in scope if the caller coordinates/teaches it (classIds), is the HOD
 // of its department, or is super_admin.
@@ -118,5 +124,52 @@ export async function rejectEnrollmentAction(input: {
     return { error: null }
   } catch (err) {
     return { error: getErrorMessage(err, "Could not reject") }
+  }
+}
+
+export async function saveAttendanceAction(input: {
+  classId: string
+  sessionDate: string
+  sessionSlot: string
+  marks: { studentId: string; status: AttStatus }[]
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "attendance:write")
+    const { ok } = await classInScope(user!, input.classId)
+    if (!ok) return { error: "That class is not in your scope." }
+
+    // Only students actually in this class can be marked — a forged studentId is
+    // dropped, not written.
+    const roster = new Set(
+      (await getStudentsByClassIds([input.classId])).map((s) => s.id)
+    )
+    const entries = input.marks
+      .filter((m) => roster.has(m.studentId))
+      .map((m) => ({
+        studentId: m.studentId,
+        classId: input.classId,
+        sessionDate: input.sessionDate,
+        sessionSlot: input.sessionSlot,
+        status: m.status,
+        recordedByFacultyId: user!.facultyId,
+      }))
+    await upsertAttendance(entries)
+
+    await createAuditLog({
+      action: "attendance.recorded",
+      actorId: user!.id,
+      targetType: "class",
+      targetId: input.classId,
+      details: {
+        date: input.sessionDate,
+        slot: input.sessionSlot,
+        count: entries.length,
+      },
+    })
+    revalidatePath(`/dashboard/class/${input.classId}/attendance`)
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not save attendance") }
   }
 }
