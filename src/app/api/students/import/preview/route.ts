@@ -25,9 +25,7 @@ export async function POST(req: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer())
     const wb = new ExcelJS.Workbook()
-    await wb.xlsx.load(
-      buffer as unknown as Parameters<typeof wb.xlsx.load>[0]
-    )
+    await wb.xlsx.load(buffer as unknown as Parameters<typeof wb.xlsx.load>[0])
 
     const sheet = wb.worksheets[0]
     if (!sheet || sheet.rowCount < 2) {
