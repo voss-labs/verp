@@ -423,7 +423,7 @@ export function PromoteStudentsClient() {
               <Badge variant="secondary" className="text-xs tabular-nums">
                 Total: {counts.total}
               </Badge>
-              <Badge variant="outline" className="text-xs tabular-nums">
+              <Badge className="bg-blue text-blue-foreground text-xs tabular-nums">
                 Eligible: {counts.eligible}
               </Badge>
               <Badge variant="outline" className="text-xs tabular-nums">

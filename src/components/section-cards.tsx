@@ -29,7 +29,7 @@ export function SectionCards() {
         detail="New admissions this semester"
         sub="Across all departments"
         icon={<UsersIcon className="size-4" />}
-        iconBg="bg-blue/10 text-blue"
+        iconBg="bg-muted text-muted-foreground"
       />
       <StatCard
         label="Faculty Members"
@@ -39,7 +39,7 @@ export function SectionCards() {
         detail="12 new hires this year"
         sub="Full-time and adjunct"
         icon={<BookOpenIcon className="size-4" />}
-        iconBg="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+        iconBg="bg-muted text-muted-foreground"
       />
       <StatCard
         label="Attendance Rate"
@@ -49,7 +49,7 @@ export function SectionCards() {
         detail="Slight dip this month"
         sub="Needs department review"
         icon={<CalendarCheckIcon className="size-4" />}
-        iconBg="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+        iconBg="bg-muted text-muted-foreground"
       />
       <StatCard
         label="Fee Collection"
@@ -59,7 +59,7 @@ export function SectionCards() {
         detail="Above target collection"
         sub="Current semester"
         icon={<WalletIcon className="size-4" />}
-        iconBg="bg-violet-500/10 text-violet-600 dark:text-violet-400"
+        iconBg="bg-muted text-muted-foreground"
       />
     </div>
   )
@@ -103,7 +103,7 @@ function StatCard({
             variant="outline"
             className={
               trendUp
-                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                ? "border-blue/20 bg-blue/10 text-blue"
                 : "text-destructive border-destructive/20 bg-destructive/10"
             }
           >

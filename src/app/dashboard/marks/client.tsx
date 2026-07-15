@@ -34,9 +34,9 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  theory: "bg-blue/8 text-blue border-blue/20",
-  practical: "bg-emerald-500/8 text-emerald-600 border-emerald-200",
-  project: "bg-violet-500/8 text-violet-600 border-violet-200",
+  theory: "bg-muted text-muted-foreground border-border",
+  practical: "bg-muted text-muted-foreground border-border",
+  project: "bg-muted text-muted-foreground border-border",
 }
 
 export function MarksOverviewClient({
@@ -70,11 +70,13 @@ export function MarksOverviewClient({
       )}
 
       {offerings.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="bg-muted mb-3 flex size-12 items-center justify-center rounded-full">
+        <div className="border-border flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
+          <div className="bg-muted mb-4 flex size-12 items-center justify-center rounded-full">
             <BookOpenIcon className="text-muted-foreground size-5" />
           </div>
-          <p className="text-sm font-medium">No course offerings found</p>
+          <p className="text-foreground text-sm font-medium">
+            No course offerings found
+          </p>
           <p className="text-muted-foreground mt-1 text-xs">
             Create offerings first to manage marks.
           </p>
