@@ -96,7 +96,10 @@ export function ImportClient({
     }
     const rows = preview.rows
       .filter((r) => r.matched && r.studentId)
-      .map((r) => ({ studentId: r.studentId!, ...applyMapping(r.marks, mapping) }))
+      .map((r) => ({
+        studentId: r.studentId!,
+        ...applyMapping(r.marks, mapping),
+      }))
     if (rows.length === 0) {
       toast.error("No parsed students match this class roster.")
       return
@@ -130,7 +133,7 @@ export function ImportClient({
               setFile(e.target.files?.[0] ?? null)
               setPreview(null)
             }}
-            className="text-sm file:mr-3 file:rounded file:border file:border-border file:bg-muted file:px-3 file:py-1.5 file:text-sm"
+            className="file:border-border file:bg-muted text-sm file:mr-3 file:rounded file:border file:px-3 file:py-1.5 file:text-sm"
           />
         </div>
         <Button size="sm" disabled={!file || uploading} onClick={runPreview}>
@@ -217,9 +220,7 @@ export function ImportClient({
 
             <div className="flex flex-wrap items-center gap-3">
               <Button size="sm" disabled={committing} onClick={commit}>
-                {committing
-                  ? "Saving…"
-                  : `Save ${preview.matchedRows} matched`}
+                {committing ? "Saving…" : `Save ${preview.matchedRows} matched`}
               </Button>
               <span className="text-muted-foreground text-xs">
                 {preview.matchedRows} matched · {unmatched} ignored

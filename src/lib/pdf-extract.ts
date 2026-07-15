@@ -22,7 +22,11 @@ export async function pdfToLines(buffer: Buffer): Promise<string[][]> {
     const items = content.items
       .map((item) => {
         const it = item as { str?: string; transform?: number[] }
-        return { str: (it.str ?? "").trim(), x: it.transform?.[4], y: it.transform?.[5] }
+        return {
+          str: (it.str ?? "").trim(),
+          x: it.transform?.[4],
+          y: it.transform?.[5],
+        }
       })
       .filter((it): it is { str: string; x: number; y: number } => {
         return Boolean(it.str) && it.x != null && it.y != null

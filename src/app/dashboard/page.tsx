@@ -157,10 +157,7 @@ export default async function DashboardPage() {
               </thead>
               <tbody className="divide-border divide-y">
                 {marks.map(({ mark, course, computed }) => (
-                  <tr
-                    key={mark.id}
-                    className="[&>td]:px-4 [&>td]:py-2.5"
-                  >
+                  <tr key={mark.id} className="[&>td]:px-4 [&>td]:py-2.5">
                     <td className="font-mono text-xs">{course.courseCode}</td>
                     <td>{course.courseName}</td>
                     <td className="tabular-nums">

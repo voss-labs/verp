@@ -208,9 +208,12 @@ function SubjectSetup({
             <Field
               key={k}
               label={
-                { maxIsa: "ISA", maxMse: "MSE", maxEse: "ESE", maxTotal: "Total" }[
-                  k
-                ]
+                {
+                  maxIsa: "ISA",
+                  maxMse: "MSE",
+                  maxEse: "ESE",
+                  maxTotal: "Total",
+                }[k]
               }
             >
               <Input

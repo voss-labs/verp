@@ -14,7 +14,10 @@ export async function listCoursesForDepts(deptCodes: string[]) {
     .select()
     .from(courses)
     .where(
-      and(eq(courses.isActive, true), inArray(courses.departmentCode, deptCodes))
+      and(
+        eq(courses.isActive, true),
+        inArray(courses.departmentCode, deptCodes)
+      )
     )
     .orderBy(courses.courseCode)
 }

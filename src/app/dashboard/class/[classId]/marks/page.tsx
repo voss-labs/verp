@@ -5,10 +5,7 @@ import { can } from "@/lib/rbac"
 import { expectedYear } from "@/lib/roll-number"
 import { getClassById } from "@/db/queries/classes"
 import { getStudentsByClassIds } from "@/db/queries/students"
-import {
-  listOfferingsForClass,
-  getOfferingById,
-} from "@/db/queries/offerings"
+import { listOfferingsForClass, getOfferingById } from "@/db/queries/offerings"
 import { getMarksForOffering } from "@/db/queries/marks"
 import { MarksClient } from "./client"
 
