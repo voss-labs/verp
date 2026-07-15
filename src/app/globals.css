@@ -89,7 +89,9 @@
   --chart-3: oklch(0.42 0.2 258);
   --chart-4: oklch(0.72 0.1 258);
   --chart-5: oklch(0.32 0.16 258);
-  --radius: 0.625rem;
+  /* Near-square: a professional ERP look, not playful. Drives the whole radius
+     scale (--radius-sm..4xl), so every card, table and control sharpens at once. */
+  --radius: 0.2rem;
   /* Sidebar - tinted blue-gray for brand identity */
   --sidebar: oklch(0.97 0.008 258);
   --sidebar-foreground: oklch(0.22 0.03 260);

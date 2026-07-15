@@ -107,3 +107,13 @@ export async function updateStudent(
 export async function deactivateStudent(id: string) {
   return updateStudent(id, { isActive: false })
 }
+
+export async function deactivateStudentsByIds(ids: string[]) {
+  if (ids.length === 0) return 0
+  const rows = await db
+    .update(students)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(inArray(students.id, ids))
+    .returning({ id: students.id })
+  return rows.length
+}

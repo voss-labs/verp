@@ -37,7 +37,12 @@ type Staff = {
   firstName: string
   lastName: string
 }
-type Faculty = { id: string; name: string; department: string }
+type Faculty = {
+  id: string
+  name: string
+  department: string
+  role: "super_admin" | "hod" | "faculty"
+}
 
 export function DeptClient({
   departments,
@@ -81,8 +86,11 @@ export function DeptClient({
     <div className="flex flex-col gap-8">
       {departments.map((d) => {
         const deptClasses = classes.filter((c) => c.departmentCode === d.code)
-        // A coordinator is picked from faculty in the same department.
-        const deptFaculty = faculty.filter((f) => f.department === d.code)
+        // A class coordinator is a teaching faculty in this department — never the
+        // HOD or an admin, so filter to the plain faculty tier.
+        const deptFaculty = faculty.filter(
+          (f) => f.department === d.code && f.role === "faculty"
+        )
         return (
           <section key={d.code} className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
@@ -118,6 +126,10 @@ export function DeptClient({
                         <div className="flex items-center gap-2">
                           <Select
                             value={coord?.facultyId ?? ""}
+                            items={deptFaculty.map((f) => ({
+                              value: f.id,
+                              label: f.name,
+                            }))}
                             disabled={pending || deptFaculty.length === 0}
                             onValueChange={(v) =>
                               v &&

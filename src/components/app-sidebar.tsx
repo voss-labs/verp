@@ -4,7 +4,6 @@ import * as React from "react"
 
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
-import { TeamSwitcher } from "@/components/team-switcher"
 import {
   Sidebar,
   SidebarContent,
@@ -23,14 +22,14 @@ import {
 import { useSession } from "@/lib/auth-client"
 import { useUserRole } from "@/hooks/use-user-role"
 import { VossMark } from "@/components/voss-logo"
+import { Badge } from "@/components/ui/badge"
 
-const teams = [
-  {
-    name: "VOSS",
-    logo: <VossMark className="text-base" />,
-    plan: "VERP · Vidyalankar ERP",
-  },
-]
+const TIER_LABEL = {
+  super_admin: "Super-admin",
+  hod: "HOD",
+  faculty: "Faculty",
+  student: "Student",
+} as const
 
 // MVP surface only: roster and identity. Marks / attendance / courses come back
 // with the features that own them, each adding its own nav.
@@ -178,12 +177,32 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={teams} />
+        <div className="flex items-center gap-2 px-1 py-1.5">
+          <div className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-md">
+            <VossMark className="text-base" />
+          </div>
+          <div className="grid leading-tight group-data-[collapsible=icon]:hidden">
+            <span className="text-sm font-semibold">VOSS</span>
+            <span className="text-muted-foreground text-xs">
+              VERP · Vidyalankar ERP
+            </span>
+          </div>
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navItems} />
       </SidebarContent>
       <SidebarFooter>
+        {tier && (
+          <div className="px-1 pb-1 group-data-[collapsible=icon]:hidden">
+            <Badge
+              variant="outline"
+              className="w-full justify-center text-[11px] font-medium"
+            >
+              Viewing as {TIER_LABEL[tier]}
+            </Badge>
+          </div>
+        )}
         <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail />

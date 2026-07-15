@@ -181,6 +181,10 @@ export function FacultyAdminClient({
                       </label>
                       <Select
                         value={cur?.facultyId ?? ""}
+                        items={faculty.map((f) => ({
+                          value: f.id,
+                          label: f.name,
+                        }))}
                         disabled={pending || faculty.length === 0}
                         onValueChange={(v) =>
                           v &&
