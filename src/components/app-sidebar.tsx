@@ -18,6 +18,7 @@ import {
   LayoutDashboardIcon,
   ScrollTextIcon,
   ShieldIcon,
+  Building2Icon,
 } from "lucide-react"
 import { useSession } from "@/lib/auth-client"
 import { useUserRole } from "@/hooks/use-user-role"
@@ -40,6 +41,12 @@ const adminNav = [
     icon: <LayoutDashboardIcon />,
     isActive: true,
     items: [{ title: "Overview", url: "/dashboard" }],
+  },
+  {
+    title: "My Department",
+    url: "/dashboard/dept",
+    icon: <Building2Icon />,
+    items: [{ title: "Classes", url: "/dashboard/dept" }],
   },
   {
     title: "Students",
@@ -83,6 +90,12 @@ const superAdminNav = [
       { title: "Faculty", url: "/dashboard/admin/faculty" },
       { title: "Roles & permissions", url: "/dashboard/admin/roles" },
     ],
+  },
+  {
+    title: "Departments",
+    url: "/dashboard/dept",
+    icon: <Building2Icon />,
+    items: [{ title: "Classes", url: "/dashboard/dept" }],
   },
   {
     title: "Students",

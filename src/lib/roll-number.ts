@@ -32,6 +32,22 @@ const DIVISIONS_BY_BRANCH: Record<string, readonly string[]> = {
 export const ALL_DIVISIONS = ["A", "B", "C"] as const
 export type Division = (typeof ALL_DIVISIONS)[number]
 
+// The numeric branch code a NEW class uses for each department (the current
+// curriculum code — legacy 103 is not used for new cohorts). Inverse of
+// BRANCH_CODES, minus the legacy alias.
+export const BRANCH_CODE_BY_DEPT: Record<string, string> = {
+  IT: "101",
+  CMPN: "102",
+  EXTC: "104",
+  BIOMED: "105",
+  EXCS: "108",
+}
+
+/** Divisions a branch runs (A/B, plus C for IT and CMPN). Defaults to A/B. */
+export function divisionsForBranch(branchCode: string): readonly string[] {
+  return DIVISIONS_BY_BRANCH[branchCode] ?? ["A", "B"]
+}
+
 // FE/SE/TE/BE, derived from how many years since admission.
 const YEAR_BY_LEVEL = ["FE", "SE", "TE", "BE"] as const
 export type Year = (typeof YEAR_BY_LEVEL)[number]
