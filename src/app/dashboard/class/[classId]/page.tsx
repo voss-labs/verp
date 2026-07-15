@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { CalendarCheckIcon } from "lucide-react"
+import { CalendarCheckIcon, GraduationCapIcon } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { buttonVariants } from "@/components/ui/button"
 import { getSessionUser } from "@/lib/session"
@@ -51,13 +51,22 @@ export default async function ClassDetailPage({
               your attendance sheet, then approve to link them.
             </p>
           </div>
-          <Link
-            href={`/dashboard/class/${classId}/attendance`}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            <CalendarCheckIcon className="mr-1.5 size-3.5" />
-            Take attendance
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/dashboard/class/${classId}/attendance`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <CalendarCheckIcon className="mr-1.5 size-3.5" />
+              Take attendance
+            </Link>
+            <Link
+              href={`/dashboard/class/${classId}/marks`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <GraduationCapIcon className="mr-1.5 size-3.5" />
+              Enter marks
+            </Link>
+          </div>
         </div>
         <QueueClient
           requests={requests.map((r) => ({

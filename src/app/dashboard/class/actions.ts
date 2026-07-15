@@ -14,6 +14,9 @@ import {
 } from "@/db/queries/students"
 import { getRequestById, updateRequest } from "@/db/queries/onboarding"
 import { upsertAttendance } from "@/db/queries/attendance"
+import { getCourseByCode, createCourse } from "@/db/queries/courses"
+import { createOffering, getOfferingById } from "@/db/queries/offerings"
+import { upsertMarks } from "@/db/queries/marks"
 
 type Result = { error: string | null }
 type AttStatus = "present" | "absent" | "late" | "excused"
@@ -171,5 +174,104 @@ export async function saveAttendanceAction(input: {
     return { error: null }
   } catch (err) {
     return { error: getErrorMessage(err, "Could not save attendance") }
+  }
+}
+
+export async function createSubjectAction(input: {
+  classId: string
+  courseCode: string
+  courseName: string
+  courseType: "theory" | "practical" | "project"
+  credits: number
+  maxIsa: number
+  maxMse: number
+  maxEse: number
+  maxTotal: number
+  semester: number
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "marks:write")
+    const { ok, cls } = await classInScope(user!, input.classId)
+    if (!ok || !cls) return { error: "That class is not in your scope." }
+    if (!input.courseCode.trim() || !input.courseName.trim())
+      return { error: "Course code and name are required." }
+
+    // Reuse the course if it already exists (a subject is taught to many classes),
+    // else create it under this class's department.
+    let course = await getCourseByCode(input.courseCode)
+    if (!course) {
+      course = await createCourse({
+        courseCode: input.courseCode,
+        courseName: input.courseName.trim(),
+        departmentCode: cls.departmentCode,
+        courseType: input.courseType,
+        credits: input.credits,
+        maxIsa: input.maxIsa,
+        maxMse: input.maxMse,
+        maxEse: input.maxEse,
+        maxTotal: input.maxTotal,
+      })
+    }
+    await createOffering({
+      courseId: course.id,
+      classId: input.classId,
+      facultyId: user!.facultyId,
+      semester: input.semester,
+    })
+    await createAuditLog({
+      action: "offering.created",
+      actorId: user!.id,
+      targetType: "class",
+      targetId: input.classId,
+      details: { courseCode: input.courseCode },
+    })
+    revalidatePath(`/dashboard/class/${input.classId}/marks`)
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not add subject") }
+  }
+}
+
+export async function saveMarksAction(input: {
+  offeringId: string
+  rows: {
+    studentId: string
+    isa: number | null
+    mse1: number | null
+    mse2: number | null
+    ese: number | null
+  }[]
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "marks:write")
+    const offering = await getOfferingById(input.offeringId)
+    if (!offering) return { error: "No such subject." }
+    const { ok } = await classInScope(user!, offering.classId)
+    if (!ok) return { error: "That class is not in your scope." }
+
+    await upsertMarks(
+      input.rows.map((r) => ({
+        courseOfferingId: input.offeringId,
+        studentId: r.studentId,
+        isa: r.isa,
+        mse1: r.mse1,
+        mse2: r.mse2,
+        ese: r.ese,
+        recordedByFacultyId: user!.facultyId,
+      }))
+    )
+    await createAuditLog({
+      action: "marks.recorded",
+      actorId: user!.id,
+      targetType: "offering",
+      targetId: input.offeringId,
+      details: { count: input.rows.length },
+    })
+    revalidatePath(`/dashboard/class/${offering.classId}/marks`)
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not save marks") }
   }
 }
