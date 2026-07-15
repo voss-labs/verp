@@ -1,4 +1,4 @@
-import { parseRollNumber, expectedYear, type Year } from "@/lib/roll-number"
+import { parseRollNumber, looksLikeRoll, type Year } from "@/lib/roll-number"
 
 // The roster fields we ingest. Deliberately only what VERP does NOT compute —
 // no marks, no SGPI/CGPA, no attendance. Those have a single source of truth
@@ -104,6 +104,52 @@ export function mapColumns(headers: string[]): (StudentField | null)[] {
   })
 }
 
+/**
+ * Find the header row in a messy sheet. Real attendance sheets open with several
+ * title/instruction rows before the real "Roll No | Name | …" header, so we scan
+ * the first `limit` rows for the one that maps to BOTH a roll number and a name.
+ * Returns the 0-based index, or -1 if no header-like row is found.
+ */
+export function detectHeaderRow(rows: string[][], limit = 15): number {
+  for (let i = 0; i < Math.min(limit, rows.length); i++) {
+    if (isHeaderLike(rows[i])) return i
+  }
+  return -1
+}
+
+// A row is header-like if it maps to a roll-number column. Used both to find the
+// header and to skip the repeated sub-header rows that real sheets stack under it
+// (e.g. "Roll No | Name" then a second row of "Roll No | Sign | Sign | …").
+function isHeaderLike(cells: string[]): boolean {
+  const m = mapColumns(cells)
+  const hasRoll = m.includes("rollNumber")
+  const hasName =
+    m.includes("name") || m.includes("firstName") || m.includes("lastName")
+  return hasRoll && hasName
+}
+
+/**
+ * Given the detected header index, return where the real data begins — after any
+ * additional stacked header rows. Attendance sheets often repeat the header two
+ * or three times (column names, then a sub-row of dates/signs).
+ */
+export function dataStartIndex(rows: string[][], headerIdx: number): number {
+  let i = headerIdx
+  while (i + 1 < rows.length && isHeaderLike(rows[i + 1])) i++
+  return i + 1
+}
+
+/**
+ * Attendance sheets carry no "Year" column — the sheet NAME does (every tab is
+ * prefixed FE/SE/TE/BE, e.g. "SE A", "BE OLD", "TE-MDM-FIE"). We use that as the
+ * default year for every row on the sheet, since deriving it from the roll number
+ * depends on the current date and goes stale once the academic year rolls over.
+ */
+export function yearFromSheetName(name: string): Year | null {
+  const m = /(?:^|[\s_-])(FE|SE|TE|BE)(?=$|[\s_-])/i.exec(name)
+  return m ? (m[1].toUpperCase() as Year) : null
+}
+
 export type CellFlag = { field: string; message: string }
 
 export type PreviewRow = {
@@ -143,7 +189,7 @@ export type RosterFields = Omit<PreviewRow, "flags">
  * Pure and client-safe (imports only the roll-number parser), so the browser
  * re-runs it live as the TR edits, and the server runs it on preview.
  */
-export function flagRow(input: RosterFields, now: Date): PreviewRow {
+export function flagRow(input: RosterFields): PreviewRow {
   const row: PreviewRow = {
     ...input,
     rollNumber: input.rollNumber.trim().toUpperCase(),
@@ -157,8 +203,10 @@ export function flagRow(input: RosterFields, now: Date): PreviewRow {
   if (!row.rollNumber) flags.push({ field: "rollNumber", message: "Missing" })
   if (!row.firstName.trim())
     flags.push({ field: "firstName", message: "Missing" })
-  if (!row.email) flags.push({ field: "email", message: "Missing" })
-  else if (!EMAIL_RE.test(row.email))
+  // Email is OPTIONAL on import. College attendance sheets carry no email — it
+  // arrives later, from the student's verified VOSS login when they claim their
+  // roll number. So a missing email is fine; only a MALFORMED one is flagged.
+  if (row.email && !EMAIL_RE.test(row.email))
     flags.push({ field: "email", message: "Not a valid email" })
 
   if (row.rollNumber) {
@@ -181,13 +229,6 @@ export function flagRow(input: RosterFields, now: Date): PreviewRow {
           field: "division",
           message: `Roll says division ${parsed.division}`,
         })
-
-      const exp = expectedYear(parsed.admissionYear, now)
-      if (row.year && exp && row.year !== exp)
-        flags.push({
-          field: "year",
-          message: `Expected ${exp} by admission year`,
-        })
     } catch (e) {
       flags.push({
         field: "rollNumber",
@@ -196,7 +237,13 @@ export function flagRow(input: RosterFields, now: Date): PreviewRow {
     }
   }
 
-  if (row.year && !YEARS.includes(row.year as Year))
+  // Department and year are NOT NULL in storage. flagRow fills department from a
+  // known roll and year from the sheet name upstream; flag whatever is still
+  // empty so a row that looks clean in the preview can never be rejected at
+  // commit for a missing required field.
+  if (!row.department) flags.push({ field: "department", message: "Missing" })
+  if (!row.year) flags.push({ field: "year", message: "Missing" })
+  else if (!YEARS.includes(row.year as Year))
     flags.push({ field: "year", message: "Expected FE / SE / TE / BE" })
 
   row.flags = flags
@@ -211,40 +258,56 @@ export function flagRow(input: RosterFields, now: Date): PreviewRow {
 export function buildPreviewRows(
   headers: string[],
   grid: string[][],
-  now: Date
+  defaultYear: Year | null = null
 ): { mapping: (StudentField | null)[]; rows: PreviewRow[] } {
   const mapping = mapColumns(headers)
   const col = (field: StudentField) => mapping.indexOf(field)
+  const cell = (cells: string[], field: StudentField) => {
+    const i = col(field)
+    return i >= 0 ? (cells[i] ?? "").toString().trim() : ""
+  }
 
-  const rows = grid.map((cells): PreviewRow => {
-    const get = (field: StudentField) => {
-      const i = col(field)
-      return i >= 0 ? (cells[i] ?? "").toString().trim() : ""
-    }
+  // Real attendance sheets sprinkle non-student rows through the data region:
+  // lab "Batch 1" separators (a merged cell that bleeds the same label into
+  // every column), mid-sheet repeated headers (OLD sheets stack two class
+  // blocks), stray title text. A row is junk if it repeats the header, or its
+  // roll cell isn't roll-shaped AND it has no distinct name — a merged label
+  // shows up as name === roll. A typo'd roll with a real, different name
+  // survives: that's a student for the TR to fix, not junk to drop.
+  const isJunk = (cells: string[]): boolean => {
+    if (isHeaderLike(cells)) return true
+    const roll = cell(cells, "rollNumber")
+    if (looksLikeRoll(roll)) return false
+    const name =
+      cell(cells, "name") || cell(cells, "firstName") || cell(cells, "lastName")
+    return !name || name.toUpperCase() === roll.toUpperCase()
+  }
 
-    let firstName = get("firstName")
-    let lastName = get("lastName")
-    if (!firstName && !lastName) {
-      const split = splitName(get("name"))
-      firstName = split.firstName
-      lastName = split.lastName
-    }
+  const rows = grid
+    .filter((cells) => !isJunk(cells))
+    .map((cells): PreviewRow => {
+      const get = (field: StudentField) => cell(cells, field)
 
-    return flagRow(
-      {
+      let firstName = get("firstName")
+      let lastName = get("lastName")
+      if (!firstName && !lastName) {
+        const split = splitName(get("name"))
+        firstName = split.firstName
+        lastName = split.lastName
+      }
+
+      return flagRow({
         rollNumber: get("rollNumber"),
         firstName,
         lastName,
         email: get("email"),
         department: get("department"),
         division: get("division"),
-        year: get("year"),
+        year: get("year") || (defaultYear ?? ""),
         semester: get("semester"),
         phoneNo: get("phoneNo"),
-      },
-      now
-    )
-  })
+      })
+    })
 
   return { mapping, rows }
 }

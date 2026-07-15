@@ -3,14 +3,31 @@ import ExcelJS from "exceljs"
 import { apiError, apiSuccess } from "@/lib/api-response"
 import { getErrorMessage } from "@/lib/error-utils"
 import { getSessionUser, isStaff } from "@/lib/session"
-import { buildPreviewRows } from "@/lib/xlsx-import"
+import {
+  buildPreviewRows,
+  detectHeaderRow,
+  dataStartIndex,
+  yearFromSheetName,
+} from "@/lib/xlsx-import"
 
 export const dynamic = "force-dynamic"
 
-// Server-side parse, deliberately. The mapping and roll-number validation live
-// in one trusted place, and the raw file is never round-tripped back to the
-// browser — the TR uploads once, edits the parsed preview, then commits.
+// Server-side parse, deliberately. The mapping, header detection and roll-number
+// validation live in one trusted place, and the raw file is never round-tripped
+// back to the browser — the TR uploads once, edits the parsed preview, commits.
 const MAX_ROWS = 2000
+
+function readSheet(sheet: ExcelJS.Worksheet): string[][] {
+  const out: string[][] = []
+  sheet.eachRow({ includeEmpty: true }, (row) => {
+    const cells: string[] = []
+    row.eachCell({ includeEmpty: true }, (cell, col) => {
+      cells[col - 1] = (cell.text ?? "").toString().trim()
+    })
+    out.push(cells)
+  })
+  return out
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,49 +39,77 @@ export async function POST(req: NextRequest) {
     const form = await req.formData()
     const file = form.get("file")
     if (!(file instanceof File)) return apiError("No file uploaded", 400)
+    const requestedSheet = (form.get("sheet") ?? "").toString()
 
     const buffer = Buffer.from(await file.arrayBuffer())
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(buffer as unknown as Parameters<typeof wb.xlsx.load>[0])
 
-    const sheet = wb.worksheets[0]
-    if (!sheet || sheet.rowCount < 2) {
-      return apiError("The sheet is empty or has no data rows", 400)
+    const sheetNames = wb.worksheets.map((w) => w.name)
+    if (sheetNames.length === 0) return apiError("The file has no sheets", 400)
+
+    // Pick the requested sheet, else the first sheet with a roster header (skips
+    // instruction/summary tabs), else the first sheet.
+    let sheet = requestedSheet
+      ? wb.worksheets.find((w) => w.name === requestedSheet)
+      : undefined
+    let grid: string[][] = sheet ? readSheet(sheet) : []
+    let headerIdx = sheet ? detectHeaderRow(grid) : -1
+
+    if (!sheet) {
+      for (const w of wb.worksheets) {
+        const g = readSheet(w)
+        const h = detectHeaderRow(g)
+        if (h >= 0) {
+          sheet = w
+          grid = g
+          headerIdx = h
+          break
+        }
+      }
+      if (!sheet) {
+        sheet = wb.worksheets[0]
+        grid = readSheet(sheet)
+        headerIdx = detectHeaderRow(grid)
+      }
     }
 
-    // First non-empty row is the header.
-    const headerRow = sheet.getRow(1)
-    const headers: string[] = []
-    headerRow.eachCell({ includeEmpty: true }, (cell, col) => {
-      headers[col - 1] = (cell.text ?? "").toString().trim()
-    })
-
-    const grid: string[][] = []
-    for (let r = 2; r <= sheet.rowCount && grid.length < MAX_ROWS; r++) {
-      const row = sheet.getRow(r)
-      const cells: string[] = []
-      let hasAny = false
-      row.eachCell({ includeEmpty: true }, (cell, col) => {
-        const v = (cell.text ?? "").toString().trim()
-        cells[col - 1] = v
-        if (v) hasAny = true
+    if (headerIdx < 0) {
+      // No recognizable header — likely an instruction/summary tab. Let the TR
+      // switch sheets rather than erroring.
+      return apiSuccess({
+        sheetNames,
+        activeSheet: sheet.name,
+        headerFound: false,
+        rows: [],
+        totalRows: 0,
+        flaggedRows: 0,
+        truncated: false,
       })
-      if (hasAny) grid.push(cells)
     }
 
-    if (grid.length === 0) return apiError("No data rows found", 400)
+    const headers = grid[headerIdx]
+    const start = dataStartIndex(grid, headerIdx)
+    const dataRows = grid
+      .slice(start)
+      .filter((cells) => cells.some((c) => c && c.trim()))
+      .slice(0, MAX_ROWS)
 
-    const { mapping, rows } = buildPreviewRows(headers, grid, new Date())
-
-    const truncated = sheet.rowCount - 1 > MAX_ROWS
+    const { rows } = buildPreviewRows(
+      headers,
+      dataRows,
+      yearFromSheetName(sheet.name)
+    )
 
     return apiSuccess({
-      headers,
-      mapping,
+      sheetNames,
+      activeSheet: sheet.name,
+      headerFound: true,
+      headerRow: headerIdx + 1,
       rows,
       totalRows: rows.length,
       flaggedRows: rows.filter((r) => r.flags.length > 0).length,
-      truncated,
+      truncated: grid.length - start > MAX_ROWS,
     })
   } catch (err) {
     console.error("Failed to preview import:", err)

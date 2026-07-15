@@ -14,8 +14,9 @@ export const dynamic = "force-dynamic"
 const importRowSchema = z.object({
   rollNumber: z.string().min(1, "Roll number is required"),
   firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Invalid email format"),
+  // Single-word names are common; last name is optional and stored as "".
+  lastName: z.string().optional(),
+  email: z.string().email("Invalid email format").optional(),
   department: z.string().min(1, "Department is required"),
   division: z.enum(["A", "B", "C"]).optional(),
   year: z.enum(["FE", "SE", "TE", "BE"]),
@@ -97,7 +98,7 @@ export async function POST(req: NextRequest) {
       const inserts = validRows.map((r) =>
         createStudent({
           firstName: r.firstName,
-          lastName: r.lastName,
+          lastName: r.lastName ?? "",
           rollNumber: r.rollNumber,
           email: r.email,
           department: r.department,
