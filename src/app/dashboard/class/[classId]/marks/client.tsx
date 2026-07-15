@@ -98,7 +98,18 @@ function SubjectSetup({
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
       <div className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold">Subjects</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Subjects</h2>
+          <button
+            type="button"
+            onClick={() =>
+              router.push(`/dashboard/class/${classId}/marks/import`)
+            }
+            className="text-muted-foreground hover:text-foreground text-xs underline"
+          >
+            Import from file
+          </button>
+        </div>
         {offerings.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             No subjects yet. Add one to start entering marks.
