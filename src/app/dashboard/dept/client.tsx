@@ -214,7 +214,7 @@ function CreateClass({
       <div className="grid gap-1.5">
         <label className="text-muted-foreground text-xs">Division</label>
         <Select value={division} onValueChange={(v) => v && setDivision(v)}>
-          <SelectTrigger size="sm" className="h-9 w-20">
+          <SelectTrigger className="h-9 w-24">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
