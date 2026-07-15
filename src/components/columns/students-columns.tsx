@@ -55,17 +55,26 @@ export const studentsColumns: ColumnDef<StudentRow>[] = [
   {
     accessorKey: "semester",
     header: "Semester",
-    cell: ({ row }) => row.getValue("semester") ?? "-",
+    cell: ({ row }) =>
+      row.getValue("semester") ?? (
+        <span className="text-muted-foreground">-</span>
+      ),
   },
   {
     accessorKey: "phoneNo",
     header: "Phone",
-    cell: ({ row }) => row.getValue("phoneNo") ?? "-",
+    cell: ({ row }) =>
+      row.getValue("phoneNo") ?? (
+        <span className="text-muted-foreground">-</span>
+      ),
   },
   {
     accessorKey: "gender",
     header: "Gender",
-    cell: ({ row }) => row.getValue("gender") ?? "-",
+    cell: ({ row }) =>
+      row.getValue("gender") ?? (
+        <span className="text-muted-foreground">-</span>
+      ),
   },
   {
     accessorKey: "isActive",

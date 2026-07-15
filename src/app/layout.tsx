@@ -1,16 +1,16 @@
 import type { Metadata } from "next"
-import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google"
+import { Geist, Geist_Mono } from "next/font/google"
 import { ThemeProvider } from "next-themes"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import "./globals.css"
 
-const fontSans = Plus_Jakarta_Sans({
+const fontSans = Geist({
   variable: "--font-sans",
   subsets: ["latin"],
 })
 
-const fontMono = JetBrains_Mono({
+const fontMono = Geist_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
 })

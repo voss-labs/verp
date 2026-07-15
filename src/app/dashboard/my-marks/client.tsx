@@ -105,9 +105,9 @@ function SemesterCard({ semester }: { semester: SemesterData }) {
                 Has Fail
               </Badge>
             )}
-            <div className="bg-muted/50 flex items-center gap-1.5 rounded-lg border px-3 py-1.5">
+            <div className="bg-blue/5 border-blue/20 flex items-center gap-1.5 rounded-lg border px-3 py-1.5">
               <span className="text-muted-foreground text-xs">SGPI</span>
-              <span className="text-blue font-bold tabular-nums">
+              <span className="text-blue text-base font-bold tabular-nums">
                 {sgpi.sgpi ?? "-"}
               </span>
             </div>

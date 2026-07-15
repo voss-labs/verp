@@ -14,7 +14,6 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import {
-  GraduationCapIcon,
   UsersIcon,
   BookOpenIcon,
   CalendarIcon,
@@ -30,12 +29,13 @@ import {
 } from "lucide-react"
 import { useSession } from "@/lib/auth-client"
 import { useUserRole } from "@/hooks/use-user-role"
+import { VossMark } from "@/components/voss-logo"
 
 const teams = [
   {
-    name: "VERP",
-    logo: <GraduationCapIcon />,
-    plan: "Vidyalankar ERP",
+    name: "VOSS",
+    logo: <VossMark className="text-base" />,
+    plan: "VERP · Vidyalankar ERP",
   },
 ]
 

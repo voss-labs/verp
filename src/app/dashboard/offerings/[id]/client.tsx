@@ -150,7 +150,7 @@ function EnrollmentSection({
                       <TableCell>
                         <button
                           onClick={() => handleUnenroll(s.id)}
-                          className="text-muted-foreground hover:text-destructive"
+                          className="text-muted-foreground hover:text-destructive transition-colors"
                         >
                           <TrashIcon className="size-3.5" />
                         </button>
@@ -201,7 +201,7 @@ function EnrollmentSection({
                         <button
                           onClick={() => handleEnroll(s.id)}
                           disabled={enrolling}
-                          className="text-muted-foreground hover:text-blue"
+                          className="text-muted-foreground hover:text-blue transition-colors disabled:opacity-50"
                         >
                           <PlusIcon className="size-4" />
                         </button>
@@ -359,7 +359,7 @@ function BatchSection({
                             <button
                               key={b.id}
                               onClick={() => handleAssignToBatch(b.id, s.id)}
-                              className="hover:bg-muted rounded border px-1.5 py-0.5 text-xs"
+                              className="border-border hover:border-blue hover:text-blue rounded border px-1.5 py-0.5 text-xs transition-colors"
                             >
                               {b.name}
                             </button>

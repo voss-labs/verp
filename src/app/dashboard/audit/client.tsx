@@ -32,24 +32,13 @@ type AuditLogEntry = {
   createdAt: string
 }
 
+// Neutral outline badges by default; orange accent reserved for notable actions
+// (locking marks), destructive for removals. No rainbow.
 const ACTION_STYLES: Record<string, string> = {
-  "marks.save": "text-blue border-blue/20 bg-blue/8",
-  "marks.lock":
-    "text-amber-600 dark:text-amber-400 border-amber-500/20 bg-amber-500/10",
-  "marks.unlock":
-    "text-emerald-600 dark:text-emerald-400 border-emerald-500/20 bg-emerald-500/10",
-  "enrollment.add":
-    "text-emerald-600 dark:text-emerald-400 border-emerald-500/20 bg-emerald-500/10",
+  "marks.lock": "text-blue border-blue/20 bg-blue/8",
+  "marks.unlock": "text-blue border-blue/20 bg-blue/8",
   "enrollment.remove":
     "text-destructive border-destructive/20 bg-destructive/10",
-  "offering.assign_faculty":
-    "text-violet-600 dark:text-violet-400 border-violet-500/20 bg-violet-500/10",
-  "batch.create": "text-blue border-blue/20 bg-blue/8",
-  "batch.assign_student": "text-blue border-blue/20 bg-blue/8",
-  "students.promote":
-    "text-emerald-600 dark:text-emerald-400 border-emerald-500/20 bg-emerald-500/10",
-  "students.graduate":
-    "text-emerald-600 dark:text-emerald-400 border-emerald-500/20 bg-emerald-500/10",
 }
 
 export function AuditLogClient({

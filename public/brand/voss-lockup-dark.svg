@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 80" role="img"
+     aria-label="VOSS">
+  <text x="0" y="62"
+        font-family="Geist, Inter, system-ui, -apple-system, sans-serif"
+        font-weight="900"
+        font-size="72"
+        letter-spacing="-3"
+        textLength="190"
+        lengthAdjust="spacingAndGlyphs"
+        fill="#FAFAFA">VOSS</text>
+  <rect x="196" y="46" width="20" height="20" fill="#FB7A3C"/>
+</svg>

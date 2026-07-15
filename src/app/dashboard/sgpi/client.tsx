@@ -416,7 +416,7 @@ export function CgpaClient({
                     ) : student.computed.cgpa != null ? (
                       <Badge
                         variant="outline"
-                        className="border-emerald-200 bg-emerald-50 text-xs text-emerald-600"
+                        className="text-success border-success/20 bg-success/10 text-xs"
                       >
                         Pass
                       </Badge>

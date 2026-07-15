@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/sidebar"
 import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
 
+import { VossMark } from "@/components/voss-logo"
+
 export function TeamSwitcher({
   teams,
 }: {
@@ -47,7 +49,7 @@ export function TeamSwitcher({
             }
           >
             <div className="bg-blue text-blue-foreground flex aspect-square size-8 items-center justify-center rounded-lg shadow-sm">
-              {activeTeam.logo}
+              <VossMark className="text-base" />
             </div>
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-bold tracking-tight">
