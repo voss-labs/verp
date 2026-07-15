@@ -11,7 +11,7 @@ export const insertStudentSchema = createInsertSchema(students, {
   phoneNo: (schema) =>
     schema.regex(/^\d{10}$/, "Phone must be 10 digits").optional(),
   department: () => z.string().min(1, "Department is required"),
-  division: () => z.enum(["A", "B"]).optional(),
+  division: () => z.enum(["A", "B", "C"]).optional(),
   year: () => z.enum(["FE", "SE", "TE", "BE"]),
   gender: () => z.enum(["M", "F", "Other", "Prefer not to say"]).optional(),
 })
