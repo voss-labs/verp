@@ -1,6 +1,18 @@
-import { eq, and, sql } from "drizzle-orm"
+import { eq, and, sql, inArray } from "drizzle-orm"
 import { db } from "@/db"
 import { faculty } from "@/db/schema"
+
+// HOD scope: faculty in their department(s).
+export async function getFacultyByDepartments(departments: string[]) {
+  if (departments.length === 0) return []
+  return db.query.faculty.findMany({
+    where: and(
+      eq(faculty.isActive, true),
+      inArray(faculty.department, departments)
+    ),
+    orderBy: (f, { asc }) => [asc(f.lastName), asc(f.firstName)],
+  })
+}
 
 export async function getFacultyById(id: string) {
   return db.query.faculty.findFirst({

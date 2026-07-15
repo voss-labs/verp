@@ -1,6 +1,30 @@
-import { eq, and } from "drizzle-orm"
+import { eq, and, inArray } from "drizzle-orm"
 import { db } from "@/db"
 import { students } from "@/db/schema"
+
+// Coordinator scope: only the students in the classes they run.
+export async function getStudentsByClassIds(classIds: string[]) {
+  if (classIds.length === 0) return []
+  return db.query.students.findMany({
+    where: and(
+      eq(students.isActive, true),
+      inArray(students.classId, classIds)
+    ),
+    orderBy: (s, { asc }) => [asc(s.rollNumber)],
+  })
+}
+
+// HOD scope: every student in their department(s).
+export async function getStudentsByDepartments(departments: string[]) {
+  if (departments.length === 0) return []
+  return db.query.students.findMany({
+    where: and(
+      eq(students.isActive, true),
+      inArray(students.department, departments)
+    ),
+    orderBy: (s, { asc }) => [asc(s.rollNumber)],
+  })
+}
 
 export async function getStudentById(id: string) {
   return db.query.students.findFirst({
