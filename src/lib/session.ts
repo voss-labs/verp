@@ -1,5 +1,5 @@
 import { headers } from "next/headers"
-import { and, eq } from "drizzle-orm"
+import { and, eq, or } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/db"
 import * as schema from "@/db/schema"
@@ -38,34 +38,41 @@ export type SessionUser = {
   capabilities: ReadonlySet<Capability>
 }
 
-async function overridesFor(
-  subjectType: "role" | "user",
-  subjectId: string
-): Promise<Override[]> {
+// The tier's role overrides and this user's user overrides in ONE round trip —
+// both live in permission_overrides, so a single OR-filtered read replaces the
+// two it used to take, then we partition by subjectType in memory.
+async function capabilitiesFor(
+  tier: Exclude<Tier, "super_admin">,
+  userId: string
+): Promise<ReadonlySet<Capability>> {
   const rows = await db
     .select({
+      subjectType: schema.permissionOverrides.subjectType,
       capability: schema.permissionOverrides.capability,
       effect: schema.permissionOverrides.effect,
     })
     .from(schema.permissionOverrides)
     .where(
       and(
-        eq(schema.permissionOverrides.subjectType, subjectType),
-        eq(schema.permissionOverrides.subjectId, subjectId),
-        eq(schema.permissionOverrides.isActive, true)
+        eq(schema.permissionOverrides.isActive, true),
+        or(
+          and(
+            eq(schema.permissionOverrides.subjectType, "role"),
+            eq(schema.permissionOverrides.subjectId, tier)
+          ),
+          and(
+            eq(schema.permissionOverrides.subjectType, "user"),
+            eq(schema.permissionOverrides.subjectId, userId)
+          )
+        )
       )
     )
-  return rows
-}
-
-async function capabilitiesFor(
-  tier: Exclude<Tier, "super_admin">,
-  userId: string
-): Promise<ReadonlySet<Capability>> {
-  const [roleOv, userOv] = await Promise.all([
-    overridesFor("role", tier),
-    overridesFor("user", userId),
-  ])
+  const roleOv: Override[] = []
+  const userOv: Override[] = []
+  for (const r of rows) {
+    const ov = { capability: r.capability, effect: r.effect }
+    ;(r.subjectType === "role" ? roleOv : userOv).push(ov)
+  }
   return effectiveCapabilities(tier, roleOv, userOv)
 }
 
@@ -103,12 +110,25 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   }
 
   // ── faculty (hod / faculty) ──
+  // One relational read pulls the faculty row plus its class assignments and HOD
+  // appointments, replacing the three separate queries this used to run.
   const fac = await db.query.faculty.findFirst({
     where: and(
       eq(schema.faculty.authUserId, userId),
       eq(schema.faculty.isActive, true)
     ),
     columns: { id: true, role: true },
+    with: {
+      classAssignments: {
+        where: (a, { eq }) => eq(a.isActive, true),
+        columns: { classId: true },
+      },
+      deptAppointments: {
+        where: (d, { eq, and }) =>
+          and(eq(d.appointment, "hod"), eq(d.isActive, true)),
+        columns: { deptCode: true },
+      },
+    },
   })
   if (fac) {
     const tier: Exclude<Tier, "student"> =
@@ -116,11 +136,9 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     if (tier === "super_admin") {
       return { ...base, tier, facultyId: fac.id, studentId: null, ...empty }
     }
-    const [deptCodes, classIds, capabilities] = await Promise.all([
-      tier === "hod" ? hodDeptCodes(fac.id) : Promise.resolve([]),
-      facultyClassIds(fac.id),
-      capabilitiesFor(tier, userId),
-    ])
+    const classIds = fac.classAssignments.map((a) => a.classId)
+    const deptCodes =
+      tier === "hod" ? fac.deptAppointments.map((d) => d.deptCode) : []
     return {
       ...base,
       tier,
@@ -128,7 +146,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       studentId: null,
       deptCodes,
       classIds,
-      capabilities,
+      capabilities: await capabilitiesFor(tier, userId),
     }
   }
 
@@ -154,33 +172,6 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
   // ── unbound ──
   return { ...base, tier: null, facultyId: null, studentId: null, ...empty }
-}
-
-async function hodDeptCodes(facultyId: string): Promise<string[]> {
-  const rows = await db
-    .select({ deptCode: schema.deptAppointments.deptCode })
-    .from(schema.deptAppointments)
-    .where(
-      and(
-        eq(schema.deptAppointments.facultyId, facultyId),
-        eq(schema.deptAppointments.appointment, "hod"),
-        eq(schema.deptAppointments.isActive, true)
-      )
-    )
-  return rows.map((r) => r.deptCode)
-}
-
-async function facultyClassIds(facultyId: string): Promise<string[]> {
-  const rows = await db
-    .select({ classId: schema.facultyClassAssignments.classId })
-    .from(schema.facultyClassAssignments)
-    .where(
-      and(
-        eq(schema.facultyClassAssignments.facultyId, facultyId),
-        eq(schema.facultyClassAssignments.isActive, true)
-      )
-    )
-  return rows.map((r) => r.classId)
 }
 
 /** Authenticated by VOSS, but not matched to anybody — the pending screen. */
