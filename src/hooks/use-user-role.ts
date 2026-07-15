@@ -2,17 +2,17 @@
 
 import { useEffect, useSyncExternalStore } from "react"
 
-type UserRole = "admin" | "faculty" | "student"
+export type Tier = "super_admin" | "hod" | "faculty" | "student"
 
 type UserRoleData = {
-  role: UserRole
+  tier: Tier | null
   facultyId: string | null
   studentId: string | null
   loading: boolean
 }
 
 let cachedData: UserRoleData = {
-  role: "admin",
+  tier: null,
   facultyId: null,
   studentId: null,
   loading: true,
@@ -30,10 +30,6 @@ function getSnapshot() {
   return cachedData
 }
 
-function getServerSnapshot() {
-  return cachedData
-}
-
 let fetched = false
 
 function fetchRole() {
@@ -46,7 +42,7 @@ function fetchRole() {
     })
     .then((user) => {
       cachedData = {
-        role: user.role,
+        tier: user.tier ?? null,
         facultyId: user.facultyId,
         studentId: user.studentId,
         loading: false,
@@ -60,7 +56,7 @@ function fetchRole() {
 }
 
 export function useUserRole(): UserRoleData {
-  const data = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  const data = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 
   useEffect(() => {
     fetchRole()

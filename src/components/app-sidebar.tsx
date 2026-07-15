@@ -95,7 +95,7 @@ const studentNav = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession()
-  const { role } = useUserRole()
+  const { tier } = useUserRole()
 
   const user = {
     name: session?.user?.name ?? "User",
@@ -104,11 +104,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }
 
   // Empty for an unbound (pending) user — they see the shell, not a menu they
-  // cannot use. Never default to adminNav: role null is not an admin.
+  // cannot use. Never default to adminNav: tier null is not an admin. (HOD shares
+  // the admin nav for now; a dedicated dept nav arrives with the HOD dashboard.)
   let navItems: typeof adminNav = []
-  if (role === "admin") navItems = adminNav
-  else if (role === "faculty") navItems = facultyNav
-  else if (role === "student") navItems = studentNav
+  if (tier === "super_admin" || tier === "hod") navItems = adminNav
+  else if (tier === "faculty") navItems = facultyNav
+  else if (tier === "student") navItems = studentNav
 
   return (
     <Sidebar collapsible="icon" {...props}>

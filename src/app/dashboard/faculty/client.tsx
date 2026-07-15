@@ -29,7 +29,7 @@ export function FacultyClient({ data }: { data: FacultyRow[] }) {
       f.lastName,
       f.email,
       f.department,
-      f.isAdmin ? "Admin" : "Faculty",
+      f.role,
       f.isActive ? "Active" : "Inactive",
     ])
 
