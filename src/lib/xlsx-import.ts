@@ -20,11 +20,25 @@ export type StudentField =
 // correction. A clever mapper that is occasionally confidently wrong is worse
 // than a simple one the TR verifies.
 const SYNONYMS: Record<StudentField, string[]> = {
-  rollNumber: ["rollnumber", "rollno", "roll", "prn", "enrollmentno", "enrollment"],
+  rollNumber: [
+    "rollnumber",
+    "rollno",
+    "roll",
+    "prn",
+    "enrollmentno",
+    "enrollment",
+  ],
   firstName: ["firstname", "fname", "givenname"],
   lastName: ["lastname", "surname", "lname"],
   name: ["name", "fullname", "studentname"],
-  email: ["email", "emailid", "mail", "emailaddress", "vitemail", "collegeemail"],
+  email: [
+    "email",
+    "emailid",
+    "mail",
+    "emailaddress",
+    "vitemail",
+    "collegeemail",
+  ],
   department: ["department", "dept", "branch"],
   division: ["division", "div", "class", "section"],
   year: ["year", "yr", "academicyear"],
@@ -44,7 +58,11 @@ function levenshtein(a: string, b: string): number {
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1
-      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost)
+      d[i][j] = Math.min(
+        d[i - 1][j] + 1,
+        d[i][j - 1] + 1,
+        d[i - 1][j - 1] + cost
+      )
     }
   }
   return d[m][n]
@@ -125,10 +143,7 @@ export type RosterFields = Omit<PreviewRow, "flags">
  * Pure and client-safe (imports only the roll-number parser), so the browser
  * re-runs it live as the TR edits, and the server runs it on preview.
  */
-export function flagRow(
-  input: RosterFields,
-  now: Date
-): PreviewRow {
+export function flagRow(input: RosterFields, now: Date): PreviewRow {
   const row: PreviewRow = {
     ...input,
     rollNumber: input.rollNumber.trim().toUpperCase(),
@@ -140,7 +155,8 @@ export function flagRow(
   const flags: CellFlag[] = []
 
   if (!row.rollNumber) flags.push({ field: "rollNumber", message: "Missing" })
-  if (!row.firstName.trim()) flags.push({ field: "firstName", message: "Missing" })
+  if (!row.firstName.trim())
+    flags.push({ field: "firstName", message: "Missing" })
   if (!row.email) flags.push({ field: "email", message: "Missing" })
   else if (!EMAIL_RE.test(row.email))
     flags.push({ field: "email", message: "Not a valid email" })
@@ -150,7 +166,10 @@ export function flagRow(
       const parsed = parseRollNumber(row.rollNumber)
       if (!row.department) row.department = parsed.department
       else if (row.department.toUpperCase() !== parsed.department)
-        flags.push({ field: "department", message: `Roll says ${parsed.department}` })
+        flags.push({
+          field: "department",
+          message: `Roll says ${parsed.department}`,
+        })
 
       if (!row.division) row.division = parsed.division
       else if (row.division !== parsed.division)
@@ -161,7 +180,10 @@ export function flagRow(
 
       const exp = expectedYear(parsed.admissionYear, now)
       if (row.year && exp && row.year !== exp)
-        flags.push({ field: "year", message: `Expected ${exp} by admission year` })
+        flags.push({
+          field: "year",
+          message: `Expected ${exp} by admission year`,
+        })
     } catch (e) {
       flags.push({
         field: "rollNumber",
