@@ -52,7 +52,9 @@ export function parseRollNumber(raw: string): ParsedRoll {
   const roll = raw.trim().toUpperCase()
   const m = ROLL_RE.exec(roll)
   if (!m) {
-    throw new Error(`"${raw}" is not a valid roll number (expected e.g. 23108A0054)`)
+    throw new Error(
+      `"${raw}" is not a valid roll number (expected e.g. 23108A0054)`
+    )
   }
   const [, yy, branchCode, division, num] = m
 
@@ -92,7 +94,8 @@ export function isValidRollNumber(raw: string): boolean {
  */
 export function expectedYear(admissionYear: number, on: Date): Year | null {
   // The academic year rolls over mid-year; treat June as the boundary.
-  const acadYearStart = on.getMonth() >= 5 ? on.getFullYear() : on.getFullYear() - 1
+  const acadYearStart =
+    on.getMonth() >= 5 ? on.getFullYear() : on.getFullYear() - 1
   const level = acadYearStart - admissionYear // 0..3
   return YEAR_BY_LEVEL[level] ?? null
 }
