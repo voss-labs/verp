@@ -22,6 +22,16 @@ export const auth = betterAuth({
     provider: "pg",
   }),
 
+  // Stay signed in for 7 days after a VOSS login. The absolute max only bounds how
+  // long a FORGOTTEN session survives; updateAge slides an active session's expiry
+  // forward daily, so an in-use account is never logged out mid-session. A session
+  // can always be revoked centrally (super-admin console + VOSS). Dial to 24h if
+  // shared staff/lab machines turn out to be the common case.
+  session: {
+    expiresIn: 60 * 60 * 24 * 7,
+    updateAge: 60 * 60 * 24,
+  },
+
   // VERP no longer holds credentials. VOSS is the only way in, so there is no
   // password here to steal, reset, or leak. Turning this back on would mean two
   // doors into the same account, and only one of them is being watched.
