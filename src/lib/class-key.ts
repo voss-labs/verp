@@ -15,10 +15,20 @@ export function classKey(
   return `${admissionYear}-${branchCode}-${division.toUpperCase()}`
 }
 
-/** Resolve a roll number to its class key. Throws if the roll is malformed. */
+/**
+ * Resolve a roll number to its class key. Throws if the roll is malformed.
+ *
+ * A class is a cohort keyed by the year the batch STARTED (FE). A direct-second-
+ * year student is admitted one year later (they skip FE) but joins that same
+ * cohort, so their roll's admission year is one ahead of the cohort — we subtract
+ * it back. Regular rolls map straight through. Repeaters (admitted a year early,
+ * no roll marker) are the one case this can't derive: they get an explicit
+ * class_key override on their student row.
+ */
 export function classKeyFromRoll(roll: string): string {
   const p = parseRollNumber(roll)
-  return classKey(p.admissionYear, p.branchCode, p.division)
+  const cohortYear = p.isDSY ? p.admissionYear - 1 : p.admissionYear
+  return classKey(cohortYear, p.branchCode, p.division)
 }
 
 /** Non-throwing variant: returns null for a roll that does not parse. */

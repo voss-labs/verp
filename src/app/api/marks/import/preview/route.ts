@@ -5,7 +5,7 @@ import { getErrorMessage } from "@/lib/error-utils"
 import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
 import { getClassById } from "@/db/queries/classes"
-import { getStudentsByClassIds } from "@/db/queries/students"
+import { getStudentsByClassKeys } from "@/db/queries/students"
 import { extractRows, guessTargets } from "@/lib/marks-import"
 import { pdfToLines } from "@/lib/pdf-extract"
 
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     // Match each parsed roll against this class's roster. Rows from another
     // division (files often stack A and B) or not-yet-enrolled students match
     // nothing and are flagged, never written.
-    const roster = await getStudentsByClassIds([classId])
+    const roster = await getStudentsByClassKeys([cls.classKey])
     const byRoll = new Map(roster.map((s) => [s.rollNumber.toUpperCase(), s]))
 
     const previewRows = trimmed.map((r) => {

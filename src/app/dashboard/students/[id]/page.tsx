@@ -25,7 +25,7 @@ export default async function StudentDetailPage({
   const inScope =
     user.tier === "super_admin" ||
     (user.tier === "hod" && user.deptCodes.includes(student.department)) ||
-    (!!student.classId && user.classIds.includes(student.classId))
+    (!!student.classKey && user.classKeys.includes(student.classKey))
   if (!inScope) redirect("/dashboard/students")
 
   const studentName = `${student.firstName} ${student.lastName}`.trim()

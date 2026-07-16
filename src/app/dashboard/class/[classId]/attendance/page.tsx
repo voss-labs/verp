@@ -4,7 +4,7 @@ import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
 import { expectedYear } from "@/lib/roll-number"
 import { getClassById } from "@/db/queries/classes"
-import { getStudentsByClassIds } from "@/db/queries/students"
+import { getStudentsByClassKeys } from "@/db/queries/students"
 import { getAttendanceForSession } from "@/db/queries/attendance"
 import { AttendanceClient } from "./client"
 
@@ -35,7 +35,7 @@ export default async function AttendancePage({
   const slot = sp.slot || "1"
 
   const [students, existing] = await Promise.all([
-    getStudentsByClassIds([classId]),
+    getStudentsByClassKeys([cls.classKey]),
     getAttendanceForSession(classId, date, slot),
   ])
   const marked: Record<string, string> = {}

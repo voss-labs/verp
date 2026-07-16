@@ -10,7 +10,7 @@ import { getClassById } from "@/db/queries/classes"
 import {
   createStudent,
   getStudentByRollNumber,
-  getStudentsByClassIds,
+  getStudentsByClassKeys,
 } from "@/db/queries/students"
 import { getRequestById, updateRequest } from "@/db/queries/onboarding"
 import { upsertAttendance } from "@/db/queries/attendance"
@@ -70,7 +70,7 @@ export async function approveEnrollmentAction(input: {
       division: parsed.division,
       year:
         expectedYear(parsed.admissionYear, now) ?? String(parsed.admissionYear),
-      classId: cls.id,
+      classKey: cls.classKey,
       authUserId: req.authUserId,
     })
     await updateRequest(req.id, {
@@ -139,13 +139,13 @@ export async function saveAttendanceAction(input: {
   try {
     const user = await getSessionUser()
     authorize(user, "attendance:write")
-    const { ok } = await classInScope(user!, input.classId)
-    if (!ok) return { error: "That class is not in your scope." }
+    const { ok, cls } = await classInScope(user!, input.classId)
+    if (!ok || !cls) return { error: "That class is not in your scope." }
 
     // Only students actually in this class can be marked — a forged studentId is
     // dropped, not written.
     const roster = new Set(
-      (await getStudentsByClassIds([input.classId])).map((s) => s.id)
+      (await getStudentsByClassKeys([cls.classKey])).map((s) => s.id)
     )
     const entries = input.marks
       .filter((m) => roster.has(m.studentId))

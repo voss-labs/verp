@@ -34,7 +34,10 @@ export type SessionUser = {
   facultyId: string | null
   studentId: string | null
   deptCodes: string[]
+  // The classes a coordinator/TR runs: `classIds` for URL-level scope checks,
+  // `classKeys` (the cohort keys) for roster queries, which key off class_key.
   classIds: string[]
+  classKeys: string[]
   capabilities: ReadonlySet<Capability>
 }
 
@@ -91,6 +94,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const empty = {
     deptCodes: [] as string[],
     classIds: [] as string[],
+    classKeys: [] as string[],
     capabilities: new Set<Capability>() as ReadonlySet<Capability>,
   }
 
@@ -122,6 +126,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       classAssignments: {
         where: (a, { eq }) => eq(a.isActive, true),
         columns: { classId: true },
+        with: { class: { columns: { classKey: true } } },
       },
       deptAppointments: {
         where: (d, { eq, and }) =>
@@ -137,6 +142,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       return { ...base, tier, facultyId: fac.id, studentId: null, ...empty }
     }
     const classIds = fac.classAssignments.map((a) => a.classId)
+    const classKeys = fac.classAssignments.map((a) => a.class.classKey)
     const deptCodes =
       tier === "hod" ? fac.deptAppointments.map((d) => d.deptCode) : []
     return {
@@ -146,6 +152,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       studentId: null,
       deptCodes,
       classIds,
+      classKeys,
       capabilities: await capabilitiesFor(tier, userId),
     }
   }
@@ -156,7 +163,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       eq(schema.students.authUserId, userId),
       eq(schema.students.isActive, true)
     ),
-    columns: { id: true, classId: true },
+    columns: { id: true, classKey: true },
   })
   if (stu) {
     return {
@@ -165,7 +172,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       facultyId: null,
       studentId: stu.id,
       deptCodes: [],
-      classIds: stu.classId ? [stu.classId] : [],
+      classIds: [],
+      classKeys: stu.classKey ? [stu.classKey] : [],
       capabilities: await capabilitiesFor("student", userId),
     }
   }

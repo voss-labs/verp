@@ -7,7 +7,6 @@ import {
   index,
 } from "drizzle-orm/pg-core"
 import { user } from "./auth"
-import { classes } from "./classes"
 
 // The roll-number-keyed roster. This is the portable core another VOSS product
 // can lift: a person is identified by their VIT roll number, linked to a VOSS
@@ -32,11 +31,13 @@ export const students = pgTable(
     department: text("department").notNull(),
     division: text("division"),
     year: text("year").notNull(),
-    // The class this roll belongs to, resolved from the roll number at approval
-    // time. Null while unlinked or if the class does not exist yet.
-    classId: uuid("class_id").references(() => classes.id, {
-      onDelete: "set null",
-    }),
+    // The cohort this student belongs to, e.g. "2023-108-A". Derived from the
+    // roll number on write (DSE rolls fold back to their batch's start year), so
+    // a class's roster is just the students sharing its class_key — no manual
+    // linking. Stored, not a hard FK: the class row may not exist yet, and a
+    // repeater whose roll can't express their cohort gets an explicit override
+    // written here. Null only for a roll we could not parse.
+    classKey: text("class_key"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -52,6 +53,6 @@ export const students = pgTable(
     index("students_is_active_idx").on(table.isActive),
     index("students_email_idx").on(table.email),
     index("students_roll_number_idx").on(table.rollNumber),
-    index("students_class_id_idx").on(table.classId),
+    index("students_class_key_idx").on(table.classKey),
   ]
 )

@@ -7,7 +7,7 @@ import { getErrorMessage } from "@/lib/error-utils"
 import { createAuditLog } from "@/db/queries"
 import {
   getAllStudents,
-  getStudentsByClassIds,
+  getStudentsByClassKeys,
   getStudentsByDepartments,
   deactivateStudentsByIds,
 } from "@/db/queries/students"
@@ -28,7 +28,7 @@ export async function bulkDeactivateStudentsAction(input: {
         ? await getAllStudents()
         : user!.tier === "hod"
           ? await getStudentsByDepartments(user!.deptCodes)
-          : await getStudentsByClassIds(user!.classIds)
+          : await getStudentsByClassKeys(user!.classKeys)
     const allowed = new Set(scoped.map((s) => s.id))
     const targets = input.ids.filter((id) => allowed.has(id))
     if (targets.length === 0)
