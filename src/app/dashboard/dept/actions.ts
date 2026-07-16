@@ -66,6 +66,102 @@ export async function createDeptFacultyAction(input: {
   }
 }
 
+// Bulk-create teaching staff in the HOD's department from an uploaded CSV, and
+// optionally assign each to one class as coordinator/TR. An email already on a
+// faculty row is reused (and still assigned), never duplicated.
+export async function bulkImportFacultyAction(input: {
+  deptCode: string
+  rows: {
+    firstName: string
+    lastName: string
+    email: string
+    employeeId: string
+  }[]
+  assignClassId?: string | null
+  assignRole?: "academic_coordinator" | "tr" | null
+}): Promise<{
+  error: string | null
+  created?: number
+  existing?: number
+  assigned?: number
+  failed?: number
+}> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "faculty:create")
+    if (!inDeptScope(user!, input.deptCode))
+      return { error: "That department is not in your scope." }
+    if (input.rows.length === 0) return { error: "No rows to import." }
+
+    // An optional class assignment must target a class in this department.
+    let assignClass: Awaited<ReturnType<typeof getClassById>> | null = null
+    if (input.assignClassId && input.assignRole) {
+      assignClass = await getClassById(input.assignClassId)
+      if (!assignClass || assignClass.departmentCode !== input.deptCode)
+        return { error: "That class is not in your department." }
+    }
+
+    let created = 0
+    let existing = 0
+    let assigned = 0
+    let failed = 0
+    for (const r of input.rows) {
+      const email = r.email.trim().toLowerCase()
+      const firstName = r.firstName.trim()
+      const employeeId = r.employeeId.trim()
+      if (!firstName || !employeeId || !EMAIL_RE.test(email)) {
+        failed++
+        continue
+      }
+      try {
+        let fac = await getFacultyByEmail(email)
+        if (fac) existing++
+        else {
+          fac = await createFaculty({
+            firstName,
+            lastName: r.lastName.trim(),
+            employeeId,
+            email,
+            department: input.deptCode,
+            role: "faculty",
+          })
+          created++
+        }
+        if (assignClass && fac && input.assignRole) {
+          await assignClassRole(
+            assignClass.id,
+            fac.id,
+            input.assignRole,
+            user!.id
+          )
+          assigned++
+        }
+      } catch {
+        failed++
+      }
+    }
+
+    await createAuditLog({
+      action: "faculty.bulk_import",
+      actorId: user!.id,
+      targetType: "faculty",
+      details: {
+        department: input.deptCode,
+        created,
+        existing,
+        assigned,
+        failed,
+        assignedClass: assignClass?.classKey ?? null,
+        role: input.assignRole ?? null,
+      },
+    })
+    revalidatePath("/dashboard/dept")
+    return { error: null, created, existing, assigned, failed }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not import faculty") }
+  }
+}
+
 // A dept is in scope if the caller is super_admin (all) or an HOD of it.
 function inDeptScope(user: SessionUser, deptCode: string): boolean {
   return user.tier === "super_admin" || user.deptCodes.includes(deptCode)

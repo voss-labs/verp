@@ -53,7 +53,10 @@ const adminNav = [
     title: "Import",
     url: "/dashboard/students/import",
     icon: <UploadIcon />,
-    items: [{ title: "Import roster", url: "/dashboard/students/import" }],
+    items: [
+      { title: "Import roster", url: "/dashboard/students/import" },
+      { title: "Import faculty", url: "/dashboard/dept/faculty-import" },
+    ],
   },
   {
     title: "Faculty",
@@ -99,7 +102,10 @@ const superAdminNav = [
     title: "Import",
     url: "/dashboard/students/import",
     icon: <UploadIcon />,
-    items: [{ title: "Import roster", url: "/dashboard/students/import" }],
+    items: [
+      { title: "Import roster", url: "/dashboard/students/import" },
+      { title: "Import faculty", url: "/dashboard/dept/faculty-import" },
+    ],
   },
   {
     title: "Faculty",
