@@ -2,13 +2,14 @@ import { eq, and, inArray } from "drizzle-orm"
 import { db } from "@/db"
 import { students } from "@/db/schema"
 
-// Coordinator scope: only the students in the classes they run.
-export async function getStudentsByClassIds(classIds: string[]) {
-  if (classIds.length === 0) return []
+// Coordinator scope: the students of a class are exactly those whose roll-derived
+// class_key matches the class — no stored link to populate or drift.
+export async function getStudentsByClassKeys(classKeys: string[]) {
+  if (classKeys.length === 0) return []
   return db.query.students.findMany({
     where: and(
       eq(students.isActive, true),
-      inArray(students.classId, classIds)
+      inArray(students.classKey, classKeys)
     ),
     orderBy: (s, { asc }) => [asc(s.rollNumber)],
   })

@@ -4,7 +4,7 @@ import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
 import { expectedYear } from "@/lib/roll-number"
 import { getClassById } from "@/db/queries/classes"
-import { getStudentsByClassIds } from "@/db/queries/students"
+import { getStudentsByClassKeys } from "@/db/queries/students"
 import { listOfferingsForClass, getOfferingById } from "@/db/queries/offerings"
 import { getMarksForOffering } from "@/db/queries/marks"
 import { MarksClient } from "./client"
@@ -44,7 +44,7 @@ export default async function MarksPage({
       : null
   if (selected) {
     const [students, existing] = await Promise.all([
-      getStudentsByClassIds([classId]),
+      getStudentsByClassKeys([cls.classKey]),
       getMarksForOffering(selected.id),
     ])
     const byStudent = Object.fromEntries(existing.map((m) => [m.studentId, m]))

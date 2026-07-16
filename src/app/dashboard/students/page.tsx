@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
 import {
   getAllStudents,
-  getStudentsByClassIds,
+  getStudentsByClassKeys,
   getStudentsByDepartments,
 } from "@/db/queries/students"
 
@@ -24,7 +24,7 @@ export default async function StudentsPage() {
       ? await getAllStudents()
       : user.tier === "hod"
         ? await getStudentsByDepartments(user.deptCodes)
-        : await getStudentsByClassIds(user.classIds)
+        : await getStudentsByClassKeys(user.classKeys)
 
   return (
     <>

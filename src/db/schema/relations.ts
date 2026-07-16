@@ -83,8 +83,8 @@ export const facultyClassAssignmentsRelations = relations(
 export const studentsRelations = relations(students, ({ one, many }) => ({
   authUser: one(user, { fields: [students.authUserId], references: [user.id] }),
   class: one(classes, {
-    fields: [students.classId],
-    references: [classes.id],
+    fields: [students.classKey],
+    references: [classes.classKey],
   }),
   marks: many(marks),
   attendance: many(attendance),

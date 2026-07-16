@@ -3,6 +3,7 @@ import { z } from "zod"
 import { apiError, apiSuccess } from "@/lib/api-response"
 import { getErrorMessage } from "@/lib/error-utils"
 import { getSessionUser, isStaff } from "@/lib/session"
+import { tryClassKeyFromRoll } from "@/lib/class-key"
 import { createStudent, createAuditLog } from "@/db/queries"
 import { db } from "@/db"
 import { students } from "@/db/schema"
@@ -102,6 +103,9 @@ export async function POST(req: NextRequest) {
           department: r.department,
           division: r.division ?? null,
           year: r.year,
+          // Cohort membership is derived from the roll, so a bulk-imported
+          // student lands in their class with no separate linking step.
+          classKey: tryClassKeyFromRoll(r.rollNumber),
         })
       )
 
