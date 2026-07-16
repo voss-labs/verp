@@ -154,10 +154,10 @@ export function FacultyImportClient({
             </div>
           )}
         </div>
-        {assignClassId && assignRole === "academic_coordinator" && (
+        {assignClassId && (
           <p className="text-muted-foreground text-xs">
-            A class has one coordinator — with multiple rows, only the last
-            stays coordinator. Use TR to assign several.
+            A class has one coordinator and one TR — with multiple rows, only
+            the last stays assigned.
           </p>
         )}
       </div>

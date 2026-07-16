@@ -5,9 +5,9 @@ import { facultyClassAssignments, faculty } from "@/db/schema"
 type ClassRole = "academic_coordinator" | "tr"
 
 /**
- * Assign a class role. The academic_coordinator is one-per-class, so the current
- * one is retired first; a tr can be added alongside. Ordered statements — no
- * transaction on neon-http, fine for an admin/HOD action.
+ * Assign a class role. Both roles are one-per-class — coordinator and TR alike —
+ * so the current holder of that role is retired before the new one is written.
+ * Ordered statements — no transaction on neon-http, fine for an admin/HOD action.
  */
 export async function assignClassRole(
   classId: string,
@@ -15,18 +15,16 @@ export async function assignClassRole(
   role: ClassRole,
   assignedBy: string | null
 ) {
-  if (role === "academic_coordinator") {
-    await db
-      .update(facultyClassAssignments)
-      .set({ isActive: false, updatedAt: new Date() })
-      .where(
-        and(
-          eq(facultyClassAssignments.classId, classId),
-          eq(facultyClassAssignments.role, "academic_coordinator"),
-          eq(facultyClassAssignments.isActive, true)
-        )
+  await db
+    .update(facultyClassAssignments)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(facultyClassAssignments.classId, classId),
+        eq(facultyClassAssignments.role, role),
+        eq(facultyClassAssignments.isActive, true)
       )
-  }
+    )
   await db
     .insert(facultyClassAssignments)
     .values({ classId, facultyId, role, assignedBy })
