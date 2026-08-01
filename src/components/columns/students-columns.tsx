@@ -47,6 +47,11 @@ export const studentsColumns: ColumnDef<StudentRow>[] = [
     ),
   },
   {
+    accessorKey: "division",
+    header: "Division",
+    cell: ({ row }) => row.getValue("division") ?? "-",
+  },
+  {
     accessorKey: "year",
     header: "Year",
   },
