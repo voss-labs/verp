@@ -8,9 +8,11 @@ Every release credits the contributors whose pull requests shipped in that cycle
 
 ## [Unreleased]
 
-First wave of community contributions. Five pull requests landed in this cycle, every one of them from a first-time contributor.
+First wave of community contributions. Six pull requests landed in this cycle, every one of them from a first-time contributor.
 
 ### Added
+
+- Department, Year and Division filters on the Students table — three dropdowns, each showing a live count that narrows as the other filters are applied, with a Clear button once any is set. The filters live on the shared `DataTableView` behind a `facets` prop, so faculty and every future table opt in with one line; counts come from TanStack's faceted row model rather than extra `GROUP BY` queries. Division is now a visible column too — it had always been in the CSV and XLSX exports but never on screen. ([#43](https://github.com/voss-labs/verp/pull/43) by [@Himanshux99](https://github.com/Himanshux99), rebased onto the post-MVP table in [#62](https://github.com/voss-labs/verp/pull/62))
 
 - Dark mode support across the dashboard — `next-themes` provider wired into the root layout with a sun / moon toggle in the site header; the existing palette already used semantic tokens, so the rollout is theme-aware out of the box. ([#36](https://github.com/voss-labs/verp/pull/36) by [@jimmyorpheus](https://github.com/jimmyorpheus))
 - 404 and error pages — root `not-found.tsx`, root `error.tsx` boundary that surfaces `error.digest` for production bug reports, plus a dashboard-scoped `not-found.tsx` and a `[...missing]` catch-all so unmatched dashboard URLs keep the sidebar chrome. ([#34](https://github.com/voss-labs/verp/pull/34) by [@OTWL](https://github.com/OTWL))
@@ -20,6 +22,8 @@ First wave of community contributions. Five pull requests landed in this cycle, 
 
 ### Fixed
 
+- One TR per class, not several — `assignClassStaff` now deactivates any existing live TR before inserting the new one, matching the single-coordinator rule the schema already enforced. ([#61](https://github.com/voss-labs/verp/pull/61))
+- `npm run setup` and the migration runner restored — the MVP reset removed `scripts/setup.ts`, `src/db/migrate.ts`, `migrate-status.ts` and `db/setup.ts` while every doc still pointed at them, so a fresh clone answered `Missing script: setup`. The wizard is back on the current architecture: it seeds roster rows that a VOSS login binds to rather than password accounts, collects the `VOSS_*` client credentials and `SUPER_ADMIN_EMAILS`, and no longer misreads a `db:push` database as foreign. ([#63](https://github.com/voss-labs/verp/pull/63))
 - Windows compatibility for `npm run setup` — `start`, `npm`, and `npx` invocations all work via the platform's shell, and migration `0008_fix_marks_locks_user_ref` is idempotent for fresh databases (uses `IF EXISTS` / `IF NOT EXISTS` guards). The wizard now completes end-to-end on Windows. ([#39](https://github.com/voss-labs/verp/pull/39) by [@Mandar885](https://github.com/Mandar885))
 
 ### Contributors
@@ -31,6 +35,7 @@ Every contributor in this cycle is a first-time contributor to VERP. Thank you f
 - [@jimmyorpheus](https://github.com/jimmyorpheus) — David Siegers ([#36](https://github.com/voss-labs/verp/pull/36))
 - [@OTWL](https://github.com/OTWL) ([#34](https://github.com/voss-labs/verp/pull/34))
 - [@Aniket-Saw](https://github.com/Aniket-Saw) ([#37](https://github.com/voss-labs/verp/pull/37))
+- [@Himanshux99](https://github.com/Himanshux99) — Himanshu Choyal ([#43](https://github.com/voss-labs/verp/pull/43))
 
 ---
 
