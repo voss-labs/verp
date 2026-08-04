@@ -9,6 +9,8 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
@@ -26,11 +28,22 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SearchIcon, DownloadIcon, Loader2Icon } from "lucide-react"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu"
+
+// Radix Select cannot hold an empty string as a value, so "no filter" needs a
+// sentinel rather than "".
+const ALL = "__all"
 
 interface DataTableViewProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -38,6 +51,10 @@ interface DataTableViewProps<TData, TValue> {
   searchKey?: string
   searchPlaceholder?: string
   globalSearch?: boolean
+  // Dropdown filters built from the values actually present in the data.
+  // Counts come from TanStack's faceted row model, so no extra queries are
+  // needed and the numbers always match what the table is showing.
+  facets?: { columnId: string; label: string }[]
   exportConfig?: {
     filename: string
     onExport: (data: TData[], format: "csv" | "xlsx") => Promise<void>
@@ -55,6 +72,7 @@ export function DataTableView<TData, TValue>({
   searchKey,
   searchPlaceholder = "Search...",
   globalSearch,
+  facets,
   exportConfig,
   rowId,
   bulkBar,
@@ -110,6 +128,8 @@ export function DataTableView<TData, TValue>({
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
     enableRowSelection: selectable,
     getRowId: rowId,
     onRowSelectionChange: setRowSelection,
@@ -122,10 +142,13 @@ export function DataTableView<TData, TValue>({
 
   const showSearch = Boolean(globalSearch || searchKey)
   const selectedIds = table.getSelectedRowModel().rows.map((r) => r.id)
+  const activeFacets = (facets ?? []).filter((f) =>
+    Boolean(table.getColumn(f.columnId)?.getFilterValue())
+  )
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center gap-3">
         {showSearch ? (
           <div className="relative w-full max-w-sm">
             <SearchIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
@@ -151,10 +174,66 @@ export function DataTableView<TData, TValue>({
         ) : (
           <div />
         )}
+        {facets && facets.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {facets.map((facet) => {
+              const column = table.getColumn(facet.columnId)
+              if (!column) return null
+              const counts = column.getFacetedUniqueValues()
+              const options = Array.from(counts.keys())
+                .filter(
+                  (v): v is string => v !== null && v !== undefined && v !== ""
+                )
+                .sort((a, b) => String(a).localeCompare(String(b)))
+              if (options.length === 0) return null
+              const value = (column.getFilterValue() as string) ?? ALL
+
+              return (
+                <Select
+                  key={facet.columnId}
+                  value={value}
+                  onValueChange={(next) =>
+                    column.setFilterValue(next === ALL ? undefined : next)
+                  }
+                >
+                  <SelectTrigger
+                    className="w-auto min-w-[9rem]"
+                    aria-label={facet.label}
+                  >
+                    <SelectValue placeholder={facet.label} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>
+                      All {facet.label.toLowerCase()}
+                    </SelectItem>
+                    {options.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option} ({counts.get(option)})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )
+            })}
+            {activeFacets.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  activeFacets.forEach((f) =>
+                    table.getColumn(f.columnId)?.setFilterValue(undefined)
+                  )
+                }
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+        )}
         {exportConfig && (
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger
-              className={buttonVariants({ variant: "outline" })}
+              className={`ml-auto ${buttonVariants({ variant: "outline" })}`}
               disabled={isExporting}
             >
               {isExporting ? (
