@@ -43,5 +43,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local ops/seed scripts (may contain college data)
-/scripts/
+# local ops/seed scripts (may contain college data).
+# Ignore the directory's contents rather than the directory itself — with a
+# trailing slash git never descends, so the negations below would not apply.
+/scripts/*
+!/scripts/setup.ts
+!/scripts/lib/

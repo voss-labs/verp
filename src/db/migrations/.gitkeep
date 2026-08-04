@@ -1,0 +1,6 @@
+Numbered SQL migrations live here, applied in filename order by `npm run db:migrate`
+and recorded in the `_migrations` ledger table.
+
+The pre-MVP series (0001-0010) was intentionally not restored: it targeted the old
+role_definitions / user_roles RBAC tables, which no longer exist. Start the new
+series at 0001 against the current schema.
