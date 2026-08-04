@@ -97,6 +97,11 @@ export function StudentsClient({
         columns={studentsColumns}
         data={data}
         globalSearch
+        facets={[
+          { columnId: "department", label: "Department" },
+          { columnId: "year", label: "Year" },
+          { columnId: "division", label: "Division" },
+        ]}
         searchPlaceholder="Search students..."
         exportConfig={{ filename: "Students", onExport: handleExport }}
         rowId={(s) => s.id}
