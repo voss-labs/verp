@@ -22,6 +22,7 @@ import {
   ShieldIcon,
   Building2Icon,
   UploadIcon,
+  GraduationCapIcon,
 } from "lucide-react"
 import { useSession } from "@/lib/auth-client"
 import { useUserRole } from "@/hooks/use-user-role"
@@ -160,6 +161,12 @@ const studentNav = [
     icon: <LayoutDashboardIcon />,
     isActive: true,
     items: [{ title: "Overview", url: "/dashboard" }],
+  },
+  {
+    title: "My Marks",
+    url: "/dashboard/my-marks",
+    icon: <GraduationCapIcon />,
+    items: [{ title: "Marks & SGPI", url: "/dashboard/my-marks" }],
   },
 ]
 

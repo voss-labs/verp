@@ -1,6 +1,10 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { CalendarCheckIcon, GraduationCapIcon } from "lucide-react"
+import {
+  CalendarCheckIcon,
+  GraduationCapIcon,
+  BarChart3Icon,
+} from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { buttonVariants } from "@/components/ui/button"
 import { getSessionUser } from "@/lib/session"
@@ -65,6 +69,13 @@ export default async function ClassDetailPage({
             >
               <GraduationCapIcon className="mr-1.5 size-3.5" />
               Enter marks
+            </Link>
+            <Link
+              href={`/dashboard/class/${classId}/results`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <BarChart3Icon className="mr-1.5 size-3.5" />
+              Results
             </Link>
           </div>
         </div>
