@@ -133,3 +133,35 @@ export function expectedYear(admissionYear: number, on: Date): Year | null {
   const level = acadYearStart - admissionYear // 0..3
   return YEAR_BY_LEVEL[level] ?? null
 }
+
+/**
+ * The year a student is in *now*, derived from their roll number.
+ *
+ * students.year is written once at import and never revisited, so it silently
+ * rots: on 2026-08-11 more than half the live roster still carried the year it
+ * was imported with, the 2024 cohort reading SE when it had reached TE. Class
+ * labels never had this problem because they compute expectedYear on every
+ * render — this is the same treatment for the student rows.
+ *
+ * It is deliberately the same argument this file opens with: branch and division
+ * are parsed rather than stored because a copy can only ever drift from the roll
+ * number. Year is no different, it just drifts on a timer instead of on a typo.
+ *
+ * Falls back to the stored value for a roll that will not parse, and for a
+ * cohort past BE — a graduated student has no current year to compute.
+ */
+export function currentYear(
+  rollNumber: string,
+  storedYear: string,
+  on: Date = new Date()
+): string {
+  try {
+    const { admissionYear, isDSY } = parseRollNumber(rollNumber)
+    // A DSY student skips FE: they enter one year later but sit with the cohort
+    // that started the year before, so the cohort's start year is what counts.
+    const cohortYear = isDSY ? admissionYear - 1 : admissionYear
+    return expectedYear(cohortYear, on) ?? storedYear
+  } catch {
+    return storedYear
+  }
+}

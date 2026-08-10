@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/page-header"
 import { StudentsClient } from "./client"
 import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
+import { currentYear } from "@/lib/roll-number"
 import {
   getAllStudents,
   getStudentsByClassKeys,
@@ -26,6 +27,14 @@ export default async function StudentsPage() {
         ? await getStudentsByDepartments(user.deptCodes)
         : await getStudentsByClassKeys(user.classKeys)
 
+  // Year is derived per render, not read from the column: the stored value is a
+  // snapshot of import day and goes stale the moment the cohort advances.
+  const now = new Date()
+  const rows = data.map((s) => ({
+    ...s,
+    year: currentYear(s.rollNumber, s.year, now),
+  }))
+
   return (
     <>
       <PageHeader
@@ -35,7 +44,7 @@ export default async function StudentsPage() {
       />
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <StudentsClient
-          data={data}
+          data={rows}
           canDeactivate={can(user, "student:deactivate")}
         />
       </div>

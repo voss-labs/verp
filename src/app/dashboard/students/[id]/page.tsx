@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation"
 import { PageHeader } from "@/components/page-header"
 import { getStudentById } from "@/db/queries/students"
 import { getSessionUser } from "@/lib/session"
+import { currentYear } from "@/lib/roll-number"
 import { can } from "@/lib/rbac"
 import { Badge } from "@/components/ui/badge"
 
@@ -38,7 +39,7 @@ export default async function StudentDetailPage({
     { label: "Roll number", value: student.rollNumber },
     { label: "Department", value: student.department },
     { label: "Division", value: student.division ?? "—" },
-    { label: "Year", value: student.year },
+    { label: "Year", value: currentYear(student.rollNumber, student.year) },
     { label: "Email", value: student.email ?? "Not yet claimed" },
     { label: "Status", value: student.isActive ? "Active" : "Inactive" },
   ]
