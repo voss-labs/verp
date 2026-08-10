@@ -8,7 +8,13 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { computeMarks, type CourseInfo } from "@/lib/sgpi"
-import { createSubjectAction, saveMarksAction } from "../../actions"
+import { downloadBase64File } from "@/lib/utils"
+import { exportTableCsv, exportTableXlsx } from "@/lib/xlsx-export"
+import {
+  createSubjectAction,
+  saveMarksAction,
+  setMarksLockAction,
+} from "../../actions"
 
 type Offering = { id: string; code: string; name: string; semester: number }
 type Row = {
@@ -20,7 +26,13 @@ type Row = {
   mse2: number | null
   ese: number | null
 }
-type Grid = { offeringId: string; course: CourseInfo; rows: Row[] }
+type LockComponent = "isa" | "mse" | "ese"
+type Grid = {
+  offeringId: string
+  course: CourseInfo
+  rows: Row[]
+  locked: LockComponent[]
+}
 
 // VIT defaults per assessment type: theory carries the MSE component, practical
 // and project are ISA + ESE only.
@@ -34,20 +46,35 @@ const CAP_PRESETS: Record<
   project: { maxIsa: 40, maxMse: 0, maxEse: 60, maxTotal: 100 },
 }
 
+const LOCK_LABEL: Record<LockComponent, string> = {
+  isa: "ISA",
+  mse: "MSE",
+  ese: "ESE",
+}
+
 export function MarksClient({
   classId,
   offerings,
   selectedId,
   grid,
+  canUnlock,
 }: {
   classId: string
   offerings: Offering[]
   selectedId: string | null
   grid: Grid | null
+  canUnlock: boolean
 }) {
   if (grid && selectedId) {
     const offering = offerings.find((o) => o.id === selectedId)!
-    return <MarksGrid classId={classId} offering={offering} grid={grid} />
+    return (
+      <MarksGrid
+        classId={classId}
+        offering={offering}
+        grid={grid}
+        canUnlock={canUnlock}
+      />
+    )
   }
   return <SubjectSetup classId={classId} offerings={offerings} />
 }
@@ -245,16 +272,90 @@ function MarksGrid({
   classId,
   offering,
   grid,
+  canUnlock,
 }: {
   classId: string
   offering: Offering
   grid: Grid
+  canUnlock: boolean
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [rows, setRows] = useState<Row[]>(grid.rows)
   const { course } = grid
   const hasMse = course.maxMse > 0
+  const locked = grid.locked
+  const isLocked = (c: LockComponent) => locked.includes(c)
+  // Nothing left to enter: every component this course has is frozen.
+  const allLocked =
+    isLocked("isa") && isLocked("ese") && (!hasMse || isLocked("mse"))
+
+  function toggleLock(component: LockComponent, next: boolean) {
+    start(async () => {
+      const res = await setMarksLockAction({
+        offeringId: offering.id,
+        component,
+        locked: next,
+      })
+      if (res.error) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(
+        next
+          ? `${LOCK_LABEL[component]} locked`
+          : `${LOCK_LABEL[component]} reopened`
+      )
+      router.refresh()
+    })
+  }
+
+  async function handleExport(format: "csv" | "xlsx") {
+    const headers = [
+      "Roll",
+      "Name",
+      "ISA",
+      ...(hasMse ? ["MSE 1", "MSE 2"] : []),
+      "ESE",
+      "Total",
+      "%",
+      "Grade",
+    ]
+    const body = rows.map((r) => {
+      const c = computeMarks(r, course)
+      return [
+        r.rollNumber,
+        r.name,
+        r.isa,
+        ...(hasMse ? [r.mse1, r.mse2] : []),
+        r.ese,
+        c.total,
+        c.percentage,
+        c.gradePoint == null ? "" : String(c.gradePoint),
+      ]
+    })
+    const date = new Date().toISOString().split("T")[0]
+    const filename = `Marks_${offering.code}_${date}.${format}`
+    if (format === "xlsx") {
+      const b64 = await exportTableXlsx({
+        title: `Marks — ${offering.code}`,
+        subtitle: offering.name,
+        headers,
+        rows: body,
+      })
+      downloadBase64File(
+        b64,
+        filename,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      )
+    } else {
+      downloadBase64File(
+        await exportTableCsv({ headers, rows: body }),
+        filename,
+        "text/csv"
+      )
+    }
+  }
 
   function edit(
     studentId: string,
@@ -309,10 +410,36 @@ function MarksGrid({
             Total/{course.maxTotal}
           </span>
         </div>
-        <Button size="sm" disabled={pending} onClick={save}>
-          {pending ? "Saving…" : "Save marks"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleExport("csv")}
+            disabled={rows.length === 0}
+          >
+            CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleExport("xlsx")}
+            disabled={rows.length === 0}
+          >
+            Excel
+          </Button>
+          <Button size="sm" disabled={pending || allLocked} onClick={save}>
+            {pending ? "Saving…" : "Save marks"}
+          </Button>
+        </div>
       </div>
+
+      <LockPanel
+        hasMse={hasMse}
+        isLocked={isLocked}
+        canUnlock={canUnlock}
+        pending={pending}
+        onToggle={toggleLock}
+      />
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">
@@ -345,6 +472,7 @@ function MarksGrid({
                       <MarkInput
                         value={r.isa}
                         max={course.maxIsa}
+                        locked={isLocked("isa")}
                         onChange={(v) => edit(r.studentId, "isa", v)}
                       />
                     </td>
@@ -353,6 +481,7 @@ function MarksGrid({
                         <MarkInput
                           value={r.mse1}
                           max={course.maxMse}
+                          locked={isLocked("mse")}
                           onChange={(v) => edit(r.studentId, "mse1", v)}
                         />
                       </td>
@@ -362,6 +491,7 @@ function MarksGrid({
                         <MarkInput
                           value={r.mse2}
                           max={course.maxMse}
+                          locked={isLocked("mse")}
                           onChange={(v) => edit(r.studentId, "mse2", v)}
                         />
                       </td>
@@ -370,6 +500,7 @@ function MarksGrid({
                       <MarkInput
                         value={r.ese}
                         max={course.maxEse}
+                        locked={isLocked("ese")}
                         onChange={(v) => edit(r.studentId, "ese", v)}
                       />
                     </td>
@@ -400,10 +531,12 @@ function MarksGrid({
 function MarkInput({
   value,
   max,
+  locked,
   onChange,
 }: {
   value: number | null
   max: number
+  locked?: boolean
   onChange: (v: string) => void
 }) {
   return (
@@ -412,9 +545,85 @@ function MarkInput({
       min={0}
       max={max}
       value={value ?? ""}
+      readOnly={locked}
+      disabled={locked}
+      aria-label={locked ? "Locked — submitted" : undefined}
       onChange={(e) => onChange(e.target.value)}
-      className="h-8 w-16 tabular-nums"
+      className={cn(
+        "h-8 w-16 tabular-nums",
+        locked && "bg-muted text-muted-foreground cursor-not-allowed"
+      )}
     />
+  )
+}
+
+/**
+ * The components are frozen separately because they finish at different points
+ * in the term. Locking is offered to anyone who can enter marks; reopening is
+ * hidden unless the viewer is the coordinator or above, and the server enforces
+ * that regardless of what this renders.
+ */
+function LockPanel({
+  hasMse,
+  isLocked,
+  canUnlock,
+  pending,
+  onToggle,
+}: {
+  hasMse: boolean
+  isLocked: (c: LockComponent) => boolean
+  canUnlock: boolean
+  pending: boolean
+  onToggle: (c: LockComponent, next: boolean) => void
+}) {
+  const components: LockComponent[] = hasMse
+    ? ["isa", "mse", "ese"]
+    : ["isa", "ese"]
+  return (
+    <div className="border-border flex flex-wrap items-center gap-2 rounded border px-3 py-2">
+      <span className="text-muted-foreground mr-1 text-xs font-medium">
+        Components
+      </span>
+      {components.map((c) => {
+        const locked = isLocked(c)
+        return (
+          <div key={c} className="flex items-center gap-1.5">
+            <Badge variant={locked ? "secondary" : "outline"}>
+              {LOCK_LABEL[c]}
+              {locked ? " · locked" : ""}
+            </Badge>
+            {locked ? (
+              canUnlock ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  disabled={pending}
+                  onClick={() => onToggle(c, false)}
+                >
+                  Unlock
+                </Button>
+              ) : null
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                disabled={pending}
+                onClick={() => onToggle(c, true)}
+              >
+                Lock
+              </Button>
+            )}
+          </div>
+        )
+      })}
+      {!canUnlock && (
+        <span className="text-muted-foreground ml-auto text-xs">
+          Ask the class coordinator to reopen a locked component.
+        </span>
+      )}
+    </div>
   )
 }
 

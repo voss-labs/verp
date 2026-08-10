@@ -134,7 +134,10 @@ const facultyNav = [
     title: "My Classes",
     url: "/dashboard/class",
     icon: <Building2Icon />,
-    items: [{ title: "Classes & requests", url: "/dashboard/class" }],
+    // Marks and attendance hang off a specific class, so the class list is the
+    // only sensible entry point. Name what is behind the link — a TR looking for
+    // marks entry should not have to guess that it lives inside a class.
+    items: [{ title: "Classes, marks & attendance", url: "/dashboard/class" }],
   },
   {
     title: "Students",

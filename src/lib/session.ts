@@ -38,6 +38,8 @@ export type SessionUser = {
   // `classKeys` (the cohort keys) for roster queries, which key off class_key.
   classIds: string[]
   classKeys: string[]
+  // The subset of classIds this faculty coordinates (vs merely teaches).
+  coordinatorClassIds: string[]
   capabilities: ReadonlySet<Capability>
 }
 
@@ -95,6 +97,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     deptCodes: [] as string[],
     classIds: [] as string[],
     classKeys: [] as string[],
+    coordinatorClassIds: [] as string[],
     capabilities: new Set<Capability>() as ReadonlySet<Capability>,
   }
 
@@ -125,7 +128,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     with: {
       classAssignments: {
         where: (a, { eq }) => eq(a.isActive, true),
-        columns: { classId: true },
+        columns: { classId: true, role: true },
         with: { class: { columns: { classKey: true } } },
       },
       deptAppointments: {
@@ -143,6 +146,12 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     }
     const classIds = fac.classAssignments.map((a) => a.classId)
     const classKeys = fac.classAssignments.map((a) => a.class.classKey)
+    // The coordinator subset, not a second query: the role column rides along on
+    // the assignment rows already being read. A TR and a coordinator both hold a
+    // class, but only the coordinator may reopen marks somebody locked.
+    const coordinatorClassIds = fac.classAssignments
+      .filter((a) => a.role === "academic_coordinator")
+      .map((a) => a.classId)
     const deptCodes =
       tier === "hod" ? fac.deptAppointments.map((d) => d.deptCode) : []
     return {
@@ -153,6 +162,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       deptCodes,
       classIds,
       classKeys,
+      coordinatorClassIds,
       capabilities: await capabilitiesFor(tier, userId),
     }
   }
@@ -174,6 +184,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       deptCodes: [],
       classIds: [],
       classKeys: stu.classKey ? [stu.classKey] : [],
+      coordinatorClassIds: [],
       capabilities: await capabilitiesFor("student", userId),
     }
   }

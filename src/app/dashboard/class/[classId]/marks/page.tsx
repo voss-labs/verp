@@ -6,7 +6,7 @@ import { expectedYear } from "@/lib/roll-number"
 import { getClassById } from "@/db/queries/classes"
 import { getStudentsByClassKeys } from "@/db/queries/students"
 import { listOfferingsForClass, getOfferingById } from "@/db/queries/offerings"
-import { getMarksForOffering } from "@/db/queries/marks"
+import { getMarksForOffering, getLockedComponents } from "@/db/queries/marks"
 import { MarksClient } from "./client"
 
 export const dynamic = "force-dynamic"
@@ -43,13 +43,15 @@ export default async function MarksPage({
       ? await getOfferingById(offeringId)
       : null
   if (selected) {
-    const [students, existing] = await Promise.all([
+    const [students, existing, locked] = await Promise.all([
       getStudentsByClassKeys([cls.classKey]),
       getMarksForOffering(selected.id),
+      getLockedComponents(selected.id),
     ])
     const byStudent = Object.fromEntries(existing.map((m) => [m.studentId, m]))
     grid = {
       offeringId: selected.id,
+      locked,
       course: {
         courseType: selected.course.courseType,
         credits: selected.course.credits,
@@ -80,6 +82,12 @@ export default async function MarksPage({
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <MarksClient
           classId={classId}
+          canUnlock={
+            user.tier === "super_admin" ||
+            (user.tier === "hod" &&
+              user.deptCodes.includes(cls.departmentCode)) ||
+            user.coordinatorClassIds.includes(classId)
+          }
           offerings={offerings.map((o) => ({
             id: o.id,
             code: o.course.courseCode,
