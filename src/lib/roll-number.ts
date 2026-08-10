@@ -153,8 +153,13 @@ export function expectedYear(admissionYear: number, on: Date): Year | null {
 export function currentYear(
   rollNumber: string,
   storedYear: string,
-  on: Date = new Date()
+  on: Date = new Date(),
+  graduatedAt?: Date | null
 ): string {
+  // A finished cohort has no current year to compute, and expectedYear returns
+  // null past BE — without this they would read as a raw admission year, which
+  // is indistinguishable from a roll that failed to parse.
+  if (graduatedAt) return "Graduated"
   try {
     const { admissionYear, isDSY } = parseRollNumber(rollNumber)
     // A DSY student skips FE: they enter one year later but sit with the cohort

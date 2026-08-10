@@ -9,6 +9,7 @@ import { students } from "./students"
 import { enrollmentRequests } from "./onboarding"
 import { courses } from "./courses"
 import { courseOfferings } from "./offerings"
+import { batches, batchAssignments } from "./batches"
 import { marks } from "./marks"
 import { attendance } from "./attendance"
 import { auditLogs } from "./audit"
@@ -88,6 +89,7 @@ export const studentsRelations = relations(students, ({ one, many }) => ({
   }),
   marks: many(marks),
   attendance: many(attendance),
+  batchAssignments: many(batchAssignments),
 }))
 
 export const enrollmentRequestsRelations = relations(
@@ -138,6 +140,29 @@ export const courseOfferingsRelations = relations(
     }),
     marks: many(marks),
     attendance: many(attendance),
+    batches: many(batches),
+  })
+)
+
+export const batchesRelations = relations(batches, ({ one, many }) => ({
+  offering: one(courseOfferings, {
+    fields: [batches.courseOfferingId],
+    references: [courseOfferings.id],
+  }),
+  assignments: many(batchAssignments),
+}))
+
+export const batchAssignmentsRelations = relations(
+  batchAssignments,
+  ({ one }) => ({
+    batch: one(batches, {
+      fields: [batchAssignments.batchId],
+      references: [batches.id],
+    }),
+    student: one(students, {
+      fields: [batchAssignments.studentId],
+      references: [students.id],
+    }),
   })
 )
 

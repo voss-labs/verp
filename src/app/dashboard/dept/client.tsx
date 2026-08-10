@@ -17,6 +17,7 @@ import { BRANCH_CODE_BY_DEPT, divisionsForBranch } from "@/lib/roll-number"
 import {
   createClassAction,
   setClassActiveAction,
+  graduateClassAction,
   assignClassRoleAction,
   createDeptFacultyAction,
 } from "./actions"
@@ -25,6 +26,7 @@ type Dept = { code: string; name: string }
 type Klass = {
   id: string
   classKey: string
+  graduated: boolean
   label: string
   departmentCode: string
   admissionYear: number
@@ -168,6 +170,7 @@ export function DeptClient({
                           <p className="text-muted-foreground font-mono text-xs">
                             {c.classKey}
                             {!c.isActive && " · inactive"}
+                            {c.graduated && " · graduated"}
                           </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -192,6 +195,22 @@ export function DeptClient({
                             }
                           >
                             {c.isActive ? "Deactivate" : "Reactivate"}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={pending}
+                            className="text-xs"
+                            onClick={() =>
+                              run(() =>
+                                graduateClassAction({
+                                  classId: c.id,
+                                  graduated: !c.graduated,
+                                })
+                              )
+                            }
+                          >
+                            {c.graduated ? "Undo graduation" : "Graduate"}
                           </Button>
                         </div>
                       </li>

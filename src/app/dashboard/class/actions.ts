@@ -17,6 +17,12 @@ import { upsertAttendance } from "@/db/queries/attendance"
 import { getCourseByCode, createCourse } from "@/db/queries/courses"
 import { createOffering, getOfferingById } from "@/db/queries/offerings"
 import {
+  createBatch,
+  getBatchById,
+  assignStudentsToBatch,
+  removeStudentFromBatch,
+} from "@/db/queries/batches"
+import {
   upsertMarks,
   getMarksForOffering,
   getLockedComponents,
@@ -368,4 +374,90 @@ function canUnlock(user: SessionUser, classId: string, deptCode: string) {
     (user.tier === "hod" && user.deptCodes.includes(deptCode)) ||
     user.coordinatorClassIds.includes(classId)
   )
+}
+
+// ── practical batches ──────────────────────────────────────────────────────
+
+export async function createBatchAction(input: {
+  offeringId: string
+  name: string
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "marks:write")
+    const offering = await getOfferingById(input.offeringId)
+    if (!offering) return { error: "No such subject." }
+    const { ok } = await classInScope(user!, offering.classId)
+    if (!ok) return { error: "That class is not in your scope." }
+    const name = input.name.trim().toUpperCase()
+    if (!name) return { error: "A batch name is required." }
+
+    await createBatch({ courseOfferingId: input.offeringId, name })
+    await createAuditLog({
+      action: "batch.created",
+      actorId: user!.id,
+      targetType: "offering",
+      targetId: input.offeringId,
+      details: { name, courseCode: offering.course.courseCode },
+    })
+    revalidatePath(`/dashboard/class/${offering.classId}/batches`)
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not create the batch") }
+  }
+}
+
+export async function assignBatchAction(input: {
+  batchId: string
+  studentIds: string[]
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "marks:write")
+    const batch = await getBatchById(input.batchId)
+    if (!batch) return { error: "No such batch." }
+    const offering = await getOfferingById(batch.courseOfferingId)
+    if (!offering) return { error: "No such subject." }
+    const { ok } = await classInScope(user!, offering.classId)
+    if (!ok) return { error: "That class is not in your scope." }
+
+    await assignStudentsToBatch({
+      batchId: input.batchId,
+      courseOfferingId: batch.courseOfferingId,
+      studentIds: input.studentIds,
+    })
+    await createAuditLog({
+      action: "batch.assigned",
+      actorId: user!.id,
+      targetType: "offering",
+      targetId: batch.courseOfferingId,
+      details: { batch: batch.name, count: input.studentIds.length },
+    })
+    revalidatePath(`/dashboard/class/${offering.classId}/batches`)
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not assign the batch") }
+  }
+}
+
+export async function removeFromBatchAction(input: {
+  batchId: string
+  studentId: string
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "marks:write")
+    const batch = await getBatchById(input.batchId)
+    if (!batch) return { error: "No such batch." }
+    const offering = await getOfferingById(batch.courseOfferingId)
+    if (!offering) return { error: "No such subject." }
+    const { ok } = await classInScope(user!, offering.classId)
+    if (!ok) return { error: "That class is not in your scope." }
+
+    await removeStudentFromBatch(input)
+    revalidatePath(`/dashboard/class/${offering.classId}/batches`)
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not remove the student") }
+  }
 }

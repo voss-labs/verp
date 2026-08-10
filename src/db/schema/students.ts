@@ -38,6 +38,12 @@ export const students = pgTable(
     // repeater whose roll can't express their cohort gets an explicit override
     // written here. Null only for a roll we could not parse.
     classKey: text("class_key"),
+    // Set when the cohort finishes. expectedYear() returns null past BE, so
+    // without this a graduated student falls back to a raw admission year and is
+    // indistinguishable from a roll that failed to parse. Nullable and dated
+    // rather than a flag: "when did they graduate" is the question actually
+    // asked of alumni records, and isActive already answers "are they here".
+    graduatedAt: timestamp("graduated_at", { withTimezone: true }),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

@@ -5,6 +5,7 @@ import { expectedYear } from "@/lib/roll-number"
 import { listDepartments } from "@/db/queries/departments"
 import { listClassesForDepts } from "@/db/queries/classes"
 import { listClassStaff } from "@/db/queries/class-staff"
+import { getGraduatedClassKeys } from "@/db/queries/students"
 import { getAllFaculty } from "@/db/queries/faculty"
 import { DeptClient } from "./client"
 
@@ -26,6 +27,7 @@ export default async function DeptPage() {
     getAllFaculty(),
   ])
   const staff = await listClassStaff(classes.map((c) => c.id))
+  const graduated = await getGraduatedClassKeys()
   const now = new Date()
 
   return (
@@ -44,6 +46,7 @@ export default async function DeptPage() {
               admissionYear: c.admissionYear,
               division: c.division,
               isActive: c.isActive,
+              graduated: graduated.has(c.classKey),
             }
           })}
           staff={staff}

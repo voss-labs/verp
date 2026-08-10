@@ -12,6 +12,7 @@ import {
   updateCourse,
   setCourseActive,
 } from "@/db/queries/courses"
+import { graduateClassKey, ungraduateClassKey } from "@/db/queries/students"
 import {
   createClass,
   getClassByKey,
@@ -376,5 +377,50 @@ export async function setCourseActiveAction(input: {
     return { error: null }
   } catch (err) {
     return { error: getErrorMessage(err, "Could not change the course") }
+  }
+}
+
+/**
+ * Graduate a cohort.
+ *
+ * Keyed by class_key, not by a list of student ids: graduation happens to a
+ * cohort, and naming the cohort is what makes it idempotent — a student who
+ * transferred in after the first run is picked up, and one already graduated is
+ * skipped rather than re-stamped with a new date.
+ *
+ * Nobody is deactivated. A graduated student's marks and attendance still have
+ * to be readable; isActive answers "should this row exist", which is a different
+ * question from "have they finished".
+ */
+export async function graduateClassAction(input: {
+  classId: string
+  graduated: boolean
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "student:update")
+    const cls = await getClassById(input.classId)
+    if (!cls) return { error: "No such class." }
+    const inScope =
+      user!.tier === "super_admin" ||
+      user!.deptCodes.includes(cls.departmentCode)
+    if (!inScope) return { error: "That class is not in your scope." }
+
+    const count = input.graduated
+      ? await graduateClassKey(cls.classKey, new Date())
+      : await ungraduateClassKey(cls.classKey)
+
+    await createAuditLog({
+      action: input.graduated ? "class.graduated" : "class.ungraduated",
+      actorId: user!.id,
+      targetType: "class",
+      targetId: input.classId,
+      details: { classKey: cls.classKey, students: count },
+    })
+    revalidatePath("/dashboard/dept")
+    revalidatePath("/dashboard/students")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not graduate the class") }
   }
 }

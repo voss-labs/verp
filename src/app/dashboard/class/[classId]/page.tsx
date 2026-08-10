@@ -4,6 +4,7 @@ import {
   CalendarCheckIcon,
   GraduationCapIcon,
   BarChart3Icon,
+  UsersIcon,
 } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { buttonVariants } from "@/components/ui/button"
@@ -69,6 +70,13 @@ export default async function ClassDetailPage({
             >
               <GraduationCapIcon className="mr-1.5 size-3.5" />
               Enter marks
+            </Link>
+            <Link
+              href={`/dashboard/class/${classId}/batches`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <UsersIcon className="mr-1.5 size-3.5" />
+              Lab batches
             </Link>
             <Link
               href={`/dashboard/class/${classId}/results`}

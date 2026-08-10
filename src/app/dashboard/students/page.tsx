@@ -32,7 +32,7 @@ export default async function StudentsPage() {
   const now = new Date()
   const rows = data.map((s) => ({
     ...s,
-    year: currentYear(s.rollNumber, s.year, now),
+    year: currentYear(s.rollNumber, s.year, now, s.graduatedAt),
   }))
 
   return (

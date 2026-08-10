@@ -39,7 +39,15 @@ export default async function StudentDetailPage({
     { label: "Roll number", value: student.rollNumber },
     { label: "Department", value: student.department },
     { label: "Division", value: student.division ?? "—" },
-    { label: "Year", value: currentYear(student.rollNumber, student.year) },
+    {
+      label: "Year",
+      value: currentYear(
+        student.rollNumber,
+        student.year,
+        new Date(),
+        student.graduatedAt
+      ),
+    },
     { label: "Email", value: student.email ?? "Not yet claimed" },
     { label: "Status", value: student.isActive ? "Active" : "Inactive" },
   ]
