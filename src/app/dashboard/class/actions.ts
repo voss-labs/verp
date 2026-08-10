@@ -16,7 +16,14 @@ import { getRequestById, updateRequest } from "@/db/queries/onboarding"
 import { upsertAttendance } from "@/db/queries/attendance"
 import { getCourseByCode, createCourse } from "@/db/queries/courses"
 import { createOffering, getOfferingById } from "@/db/queries/offerings"
-import { upsertMarks } from "@/db/queries/marks"
+import {
+  upsertMarks,
+  getMarksForOffering,
+  getLockedComponents,
+  setMarksLock,
+  isLockComponent,
+  type LockComponent,
+} from "@/db/queries/marks"
 
 type Result = { error: string | null }
 type AttStatus = "present" | "absent" | "late" | "excused"
@@ -251,17 +258,37 @@ export async function saveMarksAction(input: {
     const { ok } = await classInScope(user!, offering.classId)
     if (!ok) return { error: "That class is not in your scope." }
 
-    await upsertMarks(
-      input.rows.map((r) => ({
-        courseOfferingId: input.offeringId,
-        studentId: r.studentId,
-        isa: r.isa,
-        mse1: r.mse1,
-        mse2: r.mse2,
-        ese: r.ese,
-        recordedByFacultyId: user!.facultyId,
-      }))
-    )
+    // A locked component is frozen for everyone, including whoever locked it.
+    // Enforced here and not only in the UI: the grid is the polite reminder,
+    // this is the actual guarantee — a stale tab or a direct call must not slip
+    // a mark past a submitted component.
+    const locked = await getLockedComponents(input.offeringId)
+    const rows = input.rows.map((r) => ({
+      courseOfferingId: input.offeringId,
+      studentId: r.studentId,
+      isa: r.isa,
+      mse1: r.mse1,
+      mse2: r.mse2,
+      ese: r.ese,
+      recordedByFacultyId: user!.facultyId,
+    }))
+    if (locked.length > 0) {
+      const existing = await getMarksForOffering(input.offeringId)
+      const prev = new Map(existing.map((m) => [m.studentId, m]))
+      for (const r of rows) {
+        const before = prev.get(r.studentId)
+        // Carry the stored value forward for every locked component, so an edit
+        // to an open one cannot drag a frozen figure along with it.
+        if (locked.includes("isa")) r.isa = before?.isa ?? null
+        if (locked.includes("mse")) {
+          r.mse1 = before?.mse1 ?? null
+          r.mse2 = before?.mse2 ?? null
+        }
+        if (locked.includes("ese")) r.ese = before?.ese ?? null
+      }
+    }
+
+    await upsertMarks(rows)
     await createAuditLog({
       action: "marks.recorded",
       actorId: user!.id,
@@ -274,4 +301,71 @@ export async function saveMarksAction(input: {
   } catch (err) {
     return { error: getErrorMessage(err, "Could not save marks") }
   }
+}
+
+/**
+ * Freeze or reopen one marks component.
+ *
+ * Locking and unlocking are deliberately not the same privilege. Anyone who can
+ * enter marks can freeze them — that is just the person who finished the work
+ * saying so. Reopening is the class coordinator's call (or an HOD's, or a
+ * super-admin's), because it undoes a submission somebody else may already have
+ * acted on. A TR who spots a typo asks the coordinator; that conversation is the
+ * point, not an obstacle.
+ */
+export async function setMarksLockAction(input: {
+  offeringId: string
+  component: string
+  locked: boolean
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "marks:lock")
+    if (!isLockComponent(input.component)) {
+      return { error: "Unknown marks component." }
+    }
+    const component: LockComponent = input.component
+
+    const offering = await getOfferingById(input.offeringId)
+    if (!offering) return { error: "No such subject." }
+    const { ok, cls } = await classInScope(user!, offering.classId)
+    if (!ok || !cls) return { error: "That class is not in your scope." }
+
+    if (
+      !input.locked &&
+      !canUnlock(user!, offering.classId, cls.departmentCode)
+    ) {
+      return {
+        error:
+          "Only the class coordinator, the HOD, or an admin can reopen locked marks.",
+      }
+    }
+
+    await setMarksLock({
+      courseOfferingId: input.offeringId,
+      component,
+      locked: input.locked,
+      facultyId: user!.facultyId,
+    })
+    await createAuditLog({
+      action: input.locked ? "marks.locked" : "marks.unlocked",
+      actorId: user!.id,
+      targetType: "offering",
+      targetId: input.offeringId,
+      details: { component, courseCode: offering.course.courseCode },
+    })
+    revalidatePath(`/dashboard/class/${offering.classId}/marks`)
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not change the lock") }
+  }
+}
+
+/** Reopening is coordinator-and-above; teaching the class is not enough. */
+function canUnlock(user: SessionUser, classId: string, deptCode: string) {
+  return (
+    user.tier === "super_admin" ||
+    (user.tier === "hod" && user.deptCodes.includes(deptCode)) ||
+    user.coordinatorClassIds.includes(classId)
+  )
 }
