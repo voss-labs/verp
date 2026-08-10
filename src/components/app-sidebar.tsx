@@ -42,7 +42,10 @@ const adminNav = [
     title: "My Department",
     url: "/dashboard/dept",
     icon: <Building2Icon />,
-    items: [{ title: "Classes", url: "/dashboard/dept" }],
+    items: [
+      { title: "Classes", url: "/dashboard/dept" },
+      { title: "Course catalogue", url: "/dashboard/dept/courses" },
+    ],
   },
   {
     title: "Students",
@@ -91,7 +94,10 @@ const superAdminNav = [
     title: "Departments",
     url: "/dashboard/dept",
     icon: <Building2Icon />,
-    items: [{ title: "Classes", url: "/dashboard/dept" }],
+    items: [
+      { title: "Classes", url: "/dashboard/dept" },
+      { title: "Course catalogue", url: "/dashboard/dept/courses" },
+    ],
   },
   {
     title: "Students",

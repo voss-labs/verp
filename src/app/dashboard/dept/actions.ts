@@ -8,6 +8,11 @@ import { classKey, tryClassKeyFromRoll } from "@/lib/class-key"
 import { BRANCH_CODE_BY_DEPT, divisionsForBranch } from "@/lib/roll-number"
 import { createAuditLog } from "@/db/queries"
 import {
+  getCourseById,
+  updateCourse,
+  setCourseActive,
+} from "@/db/queries/courses"
+import {
   createClass,
   getClassByKey,
   getClassById,
@@ -280,5 +285,96 @@ export async function assignClassRoleAction(input: {
     return { error: null }
   } catch (err) {
     return { error: getErrorMessage(err, "Could not assign") }
+  }
+}
+
+/**
+ * The catalogue is department-scoped: an HOD curates their own subjects and
+ * nobody else's. course:update is the capability; the scope check is separate,
+ * exactly as it is for classes and faculty.
+ */
+async function courseInScope(user: SessionUser, courseId: string) {
+  const course = await getCourseById(courseId)
+  if (!course) return { ok: false as const, course: null }
+  // departmentCode is nullable: a course can be college-wide, owned by no single
+  // department. Nobody's HOD scope covers that, so it stays super-admin-only
+  // rather than falling to whichever HOD happens to open the page.
+  const ok =
+    user.tier === "super_admin" ||
+    (course.departmentCode !== null &&
+      user.deptCodes.includes(course.departmentCode))
+  return { ok, course }
+}
+
+export async function updateCourseAction(input: {
+  courseId: string
+  courseName: string
+  courseType: "theory" | "practical" | "project"
+  credits: number
+  maxIsa: number
+  maxMse: number
+  maxEse: number
+  maxTotal: number
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "course:update")
+    const { ok, course } = await courseInScope(user!, input.courseId)
+    if (!ok || !course) return { error: "That course is not in your scope." }
+    if (!input.courseName.trim()) return { error: "A course name is required." }
+    if (input.credits < 1) return { error: "Credits must be at least 1." }
+    if (input.maxIsa + input.maxMse + input.maxEse !== input.maxTotal) {
+      return {
+        error: `ISA + MSE + ESE must equal the total (${
+          input.maxIsa + input.maxMse + input.maxEse
+        } ≠ ${input.maxTotal}).`,
+      }
+    }
+
+    await updateCourse(input.courseId, {
+      courseName: input.courseName.trim(),
+      courseType: input.courseType,
+      credits: input.credits,
+      maxIsa: input.maxIsa,
+      maxMse: input.maxMse,
+      maxEse: input.maxEse,
+      maxTotal: input.maxTotal,
+    })
+    await createAuditLog({
+      action: "course.updated",
+      actorId: user!.id,
+      targetType: "course",
+      targetId: input.courseId,
+      details: { courseCode: course.courseCode },
+    })
+    revalidatePath("/dashboard/dept/courses")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not update the course") }
+  }
+}
+
+export async function setCourseActiveAction(input: {
+  courseId: string
+  isActive: boolean
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "course:update")
+    const { ok, course } = await courseInScope(user!, input.courseId)
+    if (!ok || !course) return { error: "That course is not in your scope." }
+
+    await setCourseActive(input.courseId, input.isActive)
+    await createAuditLog({
+      action: input.isActive ? "course.reactivated" : "course.deactivated",
+      actorId: user!.id,
+      targetType: "course",
+      targetId: input.courseId,
+      details: { courseCode: course.courseCode },
+    })
+    revalidatePath("/dashboard/dept/courses")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not change the course") }
   }
 }
