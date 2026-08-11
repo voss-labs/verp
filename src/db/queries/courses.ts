@@ -27,6 +27,7 @@ export async function createCourse(input: {
   courseName: string
   departmentCode: string
   courseType: "theory" | "practical" | "project"
+  year?: string | null
   credits: number
   maxIsa: number
   maxMse: number
@@ -49,6 +50,7 @@ export async function updateCourse(
   input: {
     courseName: string
     courseType: "theory" | "practical" | "project"
+    year?: string | null
     credits: number
     maxIsa: number
     maxMse: number

@@ -54,6 +54,15 @@ type Course = {
   maxTotal: number
   isActive: boolean
   offerings: number
+  year: string | null
+}
+
+const YEARS = ["FE", "SE", "TE", "BE"] as const
+const YEAR_LABEL: Record<string, string> = {
+  FE: "First Year",
+  SE: "Second Year",
+  TE: "Third Year",
+  BE: "Final Year",
 }
 
 export function CoursesClient({
@@ -70,25 +79,74 @@ export function CoursesClient({
   const [query, setQuery] = useState("")
   const [editing, setEditing] = useState<Course | null>(null)
   const [creating, setCreating] = useState(false)
+  const [yearFilter, setYearFilter] = useState<string>("all")
+  const [deptFilter, setDeptFilter] = useState<string>("all")
 
   const q = query.trim().toLowerCase()
-  const view = q
-    ? courses.filter(
-        (c) =>
-          c.courseCode.toLowerCase().includes(q) ||
-          c.courseName.toLowerCase().includes(q)
-      )
-    : courses
+  const view = courses.filter((c) => {
+    if (q && !`${c.courseCode} ${c.courseName}`.toLowerCase().includes(q))
+      return false
+    if (yearFilter !== "all" && (c.year ?? "") !== yearFilter) return false
+    if (deptFilter !== "all" && (c.departmentCode ?? "") !== deptFilter)
+      return false
+    return true
+  })
+
+  // Counts come from the full list, not the filtered one: a year showing 0 is
+  // information, and hiding the option would make it look like it never existed.
+  const countFor = (y: string) =>
+    courses.filter((c) => (c.year ?? "") === y).length
+  const deptsPresent = [
+    ...new Set(
+      courses.map((c) => c.departmentCode).filter((d): d is string => !!d)
+    ),
+  ].sort()
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by code or name…"
-          className="h-9 max-w-xs"
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by code or name…"
+            className="h-9 w-56"
+          />
+          <Select
+            value={yearFilter}
+            onValueChange={(v) => v && setYearFilter(v)}
+          >
+            <SelectTrigger className="h-9 w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All years</SelectItem>
+              {YEARS.map((y) => (
+                <SelectItem key={y} value={y}>
+                  {YEAR_LABEL[y]} ({countFor(y)})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {deptsPresent.length > 1 && (
+            <Select
+              value={deptFilter}
+              onValueChange={(v) => v && setDeptFilter(v)}
+            >
+              <SelectTrigger className="h-9 w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All departments</SelectItem>
+                {deptsPresent.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <span className="text-muted-foreground text-xs">
             {view.length} of {courses.length}
@@ -121,6 +179,8 @@ export function CoursesClient({
               <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
                 <th>Code</th>
                 <th>Name</th>
+                <th className="w-20">Year</th>
+                {deptsPresent.length > 1 && <th className="w-20">Dept</th>}
                 <th className="w-24">Type</th>
                 <th className="w-16">Credits</th>
                 <th className="w-32">Marks split</th>
@@ -134,6 +194,18 @@ export function CoursesClient({
                 <tr key={c.id} className="[&>td]:px-3 [&>td]:py-1.5">
                   <td className="font-mono text-xs">{c.courseCode}</td>
                   <td>{c.courseName}</td>
+                  <td>
+                    {c.year ? (
+                      <Badge variant="outline">{c.year}</Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
+                  </td>
+                  {deptsPresent.length > 1 && (
+                    <td className="text-muted-foreground text-xs">
+                      {c.departmentCode ?? "—"}
+                    </td>
+                  )}
                   <td className="capitalize">{c.courseType}</td>
                   <td className="tabular-nums">{c.credits}</td>
                   <td className="text-muted-foreground text-xs tabular-nums">
@@ -208,6 +280,7 @@ function EditDialog({
         courseId: form.id,
         courseName: form.courseName,
         courseType: form.courseType as CourseType,
+        year: form.year,
         credits: form.credits,
         maxIsa: form.maxIsa,
         maxMse: form.maxMse,
@@ -287,6 +360,26 @@ function EditDialog({
                   setForm({ ...form, credits: Number(e.target.value) })
                 }
               />
+            </Field>
+            <Field label="Year">
+              <Select
+                value={form.year ?? "none"}
+                onValueChange={(v) =>
+                  v && setForm({ ...form, year: v === "none" ? null : v })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not set</SelectItem>
+                  {YEARS.map((y) => (
+                    <SelectItem key={y} value={y}>
+                      {YEAR_LABEL[y]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
           </div>
           <div className="grid grid-cols-4 gap-3">
@@ -394,6 +487,7 @@ function CreateDialog({
   const [dept, setDept] = useState(departments[0]?.code ?? "")
   const [type, setType] = useState<CourseType>("theory")
   const [credits, setCredits] = useState(3)
+  const [year, setYear] = useState("FE")
   const [caps, setCaps] = useState(CAP_PRESETS.theory)
 
   // Changing the type re-seeds the maxima rather than leaving a theory split on
@@ -414,6 +508,7 @@ function CreateDialog({
         courseName: name,
         departmentCode: dept,
         courseType: type,
+        year,
         credits,
         ...caps,
       })
@@ -493,6 +588,20 @@ function CreateDialog({
                 value={credits}
                 onChange={(e) => setCredits(Number(e.target.value))}
               />
+            </Field>
+            <Field label="Year">
+              <Select value={year} onValueChange={(v) => v && setYear(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {YEARS.map((y) => (
+                    <SelectItem key={y} value={y}>
+                      {YEAR_LABEL[y]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
           </div>
 

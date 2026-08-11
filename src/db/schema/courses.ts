@@ -35,6 +35,15 @@ export const courses = pgTable(
       { onDelete: "set null" }
     ),
     description: text("description"),
+    // Which year of the programme the course belongs to (FE/SE/TE/BE). The
+    // syllabus is published one PDF per year, so this is what the catalogue is
+    // actually organised by — a flat list of every course the department has
+    // ever offered is not something anyone can navigate.
+    //
+    // Distinct from courseOfferings.semester, which says when a specific CLASS
+    // is taught it. The year is a property of the curriculum; the semester is a
+    // property of the delivery.
+    year: text("year"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

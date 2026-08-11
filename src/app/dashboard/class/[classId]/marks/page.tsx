@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
 import { expectedYear } from "@/lib/roll-number"
 import { getClassById } from "@/db/queries/classes"
+import { listClassStaff } from "@/db/queries/class-staff"
 import { getStudentsByClassKeys } from "@/db/queries/students"
 import { listOfferingsForClass, getOfferingById } from "@/db/queries/offerings"
 import { getMarksForOffering, getLockedComponents } from "@/db/queries/marks"
@@ -32,7 +33,20 @@ export default async function MarksPage({
     (user.tier === "hod" && user.deptCodes.includes(cls.departmentCode))
   if (!inScope) redirect("/dashboard/class")
 
-  const offerings = await listOfferingsForClass(classId)
+  // Allocation rights decide what you see. A coordinator or HOD runs the whole
+  // timetable, so they get every subject; a TR gets the ones handed to them,
+  // which is the list they can actually act on.
+  const canAllocate =
+    user.tier === "super_admin" ||
+    (user.tier === "hod" && user.deptCodes.includes(cls.departmentCode)) ||
+    user.coordinatorClassIds.includes(classId)
+
+  const [offerings, staff] = await Promise.all([
+    canAllocate
+      ? listOfferingsForClass(classId)
+      : listOfferingsForClass(classId, user.facultyId ?? undefined),
+    listClassStaff([classId]),
+  ])
   const yr = expectedYear(cls.admissionYear, new Date()) ?? cls.admissionYear
   const label = `${yr} · ${cls.departmentCode} · ${cls.division}`
 
@@ -88,11 +102,21 @@ export default async function MarksPage({
               user.deptCodes.includes(cls.departmentCode)) ||
             user.coordinatorClassIds.includes(classId)
           }
+          canAllocate={canAllocate}
+          staff={staff.map((s) => ({
+            facultyId: s.facultyId,
+            name: `${s.firstName} ${s.lastName}`.trim(),
+            role: s.role,
+          }))}
           offerings={offerings.map((o) => ({
             id: o.id,
             code: o.course.courseCode,
             name: o.course.courseName,
             semester: o.semester,
+            facultyId: o.faculty?.id ?? null,
+            facultyName: o.faculty
+              ? `${o.faculty.firstName} ${o.faculty.lastName}`.trim()
+              : null,
           }))}
           selectedId={grid?.offeringId ?? null}
           grid={grid}

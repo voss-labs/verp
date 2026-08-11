@@ -7,6 +7,7 @@ import { getErrorMessage } from "@/lib/error-utils"
 import { parseRollNumber, expectedYear } from "@/lib/roll-number"
 import { createAuditLog } from "@/db/queries"
 import { getClassById } from "@/db/queries/classes"
+import { listClassStaff } from "@/db/queries/class-staff"
 import {
   createStudent,
   getStudentByRollNumber,
@@ -15,7 +16,11 @@ import {
 import { getRequestById, updateRequest } from "@/db/queries/onboarding"
 import { upsertAttendance } from "@/db/queries/attendance"
 import { getCourseByCode, createCourse } from "@/db/queries/courses"
-import { createOffering, getOfferingById } from "@/db/queries/offerings"
+import {
+  createOffering,
+  getOfferingById,
+  setOfferingFaculty,
+} from "@/db/queries/offerings"
 import {
   createBatch,
   getBatchById,
@@ -36,6 +41,39 @@ type AttStatus = "present" | "absent" | "late" | "excused"
 
 // A class is in scope if the caller coordinates/teaches it (classIds), is the HOD
 // of its department, or is super_admin.
+/**
+ * Who may allocate a class's subjects.
+ *
+ * The coordinator owns the class — they already approve its onboarding and
+ * record its attendance — so deciding which TR teaches what belongs with them,
+ * plus the HOD above and super_admin above that. A plain TR is deliberately not
+ * included: they enter marks for the subjects they are given, and letting them
+ * mint subjects is how the same course ends up on a class twice under two
+ * spellings.
+ */
+function canAllocate(user: SessionUser, classId: string, deptCode: string) {
+  return (
+    user.tier === "super_admin" ||
+    (user.tier === "hod" && user.deptCodes.includes(deptCode)) ||
+    user.coordinatorClassIds.includes(classId)
+  )
+}
+
+/**
+ * Who may write a subject's marks: the teacher it was allocated to, or anyone
+ * senior enough to cover for them. An unallocated subject falls to the
+ * coordinator rather than to whoever finds it first.
+ */
+function canWriteMarks(
+  user: SessionUser,
+  offeringFacultyId: string | null,
+  classId: string,
+  deptCode: string
+) {
+  if (canAllocate(user, classId, deptCode)) return true
+  return offeringFacultyId != null && offeringFacultyId === user.facultyId
+}
+
 async function classInScope(user: SessionUser, classId: string) {
   const cls = await getClassById(classId)
   if (!cls) return { ok: false as const, cls: null }
@@ -201,12 +239,20 @@ export async function createSubjectAction(input: {
   maxEse: number
   maxTotal: number
   semester: number
+  /** The TR who will teach it. Null leaves the subject unallocated. */
+  facultyId?: string | null
 }): Promise<Result> {
   try {
     const user = await getSessionUser()
     authorize(user, "marks:write")
     const { ok, cls } = await classInScope(user!, input.classId)
     if (!ok || !cls) return { error: "That class is not in your scope." }
+    if (!canAllocate(user!, input.classId, cls.departmentCode)) {
+      return {
+        error:
+          "Only the class coordinator, the HOD, or an admin can add a subject.",
+      }
+    }
     if (!input.courseCode.trim() || !input.courseName.trim())
       return { error: "Course code and name are required." }
 
@@ -229,7 +275,9 @@ export async function createSubjectAction(input: {
     await createOffering({
       courseId: course.id,
       classId: input.classId,
-      facultyId: user!.facultyId,
+      // Whoever will TEACH it, not whoever typed it in. Defaulting to the
+      // creator quietly made every subject belong to the coordinator.
+      facultyId: input.facultyId ?? null,
       semester: input.semester,
     })
     await createAuditLog({
@@ -261,8 +309,18 @@ export async function saveMarksAction(input: {
     authorize(user, "marks:write")
     const offering = await getOfferingById(input.offeringId)
     if (!offering) return { error: "No such subject." }
-    const { ok } = await classInScope(user!, offering.classId)
-    if (!ok) return { error: "That class is not in your scope." }
+    const { ok, cls } = await classInScope(user!, offering.classId)
+    if (!ok || !cls) return { error: "That class is not in your scope." }
+    if (
+      !canWriteMarks(
+        user!,
+        offering.facultyId,
+        offering.classId,
+        cls.departmentCode
+      )
+    ) {
+      return { error: "That subject is allocated to another teacher." }
+    }
 
     // A locked component is frozen for everyone, including whoever locked it.
     // Enforced here and not only in the UI: the grid is the polite reminder,
@@ -459,5 +517,57 @@ export async function removeFromBatchAction(input: {
     return { error: null }
   } catch (err) {
     return { error: getErrorMessage(err, "Could not remove the student") }
+  }
+}
+
+/**
+ * Hand a subject to a different teacher, or leave it unallocated.
+ *
+ * Marks already recorded are untouched: each row carries its own
+ * recordedByFacultyId, so the history of who entered what survives a
+ * reallocation. Only responsibility for what comes next moves.
+ */
+export async function assignOfferingFacultyAction(input: {
+  offeringId: string
+  facultyId: string | null
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "marks:write")
+    const offering = await getOfferingById(input.offeringId)
+    if (!offering) return { error: "No such subject." }
+    const { ok, cls } = await classInScope(user!, offering.classId)
+    if (!ok || !cls) return { error: "That class is not in your scope." }
+    if (!canAllocate(user!, offering.classId, cls.departmentCode)) {
+      return {
+        error:
+          "Only the class coordinator, the HOD, or an admin can reallocate a subject.",
+      }
+    }
+
+    if (input.facultyId) {
+      // The teacher must actually be on this class. Allocating a subject to
+      // somebody with no assignment would hand them a class they cannot open.
+      const staff = await listClassStaff([offering.classId])
+      if (!staff.some((s) => s.facultyId === input.facultyId)) {
+        return { error: "That teacher is not assigned to this class." }
+      }
+    }
+
+    await setOfferingFaculty(input.offeringId, input.facultyId)
+    await createAuditLog({
+      action: input.facultyId ? "offering.allocated" : "offering.unallocated",
+      actorId: user!.id,
+      targetType: "offering",
+      targetId: input.offeringId,
+      details: {
+        courseCode: offering.course.courseCode,
+        facultyId: input.facultyId,
+      },
+    })
+    revalidatePath(`/dashboard/class/${offering.classId}/marks`)
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not reallocate the subject") }
   }
 }
