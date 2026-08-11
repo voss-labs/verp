@@ -1,10 +1,12 @@
 "use client"
 
+import Link from "next/link"
+
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   Dialog,
@@ -92,9 +94,17 @@ export function CoursesClient({
             {view.length} of {courses.length}
           </span>
           {canCreate && departments.length > 0 && (
-            <Button size="sm" onClick={() => setCreating(true)}>
-              Add course
-            </Button>
+            <>
+              <Link
+                href="/dashboard/dept/courses/import"
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                Import syllabus
+              </Link>
+              <Button size="sm" onClick={() => setCreating(true)}>
+                Add course
+              </Button>
+            </>
           )}
         </div>
       </div>

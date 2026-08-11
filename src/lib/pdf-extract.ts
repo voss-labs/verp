@@ -55,3 +55,36 @@ export async function pdfToLines(buffer: Buffer): Promise<string[][]> {
 
   return lines
 }
+
+export type Glyph = { str: string; x: number; y: number }
+
+/**
+ * Every text item on every page, with its position, grouped per page.
+ *
+ * pdfToLines above collapses a page into visual rows, which is right for a
+ * marksheet where one student is one line. A syllabus scheme table is not that
+ * shape: its name column wraps, so "IoT and Edge Computing" arrives as three
+ * items at the same x and three different y values, straddling the row its code
+ * sits on. Recovering it needs the raw coordinates, not rows — see
+ * lib/syllabus-import.
+ */
+export async function pdfToGlyphs(buffer: Buffer): Promise<Glyph[][]> {
+  const pdf = await getDocumentProxy(new Uint8Array(buffer))
+  const pages: Glyph[][] = []
+
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p)
+    const content = await page.getTextContent()
+    const glyphs: Glyph[] = []
+    for (const item of content.items) {
+      const it = item as { str?: string; transform?: number[] }
+      const str = (it.str ?? "").trim()
+      const x = it.transform?.[4]
+      const y = it.transform?.[5]
+      if (str && x != null && y != null) glyphs.push({ str, x, y })
+    }
+    pages.push(glyphs)
+  }
+
+  return pages
+}
