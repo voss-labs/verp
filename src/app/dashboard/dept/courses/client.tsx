@@ -1,10 +1,12 @@
 "use client"
 
+import Link from "next/link"
+
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   Dialog,
@@ -20,7 +22,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { updateCourseAction, setCourseActiveAction } from "../actions"
+import {
+  createCourseAction,
+  updateCourseAction,
+  setCourseActiveAction,
+} from "../actions"
+
+// Same VIT defaults the class-level subject form uses: theory carries the MSE
+// component, practical and project are ISA + ESE only. Kept in step so a course
+// created here and one created from a class come out identical.
+const CAP_PRESETS: Record<
+  CourseType,
+  { maxIsa: number; maxMse: number; maxEse: number; maxTotal: number }
+> = {
+  theory: { maxIsa: 20, maxMse: 20, maxEse: 60, maxTotal: 100 },
+  practical: { maxIsa: 40, maxMse: 0, maxEse: 60, maxTotal: 100 },
+  project: { maxIsa: 40, maxMse: 0, maxEse: 60, maxTotal: 100 },
+}
 
 type CourseType = "theory" | "practical" | "project"
 type Course = {
@@ -41,12 +59,17 @@ type Course = {
 export function CoursesClient({
   courses,
   canEdit,
+  canCreate,
+  departments,
 }: {
   courses: Course[]
   canEdit: boolean
+  canCreate: boolean
+  departments: { code: string; name: string }[]
 }) {
   const [query, setQuery] = useState("")
   const [editing, setEditing] = useState<Course | null>(null)
+  const [creating, setCreating] = useState(false)
 
   const q = query.trim().toLowerCase()
   const view = q
@@ -66,9 +89,24 @@ export function CoursesClient({
           placeholder="Search by code or name…"
           className="h-9 max-w-xs"
         />
-        <span className="text-muted-foreground text-xs">
-          {view.length} of {courses.length}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-muted-foreground text-xs">
+            {view.length} of {courses.length}
+          </span>
+          {canCreate && departments.length > 0 && (
+            <>
+              <Link
+                href="/dashboard/dept/courses/import"
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                Import syllabus
+              </Link>
+              <Button size="sm" onClick={() => setCreating(true)}>
+                Add course
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {courses.length === 0 ? (
@@ -135,6 +173,12 @@ export function CoursesClient({
       )}
 
       <EditDialog course={editing} onClose={() => setEditing(null)} />
+      {creating && (
+        <CreateDialog
+          departments={departments}
+          onClose={() => setCreating(false)}
+        />
+      )}
     </div>
   )
 }
@@ -333,5 +377,182 @@ function Field({
       <label className="text-muted-foreground text-xs">{label}</label>
       {children}
     </div>
+  )
+}
+
+function CreateDialog({
+  departments,
+  onClose,
+}: {
+  departments: { code: string; name: string }[]
+  onClose: () => void
+}) {
+  const router = useRouter()
+  const [pending, start] = useTransition()
+  const [code, setCode] = useState("")
+  const [name, setName] = useState("")
+  const [dept, setDept] = useState(departments[0]?.code ?? "")
+  const [type, setType] = useState<CourseType>("theory")
+  const [credits, setCredits] = useState(3)
+  const [caps, setCaps] = useState(CAP_PRESETS.theory)
+
+  // Changing the type re-seeds the maxima rather than leaving a theory split on
+  // a practical, which is the mistake this form exists to prevent.
+  function pickType(next: CourseType) {
+    setType(next)
+    setCaps(CAP_PRESETS[next])
+  }
+
+  const split = caps.maxIsa + caps.maxMse + caps.maxEse
+  const mismatch = split !== caps.maxTotal
+  const ready = code.trim() && name.trim() && dept && !mismatch && credits >= 1
+
+  function save() {
+    start(async () => {
+      const res = await createCourseAction({
+        courseCode: code,
+        courseName: name,
+        departmentCode: dept,
+        courseType: type,
+        credits,
+        ...caps,
+      })
+      if (res.error) return void toast.error(res.error)
+      toast.success(`${code.trim().toUpperCase()} added`)
+      onClose()
+      router.refresh()
+    })
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add course</DialogTitle>
+        </DialogHeader>
+
+        <div className="grid gap-3">
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Code">
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="ITC501"
+                className="font-mono"
+              />
+            </Field>
+            <div className="col-span-2">
+              <Field label="Name">
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Analog & Digital Communication"
+                />
+              </Field>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Department">
+              <Select
+                value={dept}
+                onValueChange={(v) => v && setDept(v)}
+                disabled={departments.length === 1}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((d) => (
+                    <SelectItem key={d.code} value={d.code}>
+                      {d.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Type">
+              <Select
+                value={type}
+                onValueChange={(v) => v && pickType(v as CourseType)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="theory">Theory</SelectItem>
+                  <SelectItem value="practical">Practical</SelectItem>
+                  <SelectItem value="project">Project</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Credits">
+              <Input
+                type="number"
+                min={1}
+                value={credits}
+                onChange={(e) => setCredits(Number(e.target.value))}
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-4 gap-3">
+            <Field label="Max ISA">
+              <Input
+                type="number"
+                min={0}
+                value={caps.maxIsa}
+                onChange={(e) =>
+                  setCaps({ ...caps, maxIsa: Number(e.target.value) })
+                }
+              />
+            </Field>
+            <Field label="Max MSE">
+              <Input
+                type="number"
+                min={0}
+                value={caps.maxMse}
+                onChange={(e) =>
+                  setCaps({ ...caps, maxMse: Number(e.target.value) })
+                }
+              />
+            </Field>
+            <Field label="Max ESE">
+              <Input
+                type="number"
+                min={0}
+                value={caps.maxEse}
+                onChange={(e) =>
+                  setCaps({ ...caps, maxEse: Number(e.target.value) })
+                }
+              />
+            </Field>
+            <Field label="Total">
+              <Input
+                type="number"
+                min={1}
+                value={caps.maxTotal}
+                onChange={(e) =>
+                  setCaps({ ...caps, maxTotal: Number(e.target.value) })
+                }
+              />
+            </Field>
+          </div>
+
+          {mismatch && (
+            <p className="text-destructive text-xs">
+              ISA + MSE + ESE is {split}, which does not equal the total (
+              {caps.maxTotal}).
+            </p>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button size="sm" disabled={pending || !ready} onClick={save}>
+            {pending ? "Adding…" : "Add course"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

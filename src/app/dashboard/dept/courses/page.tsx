@@ -16,10 +16,10 @@ export default async function CoursesPage() {
   if (!user) redirect("/login")
   if (!can(user, "course:read")) redirect("/dashboard")
 
-  const allDepts = await listDepartments()
+  const depts = await listDepartments()
   const scope =
     user.tier === "super_admin"
-      ? allDepts.filter((d) => d.isActive).map((d) => d.code)
+      ? depts.filter((d) => d.isActive).map((d) => d.code)
       : user.deptCodes
 
   const courses = await listCoursesForDepts(scope)
@@ -37,6 +37,10 @@ export default async function CoursesPage() {
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <CoursesClient
           canEdit={can(user, "course:update")}
+          canCreate={can(user, "course:create")}
+          departments={depts
+            .filter((d) => scope.includes(d.code))
+            .map((d) => ({ code: d.code, name: d.name }))}
           courses={courses.map((c) => ({
             id: c.id,
             courseCode: c.courseCode,

@@ -8,7 +8,9 @@ import { classKey, tryClassKeyFromRoll } from "@/lib/class-key"
 import { BRANCH_CODE_BY_DEPT, divisionsForBranch } from "@/lib/roll-number"
 import { createAuditLog } from "@/db/queries"
 import {
+  getCourseByCode,
   getCourseById,
+  createCourse,
   updateCourse,
   setCourseActive,
 } from "@/db/queries/courses"
@@ -422,5 +424,163 @@ export async function graduateClassAction(input: {
     return { error: null }
   } catch (err) {
     return { error: getErrorMessage(err, "Could not graduate the class") }
+  }
+}
+
+/**
+ * Create a course directly in the catalogue.
+ *
+ * Until now a course could only appear as a side effect of a TR adding a
+ * subject to a class, which left the catalogue with a chicken-and-egg: an HOD
+ * opening it before term starts had no way to put anything in it, and the
+ * subjects that did exist were shaped by whoever happened to type them first.
+ * Curating the catalogue up front is the HOD's job; the class-level path stays
+ * for a TR who needs a subject that was never catalogued.
+ */
+export async function createCourseAction(input: {
+  courseCode: string
+  courseName: string
+  departmentCode: string
+  courseType: "theory" | "practical" | "project"
+  credits: number
+  maxIsa: number
+  maxMse: number
+  maxEse: number
+  maxTotal: number
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "course:create")
+    const inScope =
+      user!.tier === "super_admin" ||
+      user!.deptCodes.includes(input.departmentCode)
+    if (!inScope) return { error: "That department is not in your scope." }
+
+    const code = input.courseCode.trim().toUpperCase()
+    if (!code || !input.courseName.trim()) {
+      return { error: "A course code and name are required." }
+    }
+    if (input.credits < 1) return { error: "Credits must be at least 1." }
+    if (input.maxIsa + input.maxMse + input.maxEse !== input.maxTotal) {
+      return {
+        error: `ISA + MSE + ESE must equal the total (${
+          input.maxIsa + input.maxMse + input.maxEse
+        } ≠ ${input.maxTotal}).`,
+      }
+    }
+
+    // The code is unique across the college — a subject taught to several
+    // departments is one row, not one per department.
+    const existing = await getCourseByCode(code)
+    if (existing) {
+      return { error: `${code} already exists (${existing.courseName}).` }
+    }
+
+    const course = await createCourse({
+      courseCode: code,
+      courseName: input.courseName.trim(),
+      departmentCode: input.departmentCode,
+      courseType: input.courseType,
+      credits: input.credits,
+      maxIsa: input.maxIsa,
+      maxMse: input.maxMse,
+      maxEse: input.maxEse,
+      maxTotal: input.maxTotal,
+    })
+    await createAuditLog({
+      action: "course.created",
+      actorId: user!.id,
+      targetType: "course",
+      targetId: course.id,
+      details: { courseCode: code, departmentCode: input.departmentCode },
+    })
+    revalidatePath("/dashboard/dept/courses")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not create the course") }
+  }
+}
+
+/**
+ * Import a reviewed batch of courses.
+ *
+ * Everything here has already been through the preview grid, so the rows are
+ * what a human approved rather than what a parser produced. Codes that already
+ * exist are skipped rather than failing the batch: a syllabus shares courses
+ * across regulations, so re-importing an adjacent year is normal and should be
+ * a no-op for the overlap, not an error.
+ */
+export async function bulkCreateCoursesAction(input: {
+  departmentCode: string
+  courses: {
+    courseCode: string
+    courseName: string
+    courseType: "theory" | "practical" | "project"
+    credits: number
+    maxIsa: number
+    maxMse: number
+    maxEse: number
+    maxTotal: number
+  }[]
+}): Promise<Result & { created?: number; skipped?: number }> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "course:create")
+    const inScope =
+      user!.tier === "super_admin" ||
+      user!.deptCodes.includes(input.departmentCode)
+    if (!inScope) return { error: "That department is not in your scope." }
+    if (input.courses.length === 0) return { error: "Nothing selected." }
+
+    let created = 0
+    let skipped = 0
+    const problems: string[] = []
+
+    for (const c of input.courses) {
+      const code = c.courseCode.trim().toUpperCase()
+      if (!code || !c.courseName.trim()) {
+        problems.push(`${code || "(no code)"}: needs a code and a name`)
+        continue
+      }
+      if (c.maxIsa + c.maxMse + c.maxEse !== c.maxTotal) {
+        problems.push(`${code}: marks do not sum to the total`)
+        continue
+      }
+      if (await getCourseByCode(code)) {
+        skipped++
+        continue
+      }
+      await createCourse({
+        courseCode: code,
+        courseName: c.courseName.trim(),
+        departmentCode: input.departmentCode,
+        courseType: c.courseType,
+        credits: c.credits,
+        maxIsa: c.maxIsa,
+        maxMse: c.maxMse,
+        maxEse: c.maxEse,
+        maxTotal: c.maxTotal,
+      })
+      created++
+    }
+
+    await createAuditLog({
+      action: "course.imported",
+      actorId: user!.id,
+      targetType: "department",
+      targetId: input.departmentCode,
+      details: { created, skipped, rejected: problems.length },
+    })
+    revalidatePath("/dashboard/dept/courses")
+
+    // A partial import is still a success: the rows that were fine are in, and
+    // the reviewer is told exactly which were not rather than losing the lot.
+    return {
+      error: problems.length > 0 ? problems.slice(0, 5).join("; ") : null,
+      created,
+      skipped,
+    }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not import the courses") }
   }
 }
