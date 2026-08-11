@@ -16,7 +16,15 @@ import {
   setMarksLockAction,
 } from "../../actions"
 
-type Offering = { id: string; code: string; name: string; semester: number }
+type Offering = {
+  id: string
+  code: string
+  name: string
+  semester: number
+  facultyId: string | null
+  facultyName: string | null
+}
+type Staff = { facultyId: string; name: string; role: string }
 type Row = {
   studentId: string
   name: string
@@ -58,12 +66,16 @@ export function MarksClient({
   selectedId,
   grid,
   canUnlock,
+  canAllocate,
+  staff,
 }: {
   classId: string
   offerings: Offering[]
   selectedId: string | null
   grid: Grid | null
   canUnlock: boolean
+  canAllocate: boolean
+  staff: Staff[]
 }) {
   if (grid && selectedId) {
     const offering = offerings.find((o) => o.id === selectedId)!
@@ -76,15 +88,26 @@ export function MarksClient({
       />
     )
   }
-  return <SubjectSetup classId={classId} offerings={offerings} />
+  return (
+    <SubjectSetup
+      classId={classId}
+      offerings={offerings}
+      canAllocate={canAllocate}
+      staff={staff}
+    />
+  )
 }
 
 function SubjectSetup({
   classId,
   offerings,
+  canAllocate,
+  staff,
 }: {
   classId: string
   offerings: Offering[]
+  canAllocate: boolean
+  staff: Staff[]
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -94,6 +117,7 @@ function SubjectSetup({
   const [credits, setCredits] = useState(3)
   const [semester, setSemester] = useState(1)
   const [caps, setCaps] = useState(CAP_PRESETS.theory)
+  const [teacher, setTeacher] = useState<string>("")
 
   function pickType(t: CourseType) {
     setCourseType(t)
@@ -109,6 +133,7 @@ function SubjectSetup({
         courseType,
         credits,
         semester,
+        facultyId: teacher || null,
         ...caps,
       })
       if (res.error) {
@@ -162,7 +187,11 @@ function SubjectSetup({
                       <span className="text-sm">{o.name}</span>
                     </div>
                     <span className="text-muted-foreground text-xs">
-                      Sem {o.semester} · Enter marks →
+                      Sem {o.semester} ·{" "}
+                      {o.facultyName ?? (
+                        <span className="text-destructive">Unallocated</span>
+                      )}{" "}
+                      · Enter marks →
                     </span>
                   </button>
                 </li>
@@ -174,6 +203,12 @@ function SubjectSetup({
 
       <div className="border-border flex flex-col gap-3 rounded border p-4">
         <h2 className="text-sm font-semibold">Add subject</h2>
+        {!canAllocate && (
+          <p className="text-muted-foreground text-xs">
+            Only the class coordinator or the HOD can add a subject. Yours
+            appear in the list once they allocate them to you.
+          </p>
+        )}
         <Field label="Course code">
           <Input
             value={courseCode}
@@ -230,6 +265,23 @@ function SubjectSetup({
             />
           </Field>
         </div>
+        <Field label="Taught by">
+          <select
+            value={teacher}
+            onChange={(e) => setTeacher(e.target.value)}
+            className="border-input bg-background h-9 rounded border px-2 text-sm"
+          >
+            {/* Unallocated is a real starting state, not a mistake: the subject
+                exists on the timetable before anyone is put in front of it. */}
+            <option value="">Unallocated</option>
+            {staff.map((t) => (
+              <option key={t.facultyId} value={t.facultyId}>
+                {t.name}
+                {t.role === "academic_coordinator" ? " (coordinator)" : ""}
+              </option>
+            ))}
+          </select>
+        </Field>
         <div className="grid grid-cols-4 gap-2">
           {(["maxIsa", "maxMse", "maxEse", "maxTotal"] as const).map((k) => (
             <Field
@@ -258,7 +310,9 @@ function SubjectSetup({
         <Button
           size="sm"
           className="mt-1"
-          disabled={pending || !courseCode.trim() || !courseName.trim()}
+          disabled={
+            pending || !canAllocate || !courseCode.trim() || !courseName.trim()
+          }
           onClick={add}
         >
           {pending ? "Adding…" : "Add subject"}

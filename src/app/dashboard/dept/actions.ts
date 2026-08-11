@@ -313,6 +313,7 @@ export async function updateCourseAction(input: {
   courseId: string
   courseName: string
   courseType: "theory" | "practical" | "project"
+  year?: string | null
   credits: number
   maxIsa: number
   maxMse: number
@@ -337,6 +338,7 @@ export async function updateCourseAction(input: {
     await updateCourse(input.courseId, {
       courseName: input.courseName.trim(),
       courseType: input.courseType,
+      year: input.year ?? null,
       credits: input.credits,
       maxIsa: input.maxIsa,
       maxMse: input.maxMse,
@@ -442,6 +444,7 @@ export async function createCourseAction(input: {
   courseName: string
   departmentCode: string
   courseType: "theory" | "practical" | "project"
+  year?: string | null
   credits: number
   maxIsa: number
   maxMse: number
@@ -481,6 +484,7 @@ export async function createCourseAction(input: {
       courseName: input.courseName.trim(),
       departmentCode: input.departmentCode,
       courseType: input.courseType,
+      year: input.year ?? null,
       credits: input.credits,
       maxIsa: input.maxIsa,
       maxMse: input.maxMse,
@@ -512,6 +516,8 @@ export async function createCourseAction(input: {
  */
 export async function bulkCreateCoursesAction(input: {
   departmentCode: string
+  /** Which year of the programme this syllabus covers. */
+  year?: string | null
   courses: {
     courseCode: string
     courseName: string
@@ -555,6 +561,7 @@ export async function bulkCreateCoursesAction(input: {
         courseName: c.courseName.trim(),
         departmentCode: input.departmentCode,
         courseType: c.courseType,
+        year: input.year ?? null,
         credits: c.credits,
         maxIsa: c.maxIsa,
         maxMse: c.maxMse,

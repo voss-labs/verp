@@ -53,6 +53,7 @@ export default async function CoursesPage() {
             maxEse: c.maxEse,
             maxTotal: c.maxTotal,
             isActive: c.isActive,
+            year: c.year,
             offerings: usage.get(c.id) ?? 0,
           }))}
         />

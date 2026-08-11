@@ -19,14 +19,34 @@ export async function getOfferingById(id: string) {
   })
 }
 
-// Every subject a class is being taught, with the course details.
-export async function listOfferingsForClass(classId: string) {
+// Every subject a class is being taught, with the course and the faculty who
+// teaches it. Pass facultyId to narrow to one teacher's subjects — a TR is shown
+// what they are responsible for, not the whole class's timetable.
+export async function listOfferingsForClass(
+  classId: string,
+  facultyId?: string
+) {
   return db.query.courseOfferings.findMany({
     where: and(
       eq(courseOfferings.classId, classId),
-      eq(courseOfferings.isActive, true)
+      eq(courseOfferings.isActive, true),
+      facultyId ? eq(courseOfferings.facultyId, facultyId) : undefined
     ),
-    with: { course: true },
+    with: { course: true, faculty: true },
     orderBy: courseOfferings.semester,
   })
+}
+
+/**
+ * Hand a subject to a different teacher. Nullable: an offering with no faculty
+ * is unallocated, which is a real state at the start of term and better than
+ * silently leaving it with whoever happened to create it.
+ */
+export async function setOfferingFaculty(id: string, facultyId: string | null) {
+  const [row] = await db
+    .update(courseOfferings)
+    .set({ facultyId, updatedAt: new Date() })
+    .where(eq(courseOfferings.id, id))
+    .returning()
+  return row
 }

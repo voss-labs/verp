@@ -47,6 +47,10 @@ export function ImportClient({
   const [pending, start] = useTransition()
   const [uploading, setUploading] = useState(false)
   const [dept, setDept] = useState(departments[0].code)
+  // Asked rather than parsed. Each syllabus PDF covers exactly one year, and the
+  // person uploading it knows which — reading it out of the cover page would be
+  // a guess where a two-click answer is certain.
+  const [year, setYear] = useState("FE")
   const [rows, setRows] = useState<Row[] | null>(null)
   const [meta, setMeta] = useState<{ fileName: string; pages: number } | null>(
     null
@@ -100,6 +104,7 @@ export function ImportClient({
     start(async () => {
       const res = await bulkCreateCoursesAction({
         departmentCode: dept,
+        year,
         courses: chosen.map((c) => ({
           courseCode: c.courseCode,
           courseName: c.courseName,
@@ -172,7 +177,7 @@ export function ImportClient({
         </div>
         <div className="flex items-center gap-2">
           <Select value={dept} onValueChange={(v) => v && setDept(v)}>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-28">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -181,6 +186,17 @@ export function ImportClient({
                   {d.code}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select value={year} onValueChange={(v) => v && setYear(v)}>
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="FE">First Year</SelectItem>
+              <SelectItem value="SE">Second Year</SelectItem>
+              <SelectItem value="TE">Third Year</SelectItem>
+              <SelectItem value="BE">Final Year</SelectItem>
             </SelectContent>
           </Select>
           <Button variant="outline" size="sm" onClick={() => setRows(null)}>
