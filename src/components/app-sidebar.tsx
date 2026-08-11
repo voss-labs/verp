@@ -94,8 +94,10 @@ const superAdminNav = [
     title: "Departments",
     url: "/dashboard/dept",
     icon: <Building2Icon />,
+    // The per-department dashboard lives at /dashboard/dept/[code]; this list
+    // is the way in, since the nav cannot know the codes without a fetch.
     items: [
-      { title: "Classes", url: "/dashboard/dept" },
+      { title: "All departments", url: "/dashboard/dept" },
       { title: "Course catalogue", url: "/dashboard/dept/courses" },
     ],
   },
