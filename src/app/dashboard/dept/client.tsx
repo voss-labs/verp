@@ -1,5 +1,7 @@
 "use client"
 
+import Link from "next/link"
+
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -103,6 +105,12 @@ export function DeptClient({
                 {d.code}
               </Badge>
               <h3 className="text-sm font-medium">{d.name}</h3>
+              <Link
+                href={`/dashboard/dept/${d.code}`}
+                className="text-muted-foreground hover:text-foreground ml-auto text-xs underline"
+              >
+                Department dashboard →
+              </Link>
             </div>
 
             <div className="flex flex-wrap gap-2">
