@@ -22,6 +22,7 @@ import {
   ShieldIcon,
   Building2Icon,
   UploadIcon,
+  GraduationCapIcon,
 } from "lucide-react"
 import { useSession } from "@/lib/auth-client"
 import { useUserRole } from "@/hooks/use-user-role"
@@ -41,7 +42,10 @@ const adminNav = [
     title: "My Department",
     url: "/dashboard/dept",
     icon: <Building2Icon />,
-    items: [{ title: "Classes", url: "/dashboard/dept" }],
+    items: [
+      { title: "Classes", url: "/dashboard/dept" },
+      { title: "Course catalogue", url: "/dashboard/dept/courses" },
+    ],
   },
   {
     title: "Students",
@@ -90,7 +94,10 @@ const superAdminNav = [
     title: "Departments",
     url: "/dashboard/dept",
     icon: <Building2Icon />,
-    items: [{ title: "Classes", url: "/dashboard/dept" }],
+    items: [
+      { title: "Classes", url: "/dashboard/dept" },
+      { title: "Course catalogue", url: "/dashboard/dept/courses" },
+    ],
   },
   {
     title: "Students",
@@ -160,6 +167,12 @@ const studentNav = [
     icon: <LayoutDashboardIcon />,
     isActive: true,
     items: [{ title: "Overview", url: "/dashboard" }],
+  },
+  {
+    title: "My Marks",
+    url: "/dashboard/my-marks",
+    icon: <GraduationCapIcon />,
+    items: [{ title: "Marks & SGPI", url: "/dashboard/my-marks" }],
   },
 ]
 

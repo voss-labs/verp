@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm"
 import { db } from "@/db"
-import { marks, marksLocks } from "@/db/schema"
+import { marks, marksLocks, courseOfferings, courses } from "@/db/schema"
 
 type Entry = {
   courseOfferingId: string
@@ -113,4 +113,33 @@ export async function setMarksLock(input: {
     })
     .returning()
   return row
+}
+
+/**
+ * Every mark recorded for a class, across all its subjects and semesters, with
+ * the student and course detail the results console needs. One read: the class
+ * has few enough offerings that per-student queries would only add round trips.
+ */
+export async function getMarksForClass(classId: string) {
+  return db
+    .select({
+      studentId: marks.studentId,
+      semester: courseOfferings.semester,
+      courseCode: courses.courseCode,
+      courseName: courses.courseName,
+      courseType: courses.courseType,
+      credits: courses.credits,
+      maxIsa: courses.maxIsa,
+      maxMse: courses.maxMse,
+      maxEse: courses.maxEse,
+      maxTotal: courses.maxTotal,
+      isa: marks.isa,
+      mse1: marks.mse1,
+      mse2: marks.mse2,
+      ese: marks.ese,
+    })
+    .from(marks)
+    .innerJoin(courseOfferings, eq(marks.courseOfferingId, courseOfferings.id))
+    .innerJoin(courses, eq(courseOfferings.courseId, courses.id))
+    .where(eq(courseOfferings.classId, classId))
 }

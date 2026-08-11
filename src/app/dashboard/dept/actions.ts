@@ -8,6 +8,12 @@ import { classKey, tryClassKeyFromRoll } from "@/lib/class-key"
 import { BRANCH_CODE_BY_DEPT, divisionsForBranch } from "@/lib/roll-number"
 import { createAuditLog } from "@/db/queries"
 import {
+  getCourseById,
+  updateCourse,
+  setCourseActive,
+} from "@/db/queries/courses"
+import { graduateClassKey, ungraduateClassKey } from "@/db/queries/students"
+import {
   createClass,
   getClassByKey,
   getClassById,
@@ -280,5 +286,141 @@ export async function assignClassRoleAction(input: {
     return { error: null }
   } catch (err) {
     return { error: getErrorMessage(err, "Could not assign") }
+  }
+}
+
+/**
+ * The catalogue is department-scoped: an HOD curates their own subjects and
+ * nobody else's. course:update is the capability; the scope check is separate,
+ * exactly as it is for classes and faculty.
+ */
+async function courseInScope(user: SessionUser, courseId: string) {
+  const course = await getCourseById(courseId)
+  if (!course) return { ok: false as const, course: null }
+  // departmentCode is nullable: a course can be college-wide, owned by no single
+  // department. Nobody's HOD scope covers that, so it stays super-admin-only
+  // rather than falling to whichever HOD happens to open the page.
+  const ok =
+    user.tier === "super_admin" ||
+    (course.departmentCode !== null &&
+      user.deptCodes.includes(course.departmentCode))
+  return { ok, course }
+}
+
+export async function updateCourseAction(input: {
+  courseId: string
+  courseName: string
+  courseType: "theory" | "practical" | "project"
+  credits: number
+  maxIsa: number
+  maxMse: number
+  maxEse: number
+  maxTotal: number
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "course:update")
+    const { ok, course } = await courseInScope(user!, input.courseId)
+    if (!ok || !course) return { error: "That course is not in your scope." }
+    if (!input.courseName.trim()) return { error: "A course name is required." }
+    if (input.credits < 1) return { error: "Credits must be at least 1." }
+    if (input.maxIsa + input.maxMse + input.maxEse !== input.maxTotal) {
+      return {
+        error: `ISA + MSE + ESE must equal the total (${
+          input.maxIsa + input.maxMse + input.maxEse
+        } ≠ ${input.maxTotal}).`,
+      }
+    }
+
+    await updateCourse(input.courseId, {
+      courseName: input.courseName.trim(),
+      courseType: input.courseType,
+      credits: input.credits,
+      maxIsa: input.maxIsa,
+      maxMse: input.maxMse,
+      maxEse: input.maxEse,
+      maxTotal: input.maxTotal,
+    })
+    await createAuditLog({
+      action: "course.updated",
+      actorId: user!.id,
+      targetType: "course",
+      targetId: input.courseId,
+      details: { courseCode: course.courseCode },
+    })
+    revalidatePath("/dashboard/dept/courses")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not update the course") }
+  }
+}
+
+export async function setCourseActiveAction(input: {
+  courseId: string
+  isActive: boolean
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "course:update")
+    const { ok, course } = await courseInScope(user!, input.courseId)
+    if (!ok || !course) return { error: "That course is not in your scope." }
+
+    await setCourseActive(input.courseId, input.isActive)
+    await createAuditLog({
+      action: input.isActive ? "course.reactivated" : "course.deactivated",
+      actorId: user!.id,
+      targetType: "course",
+      targetId: input.courseId,
+      details: { courseCode: course.courseCode },
+    })
+    revalidatePath("/dashboard/dept/courses")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not change the course") }
+  }
+}
+
+/**
+ * Graduate a cohort.
+ *
+ * Keyed by class_key, not by a list of student ids: graduation happens to a
+ * cohort, and naming the cohort is what makes it idempotent — a student who
+ * transferred in after the first run is picked up, and one already graduated is
+ * skipped rather than re-stamped with a new date.
+ *
+ * Nobody is deactivated. A graduated student's marks and attendance still have
+ * to be readable; isActive answers "should this row exist", which is a different
+ * question from "have they finished".
+ */
+export async function graduateClassAction(input: {
+  classId: string
+  graduated: boolean
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "student:update")
+    const cls = await getClassById(input.classId)
+    if (!cls) return { error: "No such class." }
+    const inScope =
+      user!.tier === "super_admin" ||
+      user!.deptCodes.includes(cls.departmentCode)
+    if (!inScope) return { error: "That class is not in your scope." }
+
+    const count = input.graduated
+      ? await graduateClassKey(cls.classKey, new Date())
+      : await ungraduateClassKey(cls.classKey)
+
+    await createAuditLog({
+      action: input.graduated ? "class.graduated" : "class.ungraduated",
+      actorId: user!.id,
+      targetType: "class",
+      targetId: input.classId,
+      details: { classKey: cls.classKey, students: count },
+    })
+    revalidatePath("/dashboard/dept")
+    revalidatePath("/dashboard/students")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not graduate the class") }
   }
 }

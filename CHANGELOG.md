@@ -8,12 +8,17 @@ Every release credits the contributors whose pull requests shipped in that cycle
 
 ## [Unreleased]
 
-First wave of community contributions. Six pull requests landed in this cycle, every one of them from a first-time contributor.
+First wave of community contributions, alongside the marks and setup work that followed the MVP reset. Every community pull request in this cycle came from a first-time contributor.
 
 ### Added
 
+- Marks entry hardened for real submission cycles — ISA, MSE and ESE lock independently, because they are finished at different points in the term and freezing the whole subject when internals go in would block the ESE column for the rest of the semester. Anyone who can enter marks may lock; reopening is the class coordinator's, HOD's or an admin's call. The `marks_locks` table and the `marks:lock` capability had both shipped unused. Grid also exports to CSV and Excel. ([#65](https://github.com/voss-labs/verp/pull/65))
+- Student marks history at `/dashboard/my-marks` — per-semester cards with the subject breakdown behind each SGPI, plus CGPA across semesters. Students previously saw one number with no way to see what produced it. ([#66](https://github.com/voss-labs/verp/pull/66))
+- Class results console at `/dashboard/class/[classId]/results` — sortable CGPA table with roll/name search, CSV and Excel export, and a per-student breakdown dialog. Roster-first: a student with no marks yet is a blank row rather than an omission, since those are the ones worth chasing. ([#66](https://github.com/voss-labs/verp/pull/66))
+- Department course catalogue at `/dashboard/dept/courses` — view, correct and retire subjects. Courses could previously only be created as a side effect of adding a subject to a class, and a typo in a course name was permanent. Retiring is a soft delete: offerings and marks reference the row. ([#66](https://github.com/voss-labs/verp/pull/66))
+- Practical batches — a lab of 70 runs as B1/B2/B3 in a room that seats 25. A batch belongs to an offering rather than a class, so a student can sit in B1 for one lab and B2 for another; re-assigning retires the previous batch so nobody is registered for two sessions at once. Theory subjects are excluded. ([#66](https://github.com/voss-labs/verp/pull/66))
+- Cohort graduation — `students.graduated_at`, set per cohort from the department page. `expectedYear()` returns null past BE, so a finished cohort previously displayed a raw admission year, indistinguishable from a roll that failed to parse. This is the part of [#40](https://github.com/voss-labs/verp/pull/40) by [@TanishqChavan10](https://github.com/TanishqChavan10) that survives the roll-keyed roster — promotion itself is no longer an action anyone performs, because the cohort advances when the calendar does. ([#66](https://github.com/voss-labs/verp/pull/66))
 - Department, Year and Division filters on the Students table — three dropdowns, each showing a live count that narrows as the other filters are applied, with a Clear button once any is set. The filters live on the shared `DataTableView` behind a `facets` prop, so faculty and every future table opt in with one line; counts come from TanStack's faceted row model rather than extra `GROUP BY` queries. Division is now a visible column too — it had always been in the CSV and XLSX exports but never on screen. ([#43](https://github.com/voss-labs/verp/pull/43) by [@Himanshux99](https://github.com/Himanshux99), rebased onto the post-MVP table in [#62](https://github.com/voss-labs/verp/pull/62))
-
 - Dark mode support across the dashboard — `next-themes` provider wired into the root layout with a sun / moon toggle in the site header; the existing palette already used semantic tokens, so the rollout is theme-aware out of the box. ([#36](https://github.com/voss-labs/verp/pull/36) by [@jimmyorpheus](https://github.com/jimmyorpheus))
 - 404 and error pages — root `not-found.tsx`, root `error.tsx` boundary that surfaces `error.digest` for production bug reports, plus a dashboard-scoped `not-found.tsx` and a `[...missing]` catch-all so unmatched dashboard URLs keep the sidebar chrome. ([#34](https://github.com/voss-labs/verp/pull/34) by [@OTWL](https://github.com/OTWL))
 - CSV / XLSX export on the Students, Faculty, Courses, Attendance, and Audit Log pages — exports honour active filters and the user's current sort order, with styled XLSX output via `exceljs`. ([#37](https://github.com/voss-labs/verp/pull/37) by [@Aniket-Saw](https://github.com/Aniket-Saw))
@@ -22,6 +27,8 @@ First wave of community contributions. Six pull requests landed in this cycle, e
 
 ### Fixed
 
+- SGPI no longer diluted by subjects that have not been graded yet — every subject's credits went into the denominator including ones with no computable grade, so a term whose ESE had not happened reported an SGPI of 0 rather than "not yet". An ungraded subject now contributes neither credits nor credit points; a fail still contributes its credits, because a fail is a result. This changes the figure previously shown on the student dashboard. ([#66](https://github.com/voss-labs/verp/pull/66))
+- Academic year derived from the roll number instead of a stored snapshot — `students.year` was written once at import and never revisited, so 80 of 168 students on the live roster were displaying the year they were imported with, the 2024 cohort reading SE having reached TE. Class labels never had this problem because they compute `expectedYear()` on render; student rows now do the same, folding DSY rolls back to their cohort's start year. ([#66](https://github.com/voss-labs/verp/pull/66))
 - One TR per class, not several — `assignClassStaff` now deactivates any existing live TR before inserting the new one, matching the single-coordinator rule the schema already enforced. ([#61](https://github.com/voss-labs/verp/pull/61))
 - `npm run setup` and the migration runner restored — the MVP reset removed `scripts/setup.ts`, `src/db/migrate.ts`, `migrate-status.ts` and `db/setup.ts` while every doc still pointed at them, so a fresh clone answered `Missing script: setup`. The wizard is back on the current architecture: it seeds roster rows that a VOSS login binds to rather than password accounts, collects the `VOSS_*` client credentials and `SUPER_ADMIN_EMAILS`, and no longer misreads a `db:push` database as foreign. ([#63](https://github.com/voss-labs/verp/pull/63))
 - Windows compatibility for `npm run setup` — `start`, `npm`, and `npx` invocations all work via the platform's shell, and migration `0008_fix_marks_locks_user_ref` is idempotent for fresh databases (uses `IF EXISTS` / `IF NOT EXISTS` guards). The wizard now completes end-to-end on Windows. ([#39](https://github.com/voss-labs/verp/pull/39) by [@Mandar885](https://github.com/Mandar885))
@@ -36,6 +43,8 @@ Every contributor in this cycle is a first-time contributor to VERP. Thank you f
 - [@OTWL](https://github.com/OTWL) ([#34](https://github.com/voss-labs/verp/pull/34))
 - [@Aniket-Saw](https://github.com/Aniket-Saw) ([#37](https://github.com/voss-labs/verp/pull/37))
 - [@Himanshux99](https://github.com/Himanshux99) — Himanshu Choyal ([#43](https://github.com/voss-labs/verp/pull/43))
+- [@ManasD2011](https://github.com/ManasD2011) — Manas Deshpande ([#42](https://github.com/voss-labs/verp/pull/42))
+- [@TanishqChavan10](https://github.com/TanishqChavan10) — Tanishq Chavan ([#40](https://github.com/voss-labs/verp/pull/40))
 
 ---
 

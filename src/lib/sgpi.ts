@@ -90,8 +90,14 @@ export function computeSgpi(
 
   for (const { marks, course } of entries) {
     const computed = computeMarks(marks, course)
-    totalCredits += course.credits
 
+    // An ungraded subject is "not yet", not zero. Counting its credits while it
+    // can contribute no credit points divides by a denominator the student has
+    // not had the chance to earn against — mid-term, that reported SGPI 0 for a
+    // class whose ESE simply had not happened yet.
+    if (computed.gradePoint == null) continue
+
+    totalCredits += course.credits
     if (computed.status === "fail" || computed.gradePoint === "Fail") {
       hasFail = true
     } else if (computed.creditPoints != null) {
@@ -105,4 +111,82 @@ export function computeSgpi(
       : null
 
   return { totalCreditPoints, totalCredits, sgpi, hasFail }
+}
+
+// ── CGPA across semesters ──────────────────────────────────────────────────
+//
+// Lifted out of the pre-reset SGPI page, where it lived inside a client
+// component and could only ever serve that one screen. It is pure arithmetic
+// over computeSgpi, so it belongs beside it — the student's own view and the
+// staff console now compute identically instead of drifting apart.
+//
+// The old version keyed semesters by (number, academicYear) because offerings
+// hung off an academic_years table. Cohort identity now lives in the class key,
+// so a bare semester number is enough.
+
+export type SemesterEntries = {
+  semester: number
+  entries: { marks: MarksInput; course: CourseInfo }[]
+}
+
+export type SemesterResult = {
+  semester: number
+  sgpi: SgpiResult
+}
+
+export type CgpaResult = {
+  cgpa: number | null
+  totalCredits: number
+  totalCreditPoints: number
+  hasFail: boolean
+  /** Semesters with a computable SGPI — an in-progress term contributes none. */
+  completedSemesters: number
+  perSemester: SemesterResult[]
+}
+
+export function computeCgpa(semesters: SemesterEntries[]): CgpaResult {
+  let totalCredits = 0
+  let totalCreditPoints = 0
+  let hasFail = false
+  let completedSemesters = 0
+  const perSemester: SemesterResult[] = []
+
+  for (const sem of [...semesters].sort((a, b) => a.semester - b.semester)) {
+    const sgpi = computeSgpi(sem.entries)
+    perSemester.push({ semester: sem.semester, sgpi })
+    totalCredits += sgpi.totalCredits
+    totalCreditPoints += sgpi.totalCreditPoints
+    if (sgpi.hasFail) hasFail = true
+    if (sgpi.sgpi != null) completedSemesters++
+  }
+
+  const cgpa =
+    totalCredits > 0
+      ? Math.round((totalCreditPoints / totalCredits) * 100) / 100
+      : null
+
+  return {
+    cgpa,
+    totalCredits,
+    totalCreditPoints,
+    hasFail,
+    completedSemesters,
+    perSemester,
+  }
+}
+
+/** Group flat marks rows into the per-semester shape computeCgpa expects. */
+export function groupBySemester(
+  rows: { semester: number; marks: MarksInput; course: CourseInfo }[]
+): SemesterEntries[] {
+  const bySem = new Map<number, { marks: MarksInput; course: CourseInfo }[]>()
+  for (const r of rows) {
+    const list = bySem.get(r.semester) ?? []
+    list.push({ marks: r.marks, course: r.course })
+    bySem.set(r.semester, list)
+  }
+  return [...bySem.entries()].map(([semester, entries]) => ({
+    semester,
+    entries,
+  }))
 }

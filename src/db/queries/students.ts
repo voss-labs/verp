@@ -1,4 +1,4 @@
-import { eq, and, inArray } from "drizzle-orm"
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm"
 import { db } from "@/db"
 import { students } from "@/db/schema"
 
@@ -117,4 +117,47 @@ export async function deactivateStudentsByIds(ids: string[]) {
     .where(inArray(students.id, ids))
     .returning({ id: students.id })
   return rows.length
+}
+
+/**
+ * Mark a whole cohort as graduated. Keyed by class_key rather than a list of
+ * ids: graduation happens to a cohort, and naming the cohort is what makes the
+ * action idempotent — re-running it cannot catch a student who transferred in
+ * afterwards by accident.
+ *
+ * isActive is left alone. A graduated student is not deactivated: their marks
+ * and attendance still have to be readable, and deactivation is the tool for
+ * "this row should not have existed", which is a different statement.
+ */
+export async function graduateClassKey(classKey: string, on: Date) {
+  const rows = await db
+    .update(students)
+    .set({ graduatedAt: on, updatedAt: new Date() })
+    .where(and(eq(students.classKey, classKey), isNull(students.graduatedAt)))
+    .returning({ id: students.id })
+  return rows.length
+}
+
+/** Undo a graduation marked in error. */
+export async function ungraduateClassKey(classKey: string) {
+  const rows = await db
+    .update(students)
+    .set({ graduatedAt: null, updatedAt: new Date() })
+    .where(eq(students.classKey, classKey))
+    .returning({ id: students.id })
+  return rows.length
+}
+
+/**
+ * Cohorts with at least one graduated student. Graduation is recorded per
+ * student because that is where it is true — but the dept page asks the
+ * cohort-level question, so it is answered with one distinct read rather than
+ * loading every roster to find out.
+ */
+export async function getGraduatedClassKeys(): Promise<Set<string>> {
+  const rows = await db
+    .selectDistinct({ classKey: students.classKey })
+    .from(students)
+    .where(isNotNull(students.graduatedAt))
+  return new Set(rows.map((r) => r.classKey).filter((k): k is string => !!k))
 }
