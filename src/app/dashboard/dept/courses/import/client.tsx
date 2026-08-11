@@ -14,7 +14,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 import { bulkCreateCoursesAction } from "../../actions"
+
+// The total is the sum of the three components by definition — the parser only
+// accepts a row when they balance. Deriving it here rather than letting it be
+// typed removes the one way a reviewer could produce a row the server would
+// reject, and doubles as a check on their own edit: mistype ISA and the total
+// stops matching the figure printed in the syllabus.
+const parsedTotal = (r: Row) => r.maxIsa + r.maxMse + r.maxEse
 
 type CourseType = "theory" | "practical" | "project"
 type Row = {
@@ -100,7 +108,7 @@ export function ImportClient({
           maxIsa: c.maxIsa,
           maxMse: c.maxMse,
           maxEse: c.maxEse,
-          maxTotal: c.maxTotal,
+          maxTotal: parsedTotal(c),
         })),
       })
       if (res.created != null) {
@@ -144,6 +152,13 @@ export function ImportClient({
 
   const trusted = rows.filter((r) => r.nameSource === "detail").length
   const suggested = rows.filter((r) => r.nameSource === "table").length
+
+  // Catch here what the action would reject anyway, so an edit that breaks a
+  // row says so next to the row rather than as a toast after a round trip.
+  const chosen = rows.filter((r) => picked.has(r.courseCode))
+  const broken = chosen.filter(
+    (r) => !r.courseName.trim() || r.credits < 1 || parsedTotal(r) < 1
+  )
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -181,6 +196,19 @@ export function ImportClient({
         </div>
       </div>
 
+      {broken.length > 0 && (
+        <p className="text-destructive text-sm">
+          {broken.length} selected{" "}
+          {broken.length === 1 ? "row needs" : "rows need"} a name and at least
+          one credit before importing:{" "}
+          {broken
+            .slice(0, 6)
+            .map((r) => r.courseCode)
+            .join(", ")}
+          {broken.length > 6 && "…"}
+        </p>
+      )}
+
       <div className="border-border overflow-x-auto rounded border">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-muted-foreground text-xs">
@@ -190,7 +218,9 @@ export function ImportClient({
               <th>Name</th>
               <th className="w-28">Type</th>
               <th className="w-16">Cr</th>
-              <th className="w-32">ISA/MSE/ESE</th>
+              <th className="w-20">ISA</th>
+              <th className="w-20">MSE</th>
+              <th className="w-20">ESE</th>
               <th className="w-16">Total</th>
               <th>Needs attention</th>
             </tr>
@@ -201,7 +231,12 @@ export function ImportClient({
               return (
                 <tr
                   key={r.courseCode}
-                  className={flagged ? "bg-destructive/5" : undefined}
+                  className={cn(
+                    flagged && "bg-destructive/5",
+                    picked.has(r.courseCode) &&
+                      (!r.courseName.trim() || r.credits < 1) &&
+                      "outline-destructive outline outline-1 -outline-offset-1"
+                  )}
                 >
                   <td className="px-2">
                     <Checkbox
@@ -242,11 +277,44 @@ export function ImportClient({
                       </SelectContent>
                     </Select>
                   </td>
-                  <td className="px-2 tabular-nums">{r.credits}</td>
-                  <td className="text-muted-foreground px-2 text-xs tabular-nums">
-                    {r.maxIsa}/{r.maxMse}/{r.maxEse}
+                  <td className="px-2">
+                    <NumCell
+                      value={r.credits}
+                      onChange={(v) => edit(r.courseCode, { credits: v })}
+                    />
                   </td>
-                  <td className="px-2 tabular-nums">{r.maxTotal}</td>
+                  <td className="px-2">
+                    <NumCell
+                      value={r.maxIsa}
+                      onChange={(v) => edit(r.courseCode, { maxIsa: v })}
+                    />
+                  </td>
+                  <td className="px-2">
+                    <NumCell
+                      value={r.maxMse}
+                      onChange={(v) => edit(r.courseCode, { maxMse: v })}
+                    />
+                  </td>
+                  <td className="px-2">
+                    <NumCell
+                      value={r.maxEse}
+                      onChange={(v) => edit(r.courseCode, { maxEse: v })}
+                    />
+                  </td>
+                  <td
+                    className={cn(
+                      "px-2 tabular-nums",
+                      parsedTotal(r) !== r.maxTotal &&
+                        "text-destructive font-medium"
+                    )}
+                    title={
+                      parsedTotal(r) !== r.maxTotal
+                        ? `The syllabus stated ${r.maxTotal}`
+                        : undefined
+                    }
+                  >
+                    {parsedTotal(r)}
+                  </td>
                   <td className="px-2">
                     {r.warnings.map((w) => (
                       <Badge key={w} variant="outline" className="mr-1 text-xs">
@@ -261,5 +329,23 @@ export function ImportClient({
         </table>
       </div>
     </div>
+  )
+}
+
+function NumCell({
+  value,
+  onChange,
+}: {
+  value: number
+  onChange: (v: number) => void
+}) {
+  return (
+    <Input
+      type="number"
+      min={0}
+      value={value}
+      onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
+      className="h-8 w-16 tabular-nums"
+    />
   )
 }
