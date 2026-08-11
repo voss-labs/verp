@@ -79,8 +79,13 @@ const VERTICALS = new Set([
 // theory/lab pair. PCEC08T, BSC02, MDMIE01, EC46.
 const CODE = /^[A-Z]{2,6}\d{1,3}[A-Z]?$/
 
-// Template rows standing in for "whichever elective the student picks".
+// Template rows standing in for "whichever elective the student picks":
+// MDMXX, PEECxxT, CCXXX, ECXX. They carry no digits, so they fail CODE — and
+// were being dropped without a word, leaving the reviewer to wonder why the
+// table had more rows than the preview. They are recognised so they can be
+// reported and skipped deliberately rather than by accident.
 const PLACEHOLDER = /X{2,}|\bxx\b/i
+const PLACEHOLDER_CODE = /^[A-Z]{2,6}(X{2,}|xx)[A-Z]?$/i
 
 const num = (v: string): number | null => {
   const t = v.trim()
@@ -90,10 +95,12 @@ const num = (v: string): number | null => {
 }
 
 function looksLikeCode(cell: string): boolean {
-  const c = cell.trim().replace(/[$*#]/g, "").toUpperCase()
+  const raw = cell.trim().replace(/[$*#]/g, "")
+  const c = raw.toUpperCase()
   // The digits are what separate a code from a vertical: BSC is a basket,
   // BSC02 is a course. Stripping the digits before comparing rejected every
   // First Year code, whose prefixes (BSC, ESC, AEC, VSEC) are all basket names.
+  if (PLACEHOLDER_CODE.test(raw)) return !VERTICALS.has(c)
   if (!CODE.test(c)) return false
   return !VERTICALS.has(c)
 }

@@ -12,9 +12,11 @@
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "format": "prettier --write \"{src,scripts}/**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"{src,scripts}/**/*.{ts,tsx,js,jsx,json,css,md}\"",
-    "check": "npm run typecheck && npm run lint && npm run format:check",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
     "fix": "npm run lint:fix && npm run format",
     "setup": "tsx scripts/setup.ts",
     "db:setup": "tsx src/db/setup.ts",
@@ -68,13 +70,14 @@
     "@types/ws": "^8.18.1",
     "dotenv": "^17.2.1",
     "drizzle-kit": "^0.31.9",
-    "log-update": "^5.0.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "log-update": "^5.0.1",
     "prettier": "^3.4.0",
     "prettier-plugin-tailwindcss": "^0.6.0",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }
