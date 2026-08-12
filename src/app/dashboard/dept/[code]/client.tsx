@@ -93,7 +93,7 @@ export function DeptDashboardClient({
           <Empty>No classes yet in this department.</Empty>
         ) : (
           <Table
-            head={["Class", "Coordinator", "TR", "Students", "Status"]}
+            head={["Class", "Coordinator", "TR", "Students", "Status", ""]}
             rows={classes.map((c) => [
               <Link
                 key="k"

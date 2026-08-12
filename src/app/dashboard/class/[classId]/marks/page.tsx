@@ -4,7 +4,6 @@ import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
 import { expectedYear } from "@/lib/roll-number"
 import { getClassById } from "@/db/queries/classes"
-import { listClassStaff } from "@/db/queries/class-staff"
 import { getStudentsByClassKeys } from "@/db/queries/students"
 import { listOfferingsForClass, getOfferingById } from "@/db/queries/offerings"
 import { getMarksForOffering, getLockedComponents } from "@/db/queries/marks"
@@ -41,12 +40,9 @@ export default async function MarksPage({
     (user.tier === "hod" && user.deptCodes.includes(cls.departmentCode)) ||
     user.coordinatorClassIds.includes(classId)
 
-  const [offerings, staff] = await Promise.all([
-    canAllocate
-      ? listOfferingsForClass(classId)
-      : listOfferingsForClass(classId, user.facultyId ?? undefined),
-    listClassStaff([classId]),
-  ])
+  const offerings = canAllocate
+    ? await listOfferingsForClass(classId)
+    : await listOfferingsForClass(classId, user.facultyId ?? undefined)
   const yr = expectedYear(cls.admissionYear, new Date()) ?? cls.admissionYear
   const label = `${yr} · ${cls.departmentCode} · ${cls.division}`
 
@@ -103,11 +99,6 @@ export default async function MarksPage({
             user.coordinatorClassIds.includes(classId)
           }
           canAllocate={canAllocate}
-          staff={staff.map((s) => ({
-            facultyId: s.facultyId,
-            name: `${s.firstName} ${s.lastName}`.trim(),
-            role: s.role,
-          }))}
           offerings={offerings.map((o) => ({
             id: o.id,
             code: o.course.courseCode,
