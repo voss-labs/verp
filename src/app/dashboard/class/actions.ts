@@ -244,7 +244,10 @@ export async function createSubjectAction(input: {
 }): Promise<Result> {
   try {
     const user = await getSessionUser()
-    authorize(user, "marks:write")
+    // offering:create, not marks:write. An HOD allocates subjects and never
+    // enters marks, so gating this on marks:write shut out the one role the
+    // scope check below was written to admit.
+    authorize(user, "offering:create")
     const { ok, cls } = await classInScope(user!, input.classId)
     if (!ok || !cls) return { error: "That class is not in your scope." }
     if (!canAllocate(user!, input.classId, cls.departmentCode)) {
@@ -533,7 +536,7 @@ export async function assignOfferingFacultyAction(input: {
 }): Promise<Result> {
   try {
     const user = await getSessionUser()
-    authorize(user, "marks:write")
+    authorize(user, "offering:update")
     const offering = await getOfferingById(input.offeringId)
     if (!offering) return { error: "No such subject." }
     const { ok, cls } = await classInScope(user!, offering.classId)

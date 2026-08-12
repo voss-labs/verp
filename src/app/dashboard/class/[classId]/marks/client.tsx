@@ -1,5 +1,7 @@
 "use client"
 
+import Link from "next/link"
+
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -10,11 +12,7 @@ import { cn } from "@/lib/utils"
 import { computeMarks, type CourseInfo } from "@/lib/sgpi"
 import { downloadBase64File } from "@/lib/utils"
 import { exportTableCsv, exportTableXlsx } from "@/lib/xlsx-export"
-import {
-  createSubjectAction,
-  saveMarksAction,
-  setMarksLockAction,
-} from "../../actions"
+import { saveMarksAction, setMarksLockAction } from "../../actions"
 
 type Offering = {
   id: string
@@ -24,7 +22,6 @@ type Offering = {
   facultyId: string | null
   facultyName: string | null
 }
-type Staff = { facultyId: string; name: string; role: string }
 type Row = {
   studentId: string
   name: string
@@ -42,18 +39,6 @@ type Grid = {
   locked: LockComponent[]
 }
 
-// VIT defaults per assessment type: theory carries the MSE component, practical
-// and project are ISA + ESE only.
-type CourseType = "theory" | "practical" | "project"
-const CAP_PRESETS: Record<
-  CourseType,
-  { maxIsa: number; maxMse: number; maxEse: number; maxTotal: number }
-> = {
-  theory: { maxIsa: 20, maxMse: 20, maxEse: 60, maxTotal: 100 },
-  practical: { maxIsa: 40, maxMse: 0, maxEse: 60, maxTotal: 100 },
-  project: { maxIsa: 40, maxMse: 0, maxEse: 60, maxTotal: 100 },
-}
-
 const LOCK_LABEL: Record<LockComponent, string> = {
   isa: "ISA",
   mse: "MSE",
@@ -67,7 +52,6 @@ export function MarksClient({
   grid,
   canUnlock,
   canAllocate,
-  staff,
 }: {
   classId: string
   offerings: Offering[]
@@ -75,7 +59,6 @@ export function MarksClient({
   grid: Grid | null
   canUnlock: boolean
   canAllocate: boolean
-  staff: Staff[]
 }) {
   if (grid && selectedId) {
     const offering = offerings.find((o) => o.id === selectedId)!
@@ -93,7 +76,6 @@ export function MarksClient({
       classId={classId}
       offerings={offerings}
       canAllocate={canAllocate}
-      staff={staff}
     />
   )
 }
@@ -102,50 +84,12 @@ function SubjectSetup({
   classId,
   offerings,
   canAllocate,
-  staff,
 }: {
   classId: string
   offerings: Offering[]
   canAllocate: boolean
-  staff: Staff[]
 }) {
   const router = useRouter()
-  const [pending, start] = useTransition()
-  const [courseCode, setCourseCode] = useState("")
-  const [courseName, setCourseName] = useState("")
-  const [courseType, setCourseType] = useState<CourseType>("theory")
-  const [credits, setCredits] = useState(3)
-  const [semester, setSemester] = useState(1)
-  const [caps, setCaps] = useState(CAP_PRESETS.theory)
-  const [teacher, setTeacher] = useState<string>("")
-
-  function pickType(t: CourseType) {
-    setCourseType(t)
-    setCaps(CAP_PRESETS[t])
-  }
-
-  function add() {
-    start(async () => {
-      const res = await createSubjectAction({
-        classId,
-        courseCode,
-        courseName,
-        courseType,
-        credits,
-        semester,
-        facultyId: teacher || null,
-        ...caps,
-      })
-      if (res.error) {
-        toast.error(res.error)
-        return
-      }
-      toast.success("Subject added")
-      setCourseCode("")
-      setCourseName("")
-      router.refresh()
-    })
-  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -202,121 +146,25 @@ function SubjectSetup({
       </div>
 
       <div className="border-border flex flex-col gap-3 rounded border p-4">
-        <h2 className="text-sm font-semibold">Add subject</h2>
+        <h2 className="text-sm font-semibold">Adding subjects</h2>
+        <p className="text-muted-foreground text-sm">
+          Subjects are chosen from the department catalogue and allocated to a
+          teacher on the{" "}
+          <Link
+            href={`/dashboard/class/${classId}/subjects`}
+            className="underline"
+          >
+            Subjects
+          </Link>{" "}
+          page. Defining them there once — rather than typing a code into every
+          class — is what keeps credits and the marks split consistent.
+        </p>
         {!canAllocate && (
           <p className="text-muted-foreground text-xs">
-            Only the class coordinator or the HOD can add a subject. Yours
-            appear in the list once they allocate them to you.
+            Your subjects appear on the left once the coordinator or HOD
+            allocates them to you.
           </p>
         )}
-        <Field label="Course code">
-          <Input
-            value={courseCode}
-            onChange={(e) => setCourseCode(e.target.value.toUpperCase())}
-            placeholder="ITC501"
-            className="h-9 font-mono"
-          />
-        </Field>
-        <Field label="Course name">
-          <Input
-            value={courseName}
-            onChange={(e) => setCourseName(e.target.value)}
-            placeholder="Analog & Digital Communication"
-            className="h-9"
-          />
-        </Field>
-        <Field label="Type">
-          <div className="flex overflow-hidden rounded border">
-            {(["theory", "practical", "project"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => pickType(t)}
-                className={cn(
-                  "flex-1 px-2 py-1.5 text-xs font-medium capitalize transition-colors",
-                  courseType === t
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted"
-                )}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Credits">
-            <Input
-              type="number"
-              min={0}
-              value={credits}
-              onChange={(e) => setCredits(Number(e.target.value))}
-              className="h-9"
-            />
-          </Field>
-          <Field label="Semester">
-            <Input
-              type="number"
-              min={1}
-              max={8}
-              value={semester}
-              onChange={(e) => setSemester(Number(e.target.value))}
-              className="h-9"
-            />
-          </Field>
-        </div>
-        <Field label="Taught by">
-          <select
-            value={teacher}
-            onChange={(e) => setTeacher(e.target.value)}
-            className="border-input bg-background h-9 rounded border px-2 text-sm"
-          >
-            {/* Unallocated is a real starting state, not a mistake: the subject
-                exists on the timetable before anyone is put in front of it. */}
-            <option value="">Unallocated</option>
-            {staff.map((t) => (
-              <option key={t.facultyId} value={t.facultyId}>
-                {t.name}
-                {t.role === "academic_coordinator" ? " (coordinator)" : ""}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <div className="grid grid-cols-4 gap-2">
-          {(["maxIsa", "maxMse", "maxEse", "maxTotal"] as const).map((k) => (
-            <Field
-              key={k}
-              label={
-                {
-                  maxIsa: "ISA",
-                  maxMse: "MSE",
-                  maxEse: "ESE",
-                  maxTotal: "Total",
-                }[k]
-              }
-            >
-              <Input
-                type="number"
-                min={0}
-                value={caps[k]}
-                onChange={(e) =>
-                  setCaps((c) => ({ ...c, [k]: Number(e.target.value) }))
-                }
-                className="h-9"
-              />
-            </Field>
-          ))}
-        </div>
-        <Button
-          size="sm"
-          className="mt-1"
-          disabled={
-            pending || !canAllocate || !courseCode.trim() || !courseName.trim()
-          }
-          onClick={add}
-        >
-          {pending ? "Adding…" : "Add subject"}
-        </Button>
       </div>
     </div>
   )
@@ -677,21 +525,6 @@ function LockPanel({
           Ask the class coordinator to reopen a locked component.
         </span>
       )}
-    </div>
-  )
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="grid gap-1.5">
-      <label className="text-muted-foreground text-xs">{label}</label>
-      {children}
     </div>
   )
 }
