@@ -11,14 +11,8 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Badge } from "@/components/ui/badge"
-import { useUserRole } from "@/hooks/use-user-role"
-
-const TIER_LABEL = {
-  super_admin: "Super-admin",
-  hod: "HOD",
-  faculty: "Faculty",
-  student: "Student",
-} as const
+import { useSessionUser } from "@/components/session-provider"
+import { contextualRole } from "@/lib/navigation"
 
 export function PageHeader({
   title,
@@ -29,7 +23,16 @@ export function PageHeader({
   parent?: string
   parentHref?: string
 }) {
-  const { tier } = useUserRole()
+  const session = useSessionUser()
+  // The responsibility, not the database tier: a faculty member coordinating a
+  // class is a coordinator here, and "Faculty" told them nothing they did not
+  // already know.
+  const role = contextualRole({
+    tier: session.tier,
+    can: () => false,
+    isCoordinator: session.coordinatorClassIds.length > 0,
+    hasClasses: session.classIds.length > 0,
+  })
   return (
     <header className="bg-card flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
       <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
@@ -55,9 +58,9 @@ export function PageHeader({
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-        {tier && (
+        {session.tier && (
           <Badge variant="outline" className="ml-auto font-medium">
-            {TIER_LABEL[tier]}
+            {role}
           </Badge>
         )}
       </div>

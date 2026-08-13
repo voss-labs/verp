@@ -8,6 +8,8 @@ import { getStudentsByClassKeys } from "@/db/queries/students"
 import { getAttendanceForSession } from "@/db/queries/attendance"
 import { AttendanceClient } from "./client"
 
+type Status = "present" | "absent" | "late" | "excused"
+
 export const dynamic = "force-dynamic"
 
 export default async function AttendancePage({
@@ -60,7 +62,11 @@ export default async function AttendancePage({
             id: s.id,
             name: `${s.firstName} ${s.lastName}`.trim(),
             rollNumber: s.rollNumber,
-            status: (marked[s.id] as "present" | "absent") ?? "present",
+            // Unmarked, never present. Defaulting to present meant opening a
+            // fresh session and pressing Save recorded the whole class as
+            // attending — a register nobody took, indistinguishable from one
+            // they did.
+            status: (marked[s.id] as Status | undefined) ?? null,
           }))}
         />
       </div>
