@@ -1,6 +1,19 @@
 "use client"
 
+import { useState, useTransition } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { assignSubjectToTeacherAction } from "../actions"
 import { Badge } from "@/components/ui/badge"
 
 type Person = { name: string; email: string }
@@ -24,7 +37,13 @@ type FacultyRow = {
   claimed: boolean
 }
 
+type Course = { id: string; code: string; name: string; year: string | null }
+type ClassOption = { id: string; label: string }
+
 export function DeptDashboardClient({
+  canAssign,
+  courses,
+  classOptions,
   dept,
   hod,
   coordinator,
@@ -33,6 +52,9 @@ export function DeptDashboardClient({
   totals,
   unplaced,
 }: {
+  canAssign: boolean
+  courses: Course[]
+  classOptions: ClassOption[]
   dept: { code: string; name: string; isActive: boolean }
   hod: Person | null
   coordinator: Person | null
@@ -47,6 +69,7 @@ export function DeptDashboardClient({
     year: string
   }[]
 }) {
+  const [assigning, setAssigning] = useState<FacultyRow | null>(null)
   const placed = totals.students - totals.unplaced
   return (
     <div className="flex flex-col gap-6">
@@ -139,7 +162,14 @@ export function DeptDashboardClient({
           <Empty>No faculty on record for this department.</Empty>
         ) : (
           <Table
-            head={["Name", "Email", "Tier", "Class role", "Account"]}
+            head={[
+              "Name",
+              "Email",
+              "Tier",
+              "Class role",
+              "Account",
+              ...(canAssign ? [""] : []),
+            ]}
             rows={faculty.map((f) => [
               f.name,
               <span key="e" className="text-muted-foreground text-xs">
@@ -164,6 +194,15 @@ export function DeptDashboardClient({
           />
         )}
       </Section>
+
+      {assigning && (
+        <AssignSubjectDialog
+          teacher={assigning}
+          courses={courses}
+          classOptions={classOptions}
+          onClose={() => setAssigning(null)}
+        />
+      )}
 
       {totals.unplaced > 0 && (
         <Section title={`Not in any class (${totals.unplaced})`}>
@@ -289,5 +328,146 @@ function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
         </tbody>
       </table>
     </div>
+  )
+}
+
+function AssignSubjectDialog({
+  teacher,
+  courses,
+  classOptions,
+  onClose,
+}: {
+  teacher: FacultyRow
+  courses: Course[]
+  classOptions: ClassOption[]
+  onClose: () => void
+}) {
+  const router = useRouter()
+  const [pending, start] = useTransition()
+  const [classId, setClassId] = useState(classOptions[0]?.id ?? "")
+  const [courseId, setCourseId] = useState("")
+  const [semester, setSemester] = useState(1)
+  const [query, setQuery] = useState("")
+
+  const q = query.trim().toLowerCase()
+  const shortlist = courses.filter(
+    (c) => !q || `${c.code} ${c.name}`.toLowerCase().includes(q)
+  )
+
+  function save() {
+    start(async () => {
+      const res = await assignSubjectToTeacherAction({
+        classId,
+        facultyId: teacher.id,
+        courseId,
+        semester,
+      })
+      if (res.error) return void toast.error(res.error)
+      toast.success(`Assigned to ${teacher.name}`)
+      onClose()
+      router.refresh()
+    })
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Assign a subject to {teacher.name}</DialogTitle>
+        </DialogHeader>
+
+        {classOptions.length === 0 || courses.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            {classOptions.length === 0
+              ? "This department has no active classes yet."
+              : "This department has no catalogued courses yet."}
+          </p>
+        ) : (
+          <div className="grid gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <label className="grid gap-1.5">
+                <span className="text-muted-foreground text-xs">Division</span>
+                <select
+                  value={classId}
+                  onChange={(e) => setClassId(e.target.value)}
+                  className="border-input bg-background h-9 rounded border px-2 text-sm"
+                >
+                  {classOptions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1.5">
+                <span className="text-muted-foreground text-xs">Semester</span>
+                <Input
+                  type="number"
+                  min={1}
+                  max={8}
+                  value={semester}
+                  onChange={(e) => setSemester(Number(e.target.value))}
+                  className="h-9"
+                />
+              </label>
+            </div>
+
+            <label className="grid gap-1.5">
+              <span className="text-muted-foreground text-xs">Subject</span>
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search the catalogue…"
+                className="h-9"
+              />
+            </label>
+
+            <div className="border-border divide-border max-h-64 divide-y overflow-y-auto rounded border">
+              {shortlist.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setCourseId(c.id)}
+                  className={
+                    "hover:bg-muted flex w-full items-center gap-2 px-3 py-2 text-left text-sm " +
+                    (courseId === c.id ? "bg-muted" : "")
+                  }
+                >
+                  <Badge variant="outline" className="font-mono text-xs">
+                    {c.code}
+                  </Badge>
+                  <span className="truncate">{c.name}</span>
+                  {c.year && (
+                    <span className="text-muted-foreground ml-auto text-xs">
+                      {c.year}
+                    </span>
+                  )}
+                </button>
+              ))}
+              {shortlist.length === 0 && (
+                <p className="text-muted-foreground px-3 py-2 text-sm">
+                  Nothing matches that search.
+                </p>
+              )}
+            </div>
+
+            <p className="text-muted-foreground text-xs">
+              They are put on the division as a TR if they are not already, then
+              given this subject. Only they can enter its marks.
+            </p>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button
+            size="sm"
+            disabled={pending || !classId || !courseId}
+            onClick={save}
+          >
+            {pending ? "Assigning…" : "Assign"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

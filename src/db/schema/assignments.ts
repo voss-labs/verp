@@ -42,6 +42,10 @@ export const facultyClassAssignments = pgTable(
     uniqueIndex("class_coordinator_live_uniq")
       .on(t.classId)
       .where(sql`role = 'academic_coordinator' AND is_active`),
+    // One row per (class, faculty, role) so re-appointing reactivates rather
+    // than duplicating. TRs are deliberately NOT capped at one per class: a
+    // class has as many teachers as it has subjects.
+    uniqueIndex("class_faculty_role_uniq").on(t.classId, t.facultyId, t.role),
     index("assignments_faculty_idx").on(t.facultyId, t.isActive),
     index("assignments_class_idx").on(t.classId, t.isActive),
   ]
