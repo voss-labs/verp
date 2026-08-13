@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { DataTableView } from "@/components/data-table-view"
 import { RecordDrawer } from "@/components/record-drawer"
+import { RecordHistory } from "@/components/record-history"
 import {
   facultyColumns,
   ROLE_LABEL,
@@ -117,7 +118,9 @@ export function FacultyClient({ data }: { data: FacultyRow[] }) {
               ]
             : undefined
         }
-      />
+      >
+        <RecordHistory targetType="faculty" targetId={open?.id ?? null} />
+      </RecordDrawer>
     </>
   )
 }
