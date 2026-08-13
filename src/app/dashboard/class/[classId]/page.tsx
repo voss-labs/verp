@@ -8,7 +8,7 @@ import {
   BookOpenIcon,
 } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
-import { buttonVariants } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button-variants"
 import { getSessionUser } from "@/lib/session"
 import { expectedYear } from "@/lib/roll-number"
 import { getClassById } from "@/db/queries/classes"
