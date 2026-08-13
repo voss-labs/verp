@@ -12,7 +12,12 @@ import {
 
 export const dynamic = "force-dynamic"
 
-export default async function StudentsPage() {
+export default async function StudentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ department?: string }>
+}) {
+  const { department } = await searchParams
   const user = await getSessionUser()
   if (!user) redirect("/login")
   // A student has no student:read — they can never reach the roster, by URL or nav.
@@ -46,6 +51,7 @@ export default async function StudentsPage() {
         <StudentsClient
           data={rows}
           canDeactivate={can(user, "student:deactivate")}
+          department={department}
         />
       </div>
     </>

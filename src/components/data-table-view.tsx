@@ -69,6 +69,10 @@ interface DataTableViewProps<TData, TValue> {
   // checkbox column.
   rowId?: (row: TData) => string
   bulkBar?: (ids: string[], clear: () => void) => React.ReactNode
+  // Filters the table opens with, so a link from elsewhere can land on the
+  // exact list it was talking about rather than the whole roster. Seeded once:
+  // clearing a filter must stay cleared, not snap back on the next render.
+  initialFilters?: ColumnFiltersState
   // Opening a record. A drawer keeps the list, its filters and its scroll
   // position behind it, so comparing two records is two clicks rather than
   // four page loads.
@@ -95,10 +99,11 @@ export function DataTableView<TData, TValue>({
   bulkBar,
   onRowClick,
   mobileRow,
+  initialFilters,
 }: DataTableViewProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
+    initialFilters ?? []
   )
   const [globalFilter, setGlobalFilter] = React.useState("")
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({})

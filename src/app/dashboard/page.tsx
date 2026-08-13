@@ -7,6 +7,8 @@ import { getAttendanceSummaryForStudent } from "@/db/queries/attendance"
 import { getMarksForStudent } from "@/db/queries/marks"
 import { getClassWork, getDeptHealth } from "@/db/queries/overview"
 import { listDepartments } from "@/db/queries/departments"
+import { buildAttention } from "@/lib/attention"
+import { AttentionInbox } from "./attention-inbox"
 import {
   Attention,
   Completion,
@@ -44,6 +46,13 @@ export default async function DashboardPage() {
     deptCodes.length ? getDeptHealth(deptCodes) : Promise.resolve([]),
   ])
 
+  // Derived from what was already fetched, not a fifth query.
+  const attention = buildAttention({
+    classWork: work,
+    deptHealth: health,
+    today,
+  })
+
   const label = (c: {
     admissionYear: number
     departmentCode: string
@@ -67,6 +76,8 @@ export default async function DashboardPage() {
                 : "Nothing is assigned to you yet."}
           </p>
         </div>
+
+        <AttentionInbox items={attention} />
 
         {health.length > 0 && (
           <section className="flex flex-col gap-3">
