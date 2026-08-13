@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { assignSubjectToTeacherAction } from "../actions"
+import { DeptTabs } from "./dept-tabs"
 import { Badge } from "@/components/ui/badge"
 
 type Person = { name: string; email: string }
@@ -41,6 +42,7 @@ type Course = { id: string; code: string; name: string; year: string | null }
 type ClassOption = { id: string; label: string }
 
 export function DeptDashboardClient({
+  section,
   canAssign,
   courses,
   classOptions,
@@ -52,6 +54,7 @@ export function DeptDashboardClient({
   totals,
   unplaced,
 }: {
+  section: string
   canAssign: boolean
   courses: Course[]
   classOptions: ClassOption[]
@@ -71,8 +74,24 @@ export function DeptDashboardClient({
 }) {
   const [assigning, setAssigning] = useState<FacultyRow | null>(null)
   const placed = totals.students - totals.unplaced
+  // Sections rather than one long scroll. A real department puts leadership,
+  // classes, faculty and the unplaced list on the same page, and the thing you
+  // came for is never in view.
+  const sections = [
+    { key: "overview", label: "Overview" },
+    {
+      key: "classes",
+      label: "Classes",
+      badge: classes.filter((c) => !c.coordinator).length,
+    },
+    { key: "faculty", label: "Faculty" },
+    { key: "students", label: "Students", badge: totals.unplaced },
+  ]
+  const show = (k: string) => section === k
   return (
     <div className="flex flex-col gap-6">
+      <DeptTabs sections={sections} code={dept.code} />
+
       {!dept.isActive && (
         <p className="border-border text-muted-foreground rounded border px-3 py-2 text-sm">
           This department is deactivated. It is shown for reference; its records
@@ -80,120 +99,132 @@ export function DeptDashboardClient({
         </p>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat
-          label="Students"
-          value={totals.students}
-          hint={`${placed} in a class`}
-        />
-        <Stat
-          label="Faculty"
-          value={faculty.length}
-          hint={`${faculty.filter((f) => f.claimed).length} signed in`}
-        />
-        <Stat
-          label="Classes"
-          value={classes.length}
-          hint={`${classes.filter((c) => c.graduated).length} graduated`}
-        />
-        <Stat
-          label="Not signed in"
-          value={totals.unclaimedStudents}
-          hint="students yet to claim"
-          warn={totals.unclaimedStudents > 0}
-        />
-      </div>
-
-      <Section title="Leadership">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Lead role="Head of Department" person={hod} />
-          <Lead role="Department coordinator" person={coordinator} />
+      {show("overview") && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat
+            label="Students"
+            value={totals.students}
+            hint={`${placed} in a class`}
+          />
+          <Stat
+            label="Faculty"
+            value={faculty.length}
+            hint={`${faculty.filter((f) => f.claimed).length} signed in`}
+          />
+          <Stat
+            label="Classes"
+            value={classes.length}
+            hint={`${classes.filter((c) => c.graduated).length} graduated`}
+          />
+          <Stat
+            label="Not signed in"
+            value={totals.unclaimedStudents}
+            hint="students yet to claim"
+            warn={totals.unclaimedStudents > 0}
+          />
         </div>
-      </Section>
+      )}
 
-      <Section title={`Classes (${classes.length})`}>
-        {classes.length === 0 ? (
-          <Empty>No classes yet in this department.</Empty>
-        ) : (
-          <Table
-            head={["Class", "Coordinator", "TR", "Students", "Status", ""]}
-            rows={classes.map((c) => [
-              <Link
-                key="k"
-                href={`/dashboard/class/${c.id}`}
-                className="hover:underline"
-              >
-                <span className="font-medium">{c.label}</span>{" "}
-                <span className="text-muted-foreground font-mono text-xs">
-                  {c.classKey}
-                </span>
-              </Link>,
-              c.coordinator ?? <Unset key="c">Unassigned</Unset>,
-              c.trs.length > 0 ? c.trs.join(", ") : <Unset key="t">None</Unset>,
-              <span key="s" className="tabular-nums">
-                {c.students}
-                {c.unclaimed > 0 && (
-                  <span className="text-muted-foreground text-xs">
-                    {" "}
-                    ({c.unclaimed} not signed in)
+      {show("overview") && (
+        <Section title="Leadership">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Lead role="Head of Department" person={hod} />
+            <Lead role="Department coordinator" person={coordinator} />
+          </div>
+        </Section>
+      )}
+
+      {(show("overview") || show("classes")) && (
+        <Section title={`Classes (${classes.length})`}>
+          {classes.length === 0 ? (
+            <Empty>No classes yet in this department.</Empty>
+          ) : (
+            <Table
+              head={["Class", "Coordinator", "TR", "Students", "Status", ""]}
+              rows={classes.map((c) => [
+                <Link
+                  key="k"
+                  href={`/dashboard/class/${c.id}`}
+                  className="hover:underline"
+                >
+                  <span className="font-medium">{c.label}</span>{" "}
+                  <span className="text-muted-foreground font-mono text-xs">
+                    {c.classKey}
                   </span>
-                )}
-              </span>,
-              c.graduated ? (
-                <Badge key="g" variant="secondary">
-                  Graduated
-                </Badge>
-              ) : c.isActive ? (
-                <Badge key="g" variant="outline">
-                  Active
-                </Badge>
-              ) : (
-                <Badge key="g" variant="secondary">
-                  Inactive
-                </Badge>
-              ),
-            ])}
-          />
-        )}
-      </Section>
+                </Link>,
+                c.coordinator ?? <Unset key="c">Unassigned</Unset>,
+                c.trs.length > 0 ? (
+                  c.trs.join(", ")
+                ) : (
+                  <Unset key="t">None</Unset>
+                ),
+                <span key="s" className="tabular-nums">
+                  {c.students}
+                  {c.unclaimed > 0 && (
+                    <span className="text-muted-foreground text-xs">
+                      {" "}
+                      ({c.unclaimed} not signed in)
+                    </span>
+                  )}
+                </span>,
+                c.graduated ? (
+                  <Badge key="g" variant="secondary">
+                    Graduated
+                  </Badge>
+                ) : c.isActive ? (
+                  <Badge key="g" variant="outline">
+                    Active
+                  </Badge>
+                ) : (
+                  <Badge key="g" variant="secondary">
+                    Inactive
+                  </Badge>
+                ),
+              ])}
+            />
+          )}
+        </Section>
+      )}
 
-      <Section title={`Faculty (${faculty.length})`}>
-        {faculty.length === 0 ? (
-          <Empty>No faculty on record for this department.</Empty>
-        ) : (
-          <Table
-            head={[
-              "Name",
-              "Email",
-              "Tier",
-              "Class role",
-              "Account",
-              ...(canAssign ? [""] : []),
-            ]}
-            rows={faculty.map((f) => [
-              f.name,
-              <span key="e" className="text-muted-foreground text-xs">
-                {f.email}
-              </span>,
-              <Badge key="t" variant="outline">
-                {f.tier}
-              </Badge>,
-              f.classRoles.length > 0 ? (
-                f.classRoles.join(" · ")
-              ) : (
-                <Unset key="r">—</Unset>
-              ),
-              f.claimed ? (
-                <span key="a" className="text-muted-foreground text-xs">
-                  Signed in
-                </span>
-              ) : (
-                <Unset key="a">Not claimed</Unset>
-              ),
-            ])}
-          />
-        )}
-      </Section>
+      {(show("overview") || show("faculty")) && (
+        <Section title={`Faculty (${faculty.length})`}>
+          {faculty.length === 0 ? (
+            <Empty>No faculty on record for this department.</Empty>
+          ) : (
+            <Table
+              head={[
+                "Name",
+                "Email",
+                "Tier",
+                "Class role",
+                "Account",
+                ...(canAssign ? [""] : []),
+              ]}
+              rows={faculty.map((f) => [
+                f.name,
+                <span key="e" className="text-muted-foreground text-xs">
+                  {f.email}
+                </span>,
+                <Badge key="t" variant="outline">
+                  {f.tier}
+                </Badge>,
+                f.classRoles.length > 0 ? (
+                  f.classRoles.join(" · ")
+                ) : (
+                  <Unset key="r">—</Unset>
+                ),
+                f.claimed ? (
+                  <span key="a" className="text-muted-foreground text-xs">
+                    Signed in
+                  </span>
+                ) : (
+                  <Unset key="a">Not claimed</Unset>
+                ),
+              ])}
+            />
+          )}
+        </Section>
+      )}
 
       {assigning && (
         <AssignSubjectDialog
@@ -204,7 +235,7 @@ export function DeptDashboardClient({
         />
       )}
 
-      {totals.unplaced > 0 && (
+      {(show("overview") || show("students")) && totals.unplaced > 0 && (
         <Section title={`Not in any class (${totals.unplaced})`}>
           <p className="text-muted-foreground mb-3 text-sm">
             These students belong to the department but their cohort has no

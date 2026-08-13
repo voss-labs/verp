@@ -18,9 +18,12 @@ export const dynamic = "force-dynamic"
 
 export default async function DepartmentDashboard({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string }>
+  searchParams: Promise<{ tab?: string }>
 }) {
+  const { tab } = await searchParams
   const { code } = await params
   // Department codes are stored uppercase; a link or a typed URL may not be.
   const deptCode = decodeURIComponent(code).toUpperCase()
@@ -101,12 +104,14 @@ export default async function DepartmentDashboard({
   return (
     <>
       <PageHeader
+        trail={[{ label: "VIT" }, { label: dept.code }]}
         title={`${dept.code} — ${dept.name}`}
         parent="Departments"
         parentHref="/dashboard/dept"
       />
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <DeptDashboardClient
+          section={tab ?? "overview"}
           canAssign={
             user.tier === "super_admin" || user.deptCodes.includes(deptCode)
           }
