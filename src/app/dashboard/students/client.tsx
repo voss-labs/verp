@@ -19,9 +19,11 @@ import { bulkDeactivateStudentsAction } from "./actions"
 export function StudentsClient({
   data,
   canDeactivate,
+  department,
 }: {
   data: StudentRow[]
   canDeactivate: boolean
+  department?: string
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -105,6 +107,9 @@ export function StudentsClient({
           { columnId: "division", label: "Division" },
         ]}
         searchPlaceholder="Search students..."
+        initialFilters={
+          department ? [{ id: "department", value: department }] : undefined
+        }
         exportConfig={{ filename: "Students", onExport: handleExport }}
         rowId={(s) => s.id}
         onRowClick={setOpen}
