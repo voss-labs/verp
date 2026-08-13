@@ -5,6 +5,7 @@ import {
   computeSgpi,
   getGradePoint,
   groupBySemester,
+  marksState,
   type CourseInfo,
 } from "./sgpi"
 
@@ -190,5 +191,53 @@ describe("computeCgpa", () => {
 
   it("returns null for a student with no marks", () => {
     expect(computeCgpa([]).cgpa).toBeNull()
+  })
+})
+
+describe("marksState", () => {
+  const theory: CourseInfo = {
+    courseType: "theory",
+    credits: 4,
+    maxIsa: 20,
+    maxMse: 30,
+    maxEse: 50,
+    maxTotal: 100,
+  }
+  const blank = { isa: null, mse1: null, mse2: null, ese: null }
+
+  it("is empty before a teacher enters anything", () => {
+    expect(marksState(blank, theory)).toBe("empty")
+  })
+
+  it("is partial once any component is in", () => {
+    expect(marksState({ ...blank, isa: 18 }, theory)).toBe("partial")
+  })
+
+  // A zero is a mark, not an absence. Treating it as "nothing entered" would
+  // hide a real result from the student who scored it.
+  it("treats a scored zero as entered, not missing", () => {
+    expect(marksState({ ...blank, isa: 0 }, theory)).toBe("partial")
+  })
+
+  it("stays partial with only one MSE, whose total is provisional", () => {
+    const one = { isa: 18, mse1: 25, mse2: null, ese: 40 }
+    expect(marksState(one, theory)).toBe("partial")
+    // 58, not 83: the MSE component counts nothing until both halves exist.
+    expect(computeMarks(one, theory).total).toBe(58)
+  })
+
+  it("is graded once every component is in", () => {
+    expect(marksState({ isa: 18, mse1: 25, mse2: 27, ese: 40 }, theory)).toBe(
+      "graded"
+    )
+  })
+
+  // A practical has no MSE at all, so waiting for one would leave it forever
+  // ungraded.
+  it("grades a practical without waiting for an MSE", () => {
+    const prac: CourseInfo = { ...theory, maxMse: 0, maxIsa: 50, maxEse: 50 }
+    expect(marksState({ isa: 40, mse1: null, mse2: null, ese: 45 }, prac)).toBe(
+      "graded"
+    )
   })
 })

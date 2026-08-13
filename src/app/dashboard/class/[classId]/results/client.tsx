@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/dialog"
 import { downloadBase64File } from "@/lib/utils"
 import { exportTableCsv, exportTableXlsx } from "@/lib/xlsx-export"
-import { computeMarks, type CourseInfo } from "@/lib/sgpi"
+import { type CourseInfo } from "@/lib/sgpi"
+import { SubjectResultCells } from "@/components/subject-result"
 
 type Subject = {
   semester: number
@@ -268,32 +269,13 @@ function Breakdown({ row }: { row: Row }) {
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
-              {subjects.map((s) => {
-                const c = computeMarks(s.marks, s.course)
-                return (
-                  <tr key={s.code} className="[&>td]:px-2 [&>td]:py-1">
-                    <td className="font-mono text-xs">{s.code}</td>
-                    <td>{s.name}</td>
-                    <td className="tabular-nums">
-                      {c.percentage == null
-                        ? "—"
-                        : `${c.total}/${s.course.maxTotal}`}
-                    </td>
-                    <td className="text-muted-foreground tabular-nums">
-                      {c.percentage ?? "—"}
-                    </td>
-                    <td>
-                      {c.gradePoint == null ? (
-                        <span className="text-muted-foreground">—</span>
-                      ) : c.gradePoint === "Fail" ? (
-                        <Badge variant="destructive">Fail</Badge>
-                      ) : (
-                        <Badge variant="outline">{c.gradePoint}</Badge>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
+              {subjects.map((s) => (
+                <tr key={s.code} className="[&>td]:px-2 [&>td]:py-1">
+                  <td className="font-mono text-xs">{s.code}</td>
+                  <td>{s.name}</td>
+                  <SubjectResultCells marks={s.marks} course={s.course} />
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

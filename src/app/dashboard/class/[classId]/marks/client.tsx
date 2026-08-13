@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { computeMarks, type CourseInfo } from "@/lib/sgpi"
+import { SubjectResultCells } from "@/components/subject-result"
 import { downloadBase64File } from "@/lib/utils"
 import { exportTableCsv, exportTableXlsx } from "@/lib/xlsx-export"
 import {
@@ -406,64 +407,51 @@ function MarksGrid({
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
-              {rows.map((r) => {
-                const c = computeMarks(r, course)
-                return (
-                  <tr key={r.studentId} className="[&>td]:px-3 [&>td]:py-1.5">
-                    <td className="font-mono text-xs">{r.rollNumber}</td>
-                    <td className="whitespace-nowrap">{r.name}</td>
+              {rows.map((r) => (
+                <tr key={r.studentId} className="[&>td]:px-3 [&>td]:py-1.5">
+                  <td className="font-mono text-xs">{r.rollNumber}</td>
+                  <td className="whitespace-nowrap">{r.name}</td>
+                  <td>
+                    <MarkInput
+                      value={r.isa}
+                      max={course.maxIsa}
+                      locked={isLocked("isa")}
+                      onChange={(v) => edit(r.studentId, "isa", v)}
+                    />
+                  </td>
+                  {hasMse && (
                     <td>
                       <MarkInput
-                        value={r.isa}
-                        max={course.maxIsa}
-                        locked={isLocked("isa")}
-                        onChange={(v) => edit(r.studentId, "isa", v)}
+                        value={r.mse1}
+                        max={course.maxMse}
+                        locked={isLocked("mse")}
+                        onChange={(v) => edit(r.studentId, "mse1", v)}
                       />
                     </td>
-                    {hasMse && (
-                      <td>
-                        <MarkInput
-                          value={r.mse1}
-                          max={course.maxMse}
-                          locked={isLocked("mse")}
-                          onChange={(v) => edit(r.studentId, "mse1", v)}
-                        />
-                      </td>
-                    )}
-                    {hasMse && (
-                      <td>
-                        <MarkInput
-                          value={r.mse2}
-                          max={course.maxMse}
-                          locked={isLocked("mse")}
-                          onChange={(v) => edit(r.studentId, "mse2", v)}
-                        />
-                      </td>
-                    )}
+                  )}
+                  {hasMse && (
                     <td>
                       <MarkInput
-                        value={r.ese}
-                        max={course.maxEse}
-                        locked={isLocked("ese")}
-                        onChange={(v) => edit(r.studentId, "ese", v)}
+                        value={r.mse2}
+                        max={course.maxMse}
+                        locked={isLocked("mse")}
+                        onChange={(v) => edit(r.studentId, "mse2", v)}
                       />
                     </td>
-                    <td className="tabular-nums">{c.total}</td>
-                    <td className="text-muted-foreground tabular-nums">
-                      {c.percentage ?? "—"}
-                    </td>
-                    <td>
-                      {c.gradePoint == null ? (
-                        <span className="text-muted-foreground">—</span>
-                      ) : c.gradePoint === "Fail" ? (
-                        <Badge variant="destructive">Fail</Badge>
-                      ) : (
-                        <Badge variant="outline">{c.gradePoint}</Badge>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
+                  )}
+                  <td>
+                    <MarkInput
+                      value={r.ese}
+                      max={course.maxEse}
+                      locked={isLocked("ese")}
+                      onChange={(v) => edit(r.studentId, "ese", v)}
+                    />
+                  </td>
+                  {/* The same cells the student will see, so a teacher can
+                        tell what a row currently reads as before publishing. */}
+                  <SubjectResultCells marks={r} course={course} />
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -486,6 +474,7 @@ function MarkInput({
   return (
     <Input
       type="number"
+      inputMode="numeric"
       min={0}
       max={max}
       value={value ?? ""}
@@ -493,8 +482,12 @@ function MarkInput({
       disabled={locked}
       aria-label={locked ? "Locked — submitted" : undefined}
       onChange={(e) => onChange(e.target.value)}
+      // A wheel over a focused number input changes its value. Scrolling down
+      // a class of ninety would silently rewrite whichever mark the pointer
+      // crossed, and nothing on screen would say so.
+      onWheel={(e) => e.currentTarget.blur()}
       className={cn(
-        "h-8 w-16 tabular-nums",
+        "h-9 w-16 tabular-nums sm:h-8",
         locked && "bg-muted text-muted-foreground cursor-not-allowed"
       )}
     />

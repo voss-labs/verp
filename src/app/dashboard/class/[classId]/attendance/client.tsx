@@ -138,10 +138,11 @@ export function AttendanceClient({
             ))}
           </select>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <Button
             variant="outline"
             size="sm"
+            className="flex-1 sm:flex-none"
             disabled={remaining === 0}
             onClick={() => {
               if (
@@ -157,6 +158,7 @@ export function AttendanceClient({
           </Button>
           <Button
             size="sm"
+            className="flex-1 sm:flex-none"
             disabled={pending || markedCount === 0}
             onClick={save}
           >
@@ -188,7 +190,7 @@ export function AttendanceClient({
               type="button"
               onClick={() => setFilter(key as typeof filter)}
               className={cn(
-                "rounded border px-2 py-0.5 text-xs capitalize transition-colors",
+                "rounded border px-2.5 py-1.5 text-xs capitalize transition-colors sm:py-0.5",
                 filter === key
                   ? "border-foreground text-foreground"
                   : "border-border text-muted-foreground hover:text-foreground"
@@ -214,21 +216,32 @@ export function AttendanceClient({
             {visible.map((s) => {
               const status = marks[s.id]
               return (
+                // A register is taken standing up, on a phone, while looking
+                // at the room. On a narrow screen the four buttons get a row of
+                // their own under the name rather than being squeezed beside
+                // it, and each is tall enough to hit without aiming.
                 <li
                   key={s.id}
-                  className="flex items-center justify-between gap-3 px-4 py-2.5"
+                  className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-2.5"
                 >
                   <div className="flex items-center gap-3">
                     <Badge variant="outline" className="font-mono">
                       {s.rollNumber}
                     </Badge>
                     <span className="text-sm">{s.name}</span>
+                    {status == null && (
+                      <span className="ml-auto text-xs text-amber-600 sm:hidden">
+                        Unmarked
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {status == null && (
-                      <span className="text-xs text-amber-600">Unmarked</span>
+                      <span className="hidden text-xs text-amber-600 sm:inline">
+                        Unmarked
+                      </span>
                     )}
-                    <div className="flex overflow-hidden rounded border">
+                    <div className="grid w-full grid-cols-4 overflow-hidden rounded border sm:flex sm:w-auto">
                       {STATUSES.map((v) => (
                         <button
                           key={v}
@@ -244,7 +257,7 @@ export function AttendanceClient({
                             }))
                           }
                           className={cn(
-                            "px-3 py-1 text-xs font-medium capitalize transition-colors",
+                            "min-h-11 px-3 text-xs font-medium capitalize transition-colors sm:min-h-0 sm:py-1",
                             status === v
                               ? STATUS_STYLE[v]
                               : "text-muted-foreground hover:bg-muted"
