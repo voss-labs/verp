@@ -22,6 +22,7 @@ import {
   createOffering,
   getOfferingById,
   setOfferingFaculty,
+  setOfferingPublished,
 } from "@/db/queries/offerings"
 import {
   createBatch,
@@ -607,5 +608,70 @@ export async function assignOfferingFacultyAction(input: {
     return { error: null }
   } catch (err) {
     return { error: getErrorMessage(err, "Could not reallocate the subject") }
+  }
+}
+
+/**
+ * Publish a subject's results, or withdraw them.
+ *
+ * Every component the course actually has must be locked first. That is what
+ * makes the sequence mean anything: locking is the teacher saying the figures
+ * are final, publishing is the coordinator saying the student may see them. A
+ * publish that skipped locking would collapse the two into one button and leave
+ * "final" meaning nothing.
+ *
+ * A course with no MSE component is not asked to lock one.
+ */
+export async function setPublishedAction(input: {
+  offeringId: string
+  published: boolean
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "marks:lock")
+    const offering = await getOfferingById(input.offeringId)
+    if (!offering) return { error: "No such subject." }
+    const { ok, cls } = await classInScope(user!, offering.classId)
+    if (!ok || !cls) return { error: "That class is not in your scope." }
+    // Publication is governance, not teaching: the coordinator, the HOD or an
+    // admin decides, never the teacher acting alone on their own marks.
+    if (!canAllocate(user!, offering.classId, cls.departmentCode)) {
+      return {
+        error:
+          "Only the class coordinator, the HOD, or an admin can publish results.",
+      }
+    }
+
+    if (input.published) {
+      const required: LockComponent[] =
+        offering.course.maxMse > 0 ? ["isa", "mse", "ese"] : ["isa", "ese"]
+      const locked = (await getLockedComponents(input.offeringId)).map(
+        (l) => l.component
+      )
+      const open = required.filter((c) => !locked.includes(c))
+      if (open.length > 0) {
+        return {
+          error: `Lock ${open.join(", ").toUpperCase()} before publishing — publishing says these marks are final.`,
+        }
+      }
+    }
+
+    await setOfferingPublished(
+      input.offeringId,
+      user!.facultyId,
+      input.published
+    )
+    await createAuditLog({
+      action: input.published ? "marks.published" : "marks.withdrawn",
+      actorId: user!.id,
+      targetType: "offering",
+      targetId: input.offeringId,
+      details: { courseCode: offering.course.courseCode },
+    })
+    revalidatePath(`/dashboard/class/${offering.classId}/marks`)
+    revalidatePath("/dashboard/my-marks")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not change publication") }
   }
 }

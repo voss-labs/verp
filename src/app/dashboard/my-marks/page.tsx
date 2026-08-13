@@ -14,7 +14,12 @@ export default async function MyMarksPage() {
   if (!user.studentId) redirect("/dashboard")
 
   const rows = await getMarksForStudent(user.studentId)
-  const flat = rows.map((m) => ({
+  // Only published subjects count toward SGPI and CGPA. An unpublished subject
+  // is work in progress; folding it into an average would present a figure that
+  // moves every time a teacher saves, and that nobody has declared final.
+  const published = rows.filter((m) => m.courseOffering.publishedAt != null)
+
+  const flat = published.map((m) => ({
     semester: m.courseOffering.semester,
     marks: { isa: m.isa, mse1: m.mse1, mse2: m.mse2, ese: m.ese },
     course: {
@@ -33,7 +38,7 @@ export default async function MyMarksPage() {
     .sort((a, b) => a - b)
     .map((semester) => ({
       semester,
-      subjects: rows
+      subjects: published
         .filter((m) => m.courseOffering.semester === semester)
         .map((m) => ({
           code: m.courseOffering.course.courseCode,
@@ -55,7 +60,17 @@ export default async function MyMarksPage() {
     <>
       <PageHeader title="My marks" />
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
-        <MyMarksClient cgpa={cgpa} semesters={semesters} />
+        <MyMarksClient
+          cgpa={cgpa}
+          semesters={semesters}
+          awaiting={rows
+            .filter((m) => m.courseOffering.publishedAt == null)
+            .map((m) => ({
+              code: m.courseOffering.course.courseCode,
+              name: m.courseOffering.course.courseName,
+              semester: m.courseOffering.semester,
+            }))}
+        />
       </div>
     </>
   )

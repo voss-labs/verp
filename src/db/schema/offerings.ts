@@ -31,6 +31,16 @@ export const courseOfferings = pgTable(
     }),
     // 1..8 — which semester of the programme this offering runs in.
     semester: integer("semester").notNull(),
+    // Publication is a governed state of its own, separate from entering marks
+    // and from locking them. Locking says "I have finished"; publishing says
+    // "the student may see this". Without it a half-entered ISA appeared on a
+    // student's record the moment a teacher typed it, with no ESE and no grade,
+    // and looked like a result rather than work in progress.
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    publishedByFacultyId: uuid("published_by_faculty_id").references(
+      () => faculty.id,
+      { onDelete: "set null" }
+    ),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
