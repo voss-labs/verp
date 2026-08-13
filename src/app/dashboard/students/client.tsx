@@ -1,6 +1,6 @@
 "use client"
 
-import { useTransition } from "react"
+import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { DataTableView } from "@/components/data-table-view"
@@ -13,6 +13,7 @@ import { downloadBase64File } from "@/lib/utils"
 import Link from "next/link"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Trash2Icon, UploadIcon } from "lucide-react"
+import { RecordDrawer } from "@/components/record-drawer"
 import { bulkDeactivateStudentsAction } from "./actions"
 
 export function StudentsClient({
@@ -24,6 +25,7 @@ export function StudentsClient({
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
+  const [open, setOpen] = useState<StudentRow | null>(null)
 
   function deactivate(ids: string[], clear: () => void) {
     start(async () => {
@@ -105,6 +107,20 @@ export function StudentsClient({
         searchPlaceholder="Search students..."
         exportConfig={{ filename: "Students", onExport: handleExport }}
         rowId={(s) => s.id}
+        onRowClick={setOpen}
+        mobileRow={(s) => ({
+          title: `${s.firstName} ${s.lastName}`.trim(),
+          subtitle: s.rollNumber,
+          meta: [
+            { label: "Dept", value: s.department },
+            { label: "Year", value: s.year },
+            ...(s.division ? [{ label: "Div", value: s.division }] : []),
+            {
+              label: "Account",
+              value: s.authUserId ? "Claimed" : "Unclaimed",
+            },
+          ],
+        })}
         bulkBar={
           canDeactivate
             ? (ids, clear) => (
@@ -120,6 +136,49 @@ export function StudentsClient({
                 </Button>
               )
             : undefined
+        }
+      />
+
+      <RecordDrawer
+        open={open !== null}
+        onClose={() => setOpen(null)}
+        title={open ? `${open.firstName} ${open.lastName}`.trim() : ""}
+        subtitle={open?.email ?? "No email on record"}
+        badges={
+          open
+            ? [
+                { label: open.rollNumber },
+                ...(open.isActive
+                  ? []
+                  : [{ label: "Inactive", tone: "critical" as const }]),
+                // An unclaimed row is a student who has never signed in, which
+                // is the difference between a roster mistake and a person who
+                // simply has not arrived yet.
+                ...(open.authUserId
+                  ? []
+                  : [{ label: "Unclaimed", tone: "warn" as const }]),
+              ]
+            : undefined
+        }
+        facts={
+          open
+            ? [
+                { label: "Department", value: open.department },
+                { label: "Year", value: open.year },
+                { label: "Division", value: open.division ?? "—" },
+                { label: "Roll number", value: open.rollNumber, mono: true },
+              ]
+            : undefined
+        }
+        footer={
+          open && (
+            <Link
+              href={`/dashboard/students/${open.id}`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              Open full record
+            </Link>
+          )
         }
       />
     </>

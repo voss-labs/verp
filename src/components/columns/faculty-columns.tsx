@@ -14,7 +14,10 @@ export type FacultyRow = {
   isActive: boolean
 }
 
-const ROLE_LABEL: Record<FacultyRow["role"], string> = {
+// Exported so the table, the drawer and the filter all name a role the same
+// way. A raw "super_admin" reaching a dropdown is the same class of leak as
+// the "__all" sentinel that used to show in the filter triggers.
+export const ROLE_LABEL: Record<FacultyRow["role"], string> = {
   super_admin: "Super-admin",
   hod: "HOD",
   faculty: "Faculty",
