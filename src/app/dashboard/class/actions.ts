@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { getSessionUser, type SessionUser } from "@/lib/session"
 import { authorize } from "@/lib/rbac"
-import { canAllocate, canWriteOffering } from "@/lib/allocation"
+import { canAllocate, canReopenLock, canWriteOffering } from "@/lib/allocation"
 import { getErrorMessage } from "@/lib/error-utils"
 import { parseRollNumber, expectedYear } from "@/lib/roll-number"
 import { createAuditLog } from "@/db/queries"
@@ -298,7 +298,8 @@ export async function saveMarksAction(input: {
     // Enforced here and not only in the UI: the grid is the polite reminder,
     // this is the actual guarantee — a stale tab or a direct call must not slip
     // a mark past a submitted component.
-    const locked = await getLockedComponents(input.offeringId)
+    const lockRows = await getLockedComponents(input.offeringId)
+    const locked = lockRows.map((l) => l.component)
     const rows = input.rows.map((r) => ({
       courseOfferingId: input.offeringId,
       studentId: r.studentId,
@@ -367,13 +368,22 @@ export async function setMarksLockAction(input: {
     const { ok, cls } = await classInScope(user!, offering.classId)
     if (!ok || !cls) return { error: "That class is not in your scope." }
 
-    if (
-      !input.locked &&
-      !canUnlock(user!, offering.classId, cls.departmentCode)
-    ) {
-      return {
-        error:
-          "Only the class coordinator, the HOD, or an admin can reopen locked marks.",
+    if (!input.locked) {
+      const held = (await getLockedComponents(input.offeringId)).find(
+        (l) => l.component === component
+      )
+      if (
+        !canReopenLock(
+          user!,
+          offering.classId,
+          cls.departmentCode,
+          held?.lockedByFacultyId ?? null
+        )
+      ) {
+        return {
+          error:
+            "Only the teacher who locked this, the class coordinator, or the HOD can reopen it.",
+        }
       }
     }
 
@@ -398,13 +408,6 @@ export async function setMarksLockAction(input: {
 }
 
 /** Reopening is coordinator-and-above; teaching the class is not enough. */
-function canUnlock(user: SessionUser, classId: string, deptCode: string) {
-  return (
-    user.tier === "super_admin" ||
-    (user.tier === "hod" && user.deptCodes.includes(deptCode)) ||
-    user.coordinatorClassIds.includes(classId)
-  )
-}
 
 // ── practical batches ──────────────────────────────────────────────────────
 

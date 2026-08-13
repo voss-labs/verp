@@ -61,7 +61,15 @@ export default async function MarksPage({
     const byStudent = Object.fromEntries(existing.map((m) => [m.studentId, m]))
     grid = {
       offeringId: selected.id,
-      locked,
+      // Per component, because the right to reopen depends on who locked that
+      // one — not on a single permission for the whole page.
+      locked: locked.map((l) => ({
+        component: l.component,
+        canUnlock:
+          canAllocate ||
+          (l.lockedByFacultyId != null &&
+            l.lockedByFacultyId === user.facultyId),
+      })),
       course: {
         courseType: selected.course.courseType,
         credits: selected.course.credits,
@@ -92,12 +100,6 @@ export default async function MarksPage({
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <MarksClient
           classId={classId}
-          canUnlock={
-            user.tier === "super_admin" ||
-            (user.tier === "hod" &&
-              user.deptCodes.includes(cls.departmentCode)) ||
-            user.coordinatorClassIds.includes(classId)
-          }
           canAllocate={canAllocate}
           offerings={offerings.map((o) => ({
             id: o.id,

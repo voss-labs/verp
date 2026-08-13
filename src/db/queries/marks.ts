@@ -71,17 +71,37 @@ export function isLockComponent(v: string): v is LockComponent {
   return (LOCKABLE_COMPONENTS as readonly string[]).includes(v)
 }
 
-/** Locked components for one offering. Absent row = never locked = open. */
+export type MarksLock = {
+  component: LockComponent
+  /** Who froze it. Null for a lock recorded before this was tracked. */
+  lockedByFacultyId: string | null
+}
+
+/**
+ * Locked components for one offering, with who locked each. Absent row = never
+ * locked = open.
+ *
+ * The owner is returned, not just the component name, because reopening is
+ * allowed to the person who submitted as well as to the coordinator — undoing
+ * your own submission is a correction, not an override.
+ */
 export async function getLockedComponents(
   courseOfferingId: string
-): Promise<LockComponent[]> {
+): Promise<MarksLock[]> {
   const rows = await db
-    .select({ component: marksLocks.component, isLocked: marksLocks.isLocked })
+    .select({
+      component: marksLocks.component,
+      isLocked: marksLocks.isLocked,
+      lockedByFacultyId: marksLocks.lockedByFacultyId,
+    })
     .from(marksLocks)
     .where(eq(marksLocks.courseOfferingId, courseOfferingId))
   return rows
     .filter((r) => r.isLocked && isLockComponent(r.component))
-    .map((r) => r.component as LockComponent)
+    .map((r) => ({
+      component: r.component as LockComponent,
+      lockedByFacultyId: r.lockedByFacultyId,
+    }))
 }
 
 /**

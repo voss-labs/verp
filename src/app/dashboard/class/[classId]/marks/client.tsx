@@ -32,11 +32,13 @@ type Row = {
   ese: number | null
 }
 type LockComponent = "isa" | "mse" | "ese"
+/** A frozen component, and whether this viewer may reopen it. */
+type Lock = { component: LockComponent; canUnlock: boolean }
 type Grid = {
   offeringId: string
   course: CourseInfo
   rows: Row[]
-  locked: LockComponent[]
+  locked: Lock[]
 }
 
 const LOCK_LABEL: Record<LockComponent, string> = {
@@ -50,26 +52,17 @@ export function MarksClient({
   offerings,
   selectedId,
   grid,
-  canUnlock,
   canAllocate,
 }: {
   classId: string
   offerings: Offering[]
   selectedId: string | null
   grid: Grid | null
-  canUnlock: boolean
   canAllocate: boolean
 }) {
   if (grid && selectedId) {
     const offering = offerings.find((o) => o.id === selectedId)!
-    return (
-      <MarksGrid
-        classId={classId}
-        offering={offering}
-        grid={grid}
-        canUnlock={canUnlock}
-      />
-    )
+    return <MarksGrid classId={classId} offering={offering} grid={grid} />
   }
   return (
     <SubjectSetup
@@ -174,12 +167,10 @@ function MarksGrid({
   classId,
   offering,
   grid,
-  canUnlock,
 }: {
   classId: string
   offering: Offering
   grid: Grid
-  canUnlock: boolean
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -187,7 +178,9 @@ function MarksGrid({
   const { course } = grid
   const hasMse = course.maxMse > 0
   const locked = grid.locked
-  const isLocked = (c: LockComponent) => locked.includes(c)
+  const isLocked = (c: LockComponent) => locked.some((l) => l.component === c)
+  const mayUnlock = (c: LockComponent) =>
+    locked.find((l) => l.component === c)?.canUnlock ?? false
   // Nothing left to enter: every component this course has is frozen.
   const allLocked =
     isLocked("isa") && isLocked("ese") && (!hasMse || isLocked("mse"))
@@ -338,7 +331,7 @@ function MarksGrid({
       <LockPanel
         hasMse={hasMse}
         isLocked={isLocked}
-        canUnlock={canUnlock}
+        mayUnlock={mayUnlock}
         pending={pending}
         onToggle={toggleLock}
       />
@@ -468,13 +461,13 @@ function MarkInput({
 function LockPanel({
   hasMse,
   isLocked,
-  canUnlock,
+  mayUnlock,
   pending,
   onToggle,
 }: {
   hasMse: boolean
   isLocked: (c: LockComponent) => boolean
-  canUnlock: boolean
+  mayUnlock: (c: LockComponent) => boolean
   pending: boolean
   onToggle: (c: LockComponent, next: boolean) => void
 }) {
@@ -495,7 +488,7 @@ function LockPanel({
               {locked ? " · locked" : ""}
             </Badge>
             {locked ? (
-              canUnlock ? (
+              mayUnlock(c) ? (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -520,9 +513,9 @@ function LockPanel({
           </div>
         )
       })}
-      {!canUnlock && (
+      {components.some((c) => isLocked(c) && !mayUnlock(c)) && (
         <span className="text-muted-foreground ml-auto text-xs">
-          Ask the class coordinator to reopen a locked component.
+          Ask the class coordinator to reopen a component somebody else locked.
         </span>
       )}
     </div>
