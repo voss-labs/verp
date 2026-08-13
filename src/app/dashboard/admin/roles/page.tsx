@@ -1,11 +1,14 @@
 import { PageHeader } from "@/components/page-header"
-import { listRoleOverrides } from "@/db/queries/permissions"
+import { countUsersByTier, listRoleOverrides } from "@/db/queries/permissions"
 import { RolesClient } from "./client"
 
 export const dynamic = "force-dynamic"
 
 export default async function AdminRolesPage() {
-  const overrides = await listRoleOverrides()
+  const [overrides, headcount] = await Promise.all([
+    listRoleOverrides(),
+    countUsersByTier(),
+  ])
   return (
     <>
       <PageHeader
@@ -20,6 +23,7 @@ export default async function AdminRolesPage() {
             capability: o.capability,
             effect: o.effect,
           }))}
+          headcount={headcount}
         />
       </div>
     </>
