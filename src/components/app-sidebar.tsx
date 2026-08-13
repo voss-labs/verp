@@ -18,186 +18,54 @@ import {
   UsersIcon,
   BookOpenIcon,
   LayoutDashboardIcon,
-  ScrollTextIcon,
   ShieldIcon,
   Building2Icon,
   UploadIcon,
   GraduationCapIcon,
 } from "lucide-react"
-import { useSession } from "@/lib/auth-client"
-import { useUserRole } from "@/hooks/use-user-role"
+
+// One icon per domain, so a new page inherits the right one by naming its
+// domain rather than by editing a list.
+const DOMAIN_ICON: Record<string, React.ReactNode> = {
+  Overview: <LayoutDashboardIcon />,
+  Academics: <BookOpenIcon />,
+  Organization: <Building2Icon />,
+  People: <UsersIcon />,
+  Import: <UploadIcon />,
+  Administration: <ShieldIcon />,
+  "My academics": <GraduationCapIcon />,
+}
+import { useSessionUser, useCan } from "@/components/session-provider"
+import { buildNavigation } from "@/lib/navigation"
 import { VossMark } from "@/components/voss-logo"
 
 // MVP surface only: roster and identity. Marks / attendance / courses come back
 // with the features that own them, each adding its own nav.
-const adminNav = [
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: <LayoutDashboardIcon />,
-    isActive: true,
-    items: [{ title: "Overview", url: "/dashboard" }],
-  },
-  {
-    title: "My Department",
-    url: "/dashboard/dept",
-    icon: <Building2Icon />,
-    items: [
-      { title: "Classes", url: "/dashboard/dept" },
-      { title: "Appoint faculty", url: "/dashboard/dept/appoint" },
-      { title: "Course catalogue", url: "/dashboard/dept/courses" },
-    ],
-  },
-  {
-    title: "Students",
-    url: "/dashboard/students",
-    icon: <UsersIcon />,
-    items: [{ title: "All Students", url: "/dashboard/students" }],
-  },
-  {
-    title: "Import",
-    url: "/dashboard/students/import",
-    icon: <UploadIcon />,
-    items: [
-      { title: "Import roster", url: "/dashboard/students/import" },
-      { title: "Import faculty", url: "/dashboard/dept/faculty-import" },
-    ],
-  },
-  {
-    title: "Faculty",
-    url: "/dashboard/faculty",
-    icon: <BookOpenIcon />,
-    items: [{ title: "All Faculty", url: "/dashboard/faculty" }],
-  },
-]
-
 // Super-admin also gets the console — the door to every CRUD.
-const superAdminNav = [
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: <LayoutDashboardIcon />,
-    isActive: true,
-    items: [{ title: "Overview", url: "/dashboard" }],
-  },
-  {
-    title: "Administration",
-    url: "/dashboard/admin",
-    icon: <ShieldIcon />,
-    items: [
-      { title: "Console", url: "/dashboard/admin" },
-      { title: "Departments", url: "/dashboard/admin/departments" },
-      { title: "Faculty", url: "/dashboard/admin/faculty" },
-      { title: "Roles & permissions", url: "/dashboard/admin/roles" },
-    ],
-  },
-  {
-    title: "Departments",
-    url: "/dashboard/dept",
-    icon: <Building2Icon />,
-    // The per-department dashboard lives at /dashboard/dept/[code]; this list
-    // is the way in, since the nav cannot know the codes without a fetch.
-    items: [
-      { title: "All departments", url: "/dashboard/dept" },
-      { title: "Appoint faculty", url: "/dashboard/dept/appoint" },
-      { title: "Course catalogue", url: "/dashboard/dept/courses" },
-    ],
-  },
-  {
-    title: "Students",
-    url: "/dashboard/students",
-    icon: <UsersIcon />,
-    items: [{ title: "All Students", url: "/dashboard/students" }],
-  },
-  {
-    title: "Import",
-    url: "/dashboard/students/import",
-    icon: <UploadIcon />,
-    items: [
-      { title: "Import roster", url: "/dashboard/students/import" },
-      { title: "Import faculty", url: "/dashboard/dept/faculty-import" },
-    ],
-  },
-  {
-    title: "Faculty",
-    url: "/dashboard/faculty",
-    icon: <BookOpenIcon />,
-    items: [{ title: "All Faculty", url: "/dashboard/faculty" }],
-  },
-  {
-    title: "Activity Log",
-    url: "/dashboard/audit",
-    icon: <ScrollTextIcon />,
-    items: [{ title: "All Logs", url: "/dashboard/audit" }],
-  },
-]
-
 // Coordinators/TRs own their classes: approve enrolments, manage the roster.
-const facultyNav = [
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: <LayoutDashboardIcon />,
-    isActive: true,
-    items: [{ title: "Overview", url: "/dashboard" }],
-  },
-  {
-    title: "My Classes",
-    url: "/dashboard/class",
-    icon: <Building2Icon />,
-    // Marks and attendance hang off a specific class, so the class list is the
-    // only sensible entry point. Name what is behind the link — a TR looking for
-    // marks entry should not have to guess that it lives inside a class.
-    items: [{ title: "Classes, marks & attendance", url: "/dashboard/class" }],
-  },
-  {
-    title: "Students",
-    url: "/dashboard/students",
-    icon: <UsersIcon />,
-    items: [{ title: "All Students", url: "/dashboard/students" }],
-  },
-  {
-    title: "Import",
-    url: "/dashboard/students/import",
-    icon: <UploadIcon />,
-    items: [{ title: "Import roster", url: "/dashboard/students/import" }],
-  },
-]
-
-const studentNav = [
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: <LayoutDashboardIcon />,
-    isActive: true,
-    items: [{ title: "Overview", url: "/dashboard" }],
-  },
-  {
-    title: "My Marks",
-    url: "/dashboard/my-marks",
-    icon: <GraduationCapIcon />,
-    items: [{ title: "Marks & SGPI", url: "/dashboard/my-marks" }],
-  },
-]
-
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { data: session } = useSession()
-  const { tier } = useUserRole()
-
+  // Server-resolved, so the first paint already knows who this is. Reading it
+  // from the session hook meant rendering "User" until a fetch returned, which
+  // is what produced the identity flicker and the hydration mismatch.
+  const session = useSessionUser()
+  const can = useCan()
   const user = {
-    name: session?.user?.name ?? "User",
-    email: session?.user?.email ?? "",
-    avatar: session?.user?.image ?? "",
+    name: session.name,
+    email: session.email,
+    avatar: session.image ?? "",
   }
-
-  // Empty for an unbound (pending) user — they see the shell, not a menu they
-  // cannot use. Never default to adminNav: tier null is not an admin. (HOD shares
-  // the admin nav for now; a dedicated dept nav arrives with the HOD dashboard.)
-  let navItems: typeof adminNav = []
-  if (tier === "super_admin") navItems = superAdminNav
-  else if (tier === "hod") navItems = adminNav
-  else if (tier === "faculty") navItems = facultyNav
-  else if (tier === "student") navItems = studentNav
+  const navItems = buildNavigation({
+    tier: session.tier,
+    can,
+    isCoordinator: session.coordinatorClassIds.length > 0,
+    hasClasses: session.classIds.length > 0,
+  }).map((d) => ({
+    title: d.domain,
+    url: d.url,
+    icon: DOMAIN_ICON[d.domain] ?? <LayoutDashboardIcon />,
+    isActive: d.domain === "Overview",
+    items: d.items,
+  }))
 
   return (
     <Sidebar collapsible="icon" {...props}>

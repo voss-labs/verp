@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
+import { SessionProvider } from "@/components/session-provider"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { getSessionUser, isUnbound } from "@/lib/session"
 
@@ -18,10 +19,27 @@ export default async function DashboardLayout({
   if (!user) redirect("/login")
   if (isUnbound(user)) redirect("/unclaimed")
 
+  // Resolved once here and handed down, rather than every client component
+  // fetching /api/me for itself.
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>{children}</SidebarInset>
-    </SidebarProvider>
+    <SessionProvider
+      session={{
+        name: user.name,
+        email: user.email,
+        image: user.image,
+        tier: user.tier,
+        facultyId: user.facultyId,
+        studentId: user.studentId,
+        deptCodes: user.deptCodes,
+        classIds: user.classIds,
+        coordinatorClassIds: user.coordinatorClassIds,
+        capabilities: [...user.capabilities],
+      }}
+    >
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>{children}</SidebarInset>
+      </SidebarProvider>
+    </SessionProvider>
   )
 }

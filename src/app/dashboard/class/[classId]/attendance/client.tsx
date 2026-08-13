@@ -9,12 +9,24 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { saveAttendanceAction } from "../../actions"
 
-type Status = "present" | "absent"
+// The schema has no "unmarked" value: an unmarked student is simply a row that
+// does not exist yet. Null models that here so the difference between "absent"
+// and "nobody has said" survives all the way to the save.
+type Status = "present" | "absent" | "late" | "excused"
+type Mark = Status | null
+
+const STATUSES: Status[] = ["present", "absent", "late", "excused"]
+const STATUS_STYLE: Record<Status, string> = {
+  present: "bg-green-600 text-white",
+  absent: "bg-destructive text-white",
+  late: "bg-amber-600 text-white",
+  excused: "bg-muted-foreground text-white",
+}
 type Student = {
   id: string
   name: string
   rollNumber: string
-  status: Status
+  status: Mark
 }
 
 export function AttendanceClient({
@@ -30,19 +42,31 @@ export function AttendanceClient({
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [marks, setMarks] = useState<Record<string, Status>>(
+  const [marks, setMarks] = useState<Record<string, Mark>>(
     Object.fromEntries(students.map((s) => [s.id, s.status]))
   )
+  const [filter, setFilter] = useState<"all" | Status | "unmarked">("all")
 
-  const setAll = (status: Status) =>
-    setMarks(Object.fromEntries(students.map((s) => [s.id, status])))
+  // Only fills the gaps. A blanket "all present" is how a register gets taken
+  // without being read; this leaves deliberate marks alone and says how many it
+  // is about to touch.
+  const markRemaining = (status: Status) =>
+    setMarks((m) =>
+      Object.fromEntries(students.map((s) => [s.id, m[s.id] ?? status]))
+    )
 
   const goDate = (d: string) =>
     router.push(`/dashboard/class/${classId}/attendance?date=${d}&slot=${slot}`)
 
-  const presentCount = Object.values(marks).filter(
-    (s) => s === "present"
-  ).length
+  const markedCount = students.filter((s) => marks[s.id] != null).length
+  const remaining = students.length - markedCount
+  const countOf = (v: Status) =>
+    students.filter((s) => marks[s.id] === v).length
+  const visible = students.filter((s) => {
+    if (filter === "all") return true
+    if (filter === "unmarked") return marks[s.id] == null
+    return marks[s.id] === filter
+  })
 
   function save() {
     start(async () => {
@@ -50,7 +74,11 @@ export function AttendanceClient({
         classId,
         sessionDate: date,
         sessionSlot: slot,
-        marks: students.map((s) => ({ studentId: s.id, status: marks[s.id] })),
+        // Only what somebody actually marked. Sending the unmarked as present
+        // is what produced a full register from an untouched page.
+        marks: students
+          .filter((s) => marks[s.id] != null)
+          .map((s) => ({ studentId: s.id, status: marks[s.id] as Status })),
       })
       if (res.error) {
         toast.error(res.error)
@@ -74,30 +102,79 @@ export function AttendanceClient({
           />
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setAll("present")}>
-            All present
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={remaining === 0}
+            onClick={() => {
+              if (
+                window.confirm(
+                  `Mark the remaining ${remaining} student${remaining === 1 ? "" : "s"} present? Students you have already marked are left alone.`
+                )
+              ) {
+                markRemaining("present")
+              }
+            }}
+          >
+            Mark remaining present
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setAll("absent")}>
-            All absent
-          </Button>
-          <Button size="sm" disabled={pending} onClick={save}>
-            {pending ? "Saving…" : "Save"}
+          <Button
+            size="sm"
+            disabled={pending || markedCount === 0}
+            onClick={save}
+          >
+            {pending ? "Saving…" : `Save ${markedCount}`}
           </Button>
         </div>
       </div>
 
-      <p className="text-muted-foreground text-xs">
-        {presentCount} / {students.length} present
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-muted-foreground text-xs">
+          {markedCount} of {students.length} marked
+          {remaining > 0 && (
+            <span className="text-amber-600">
+              {" "}
+              · {remaining} still unmarked
+            </span>
+          )}
+        </p>
+        <div className="ml-auto flex flex-wrap gap-1">
+          {(
+            [
+              ["all", `All ${students.length}`],
+              ["unmarked", `Unmarked ${remaining}`],
+              ...STATUSES.map((v) => [v, `${v} ${countOf(v)}`] as const),
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFilter(key as typeof filter)}
+              className={cn(
+                "rounded border px-2 py-0.5 text-xs capitalize transition-colors",
+                filter === key
+                  ? "border-foreground text-foreground"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {students.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           No students in this class yet.
         </p>
+      ) : visible.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          No students match that filter.
+        </p>
       ) : (
         <div className="border-border overflow-hidden rounded border">
           <ul className="divide-border divide-y">
-            {students.map((s) => {
+            {visible.map((s) => {
               const status = marks[s.id]
               return (
                 <li
@@ -110,24 +187,36 @@ export function AttendanceClient({
                     </Badge>
                     <span className="text-sm">{s.name}</span>
                   </div>
-                  <div className="flex overflow-hidden rounded border">
-                    {(["present", "absent"] as const).map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => setMarks((m) => ({ ...m, [s.id]: v }))}
-                        className={cn(
-                          "px-3 py-1 text-xs font-medium capitalize transition-colors",
-                          status === v
-                            ? v === "present"
-                              ? "bg-green-600 text-white"
-                              : "bg-destructive text-white"
-                            : "text-muted-foreground hover:bg-muted"
-                        )}
-                      >
-                        {v}
-                      </button>
-                    ))}
+                  <div className="flex items-center gap-2">
+                    {status == null && (
+                      <span className="text-xs text-amber-600">Unmarked</span>
+                    )}
+                    <div className="flex overflow-hidden rounded border">
+                      {STATUSES.map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          aria-pressed={status === v}
+                          // Pressing the current value clears it, so a mark made
+                          // by mistake can be taken back to unmarked rather than
+                          // forced into being one of the other four.
+                          onClick={() =>
+                            setMarks((m) => ({
+                              ...m,
+                              [s.id]: m[s.id] === v ? null : v,
+                            }))
+                          }
+                          className={cn(
+                            "px-3 py-1 text-xs font-medium capitalize transition-colors",
+                            status === v
+                              ? STATUS_STYLE[v]
+                              : "text-muted-foreground hover:bg-muted"
+                          )}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </li>
               )

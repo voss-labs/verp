@@ -32,7 +32,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select"
 import {
   DropdownMenu,
@@ -200,7 +199,14 @@ export function DataTableView<TData, TValue>({
                     className="w-auto min-w-[9rem]"
                     aria-label={facet.label}
                   >
-                    <SelectValue placeholder={facet.label} />
+                    {/* Render the label rather than letting the primitive echo
+                        the raw value: the "no filter" case is a sentinel, and
+                        the trigger was showing "__all" to users. */}
+                    <span className="truncate">
+                      {value === ALL
+                        ? `All ${facet.label.toLowerCase()}`
+                        : `${value} (${counts.get(value) ?? 0})`}
+                    </span>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={ALL}>
