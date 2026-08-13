@@ -50,3 +50,35 @@ export async function setOfferingFaculty(id: string, facultyId: string | null) {
     .returning()
   return row
 }
+
+/**
+ * Publish or withdraw a subject's results.
+ *
+ * Withdrawing is deliberately possible: a result published against a mark that
+ * turns out to be wrong has to be retractable, and the alternative — leaving it
+ * visible while it is corrected — is worse than briefly taking it back.
+ */
+export async function setOfferingPublished(
+  id: string,
+  publishedByFacultyId: string | null,
+  published: boolean
+) {
+  const [row] = await db
+    .update(courseOfferings)
+    .set(
+      published
+        ? {
+            publishedAt: new Date(),
+            publishedByFacultyId,
+            updatedAt: new Date(),
+          }
+        : {
+            publishedAt: null,
+            publishedByFacultyId: null,
+            updatedAt: new Date(),
+          }
+    )
+    .where(eq(courseOfferings.id, id))
+    .returning()
+  return row
+}

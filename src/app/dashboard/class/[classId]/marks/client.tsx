@@ -12,7 +12,11 @@ import { cn } from "@/lib/utils"
 import { computeMarks, type CourseInfo } from "@/lib/sgpi"
 import { downloadBase64File } from "@/lib/utils"
 import { exportTableCsv, exportTableXlsx } from "@/lib/xlsx-export"
-import { saveMarksAction, setMarksLockAction } from "../../actions"
+import {
+  saveMarksAction,
+  setMarksLockAction,
+  setPublishedAction,
+} from "../../actions"
 
 type Offering = {
   id: string
@@ -36,6 +40,8 @@ type LockComponent = "isa" | "mse" | "ese"
 type Lock = { component: LockComponent; canUnlock: boolean }
 type Grid = {
   offeringId: string
+  published: boolean
+  canPublish: boolean
   course: CourseInfo
   rows: Row[]
   locked: Lock[]
@@ -185,6 +191,18 @@ function MarksGrid({
   const allLocked =
     isLocked("isa") && isLocked("ese") && (!hasMse || isLocked("mse"))
 
+  function togglePublished(next: boolean) {
+    start(async () => {
+      const res = await setPublishedAction({
+        offeringId: offering.id,
+        published: next,
+      })
+      if (res.error) return void toast.error(res.error)
+      toast.success(next ? "Results published" : "Results withdrawn")
+      router.refresh()
+    })
+  }
+
   function toggleLock(component: LockComponent, next: boolean) {
     start(async () => {
       const res = await setMarksLockAction({
@@ -326,6 +344,37 @@ function MarksGrid({
             {pending ? "Saving…" : "Save marks"}
           </Button>
         </div>
+      </div>
+
+      {/* Publication is the last step, and reads as one: locking each component
+          says the figures are final, publishing says the student may see them. */}
+      <div className="border-border flex flex-wrap items-center gap-3 rounded border px-3 py-2">
+        <span className="text-muted-foreground text-xs font-medium">
+          Results
+        </span>
+        <Badge variant={grid.published ? "outline" : "secondary"}>
+          {grid.published ? "Published" : "Not published"}
+        </Badge>
+        <span className="text-muted-foreground text-xs">
+          {grid.published
+            ? "Students can see their grade for this subject."
+            : "Students cannot see a grade for this subject yet."}
+        </span>
+        {grid.canPublish ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto"
+            disabled={pending}
+            onClick={() => togglePublished(!grid.published)}
+          >
+            {grid.published ? "Withdraw" : "Publish results"}
+          </Button>
+        ) : (
+          <span className="text-muted-foreground ml-auto text-xs">
+            The class coordinator publishes results.
+          </span>
+        )}
       </div>
 
       <LockPanel

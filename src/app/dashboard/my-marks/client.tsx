@@ -23,15 +23,22 @@ type Semester = { semester: number; subjects: Subject[] }
 export function MyMarksClient({
   cgpa,
   semesters,
+  awaiting,
 }: {
   cgpa: CgpaResult
   semesters: Semester[]
+  awaiting: { code: string; name: string; semester: number }[]
 }) {
   if (semesters.length === 0) {
     return (
-      <p className="text-muted-foreground text-sm">
-        No marks recorded yet. They appear here once your teachers enter them.
-      </p>
+      <div className="flex flex-col gap-4">
+        <p className="text-muted-foreground text-sm">
+          {awaiting.length > 0
+            ? "No results have been published yet."
+            : "No marks recorded yet. They appear here once your teachers enter them."}
+        </p>
+        <AwaitingPublication subjects={awaiting} />
+      </div>
     )
   }
 
@@ -60,6 +67,8 @@ export function MyMarksClient({
           hint="earned"
         />
       </div>
+
+      <AwaitingPublication subjects={awaiting} />
 
       {semesters.map((sem) => {
         const result = cgpa.perSemester.find((p) => p.semester === sem.semester)
@@ -253,6 +262,42 @@ function Part({
           `${value}/${max}`
         )}
       </p>
+    </div>
+  )
+}
+
+/**
+ * Subjects a student is taking whose results are not published.
+ *
+ * Naming them matters: silence looks like the subject was forgotten, and a
+ * student who can see four of their six subjects will assume the other two are
+ * lost rather than pending. Marks are deliberately not shown — an unpublished
+ * figure is not a result, and showing it would make publication meaningless.
+ */
+function AwaitingPublication({
+  subjects,
+}: {
+  subjects: { code: string; name: string; semester: number }[]
+}) {
+  if (subjects.length === 0) return null
+  return (
+    <div className="border-border rounded border p-4">
+      <p className="text-sm font-medium">Awaiting publication</p>
+      <p className="text-muted-foreground mt-0.5 text-xs">
+        Your teachers are still entering or finalising these. They appear with a
+        grade once the class coordinator publishes them.
+      </p>
+      <ul className="mt-3 flex flex-col gap-1.5">
+        {subjects.map((s) => (
+          <li key={s.code} className="flex items-center gap-2 text-sm">
+            <span className="identifier">{s.code}</span>
+            <span className="truncate">{s.name}</span>
+            <span className="text-muted-foreground ml-auto text-xs">
+              Semester {s.semester}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

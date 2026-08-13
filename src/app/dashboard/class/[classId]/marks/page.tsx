@@ -63,6 +63,8 @@ export default async function MarksPage({
     const byStudent = Object.fromEntries(existing.map((m) => [m.studentId, m]))
     grid = {
       offeringId: selected.id,
+      published: selected.publishedAt != null,
+      canPublish: canAllocate,
       // Per component, because the right to reopen depends on who locked that
       // one — not on a single permission for the whole page.
       locked: locked.map((l) => ({
