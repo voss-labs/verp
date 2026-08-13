@@ -97,9 +97,21 @@ describe("tier defaults", () => {
     expect(ROLE_DEFAULTS.faculty).not.toContain("permission:manage")
   })
 
-  // An HOD runs the department; they do not enter its marks.
-  it("gives an HOD read over marks, not write", () => {
+  // An HOD runs the department rather than teaching it, but holds cover
+  // authority: when a teacher is absent mid-term somebody senior must be able
+  // to finish the work. Scope still bounds it to their own department, which is
+  // enforced separately in allocation.ts.
+  it("gives an HOD cover authority over attendance and marks", () => {
     expect(ROLE_DEFAULTS.hod).toContain("marks:read")
-    expect(ROLE_DEFAULTS.hod).not.toContain("marks:write")
+    expect(ROLE_DEFAULTS.hod).toContain("marks:write")
+    expect(ROLE_DEFAULTS.hod).toContain("marks:lock")
+    expect(ROLE_DEFAULTS.hod).toContain("attendance:write")
+  })
+
+  // Cover is not administration: an HOD still cannot rewrite the permission
+  // model or read the institution-wide audit trail.
+  it("does not give an HOD institution-level authority", () => {
+    expect(ROLE_DEFAULTS.hod).not.toContain("permission:manage")
+    expect(ROLE_DEFAULTS.hod).not.toContain("audit:read")
   })
 })
