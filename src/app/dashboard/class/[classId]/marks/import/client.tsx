@@ -1,5 +1,7 @@
 "use client"
 
+import Link from "next/link"
+
 import { useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -40,9 +42,11 @@ const fmt = (v: number | null) => (v === null ? "AB" : String(v))
 export function ImportClient({
   classId,
   offerings,
+  canAllocate,
 }: {
   classId: string
   offerings: Offering[]
+  canAllocate: boolean
 }) {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -150,34 +154,48 @@ export function ImportClient({
         <>
           {/* Step 2 — map columns + pick subject */}
           <div className="border-border flex flex-col gap-4 rounded border p-4">
-            <label className="grid gap-1.5 sm:max-w-sm">
-              <span className="text-muted-foreground text-xs">Subject</span>
-              {offerings.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  No subjects yet.{" "}
-                  <a
-                    href={`/dashboard/class/${classId}/marks`}
+            <div className="grid gap-1.5 sm:max-w-sm">
+              {/* The label wraps only the select. Wrapping the hint too would
+                  put its link inside a label, so clicking it would also drive
+                  the select. */}
+              {offerings.length > 0 && (
+                <label className="grid gap-1.5">
+                  <span className="text-muted-foreground text-xs">Subject</span>
+                  <select
+                    value={offeringId}
+                    onChange={(e) => setOfferingId(e.target.value)}
+                    className="border-border h-9 rounded border bg-transparent px-2 text-sm"
+                  >
+                    <option value="">Select a subject…</option>
+                    {offerings.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.code} — {o.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {/* Offered whether or not the list is empty: a marksheet for a
+                  subject nobody has added yet looks identical to one for a
+                  subject allocated to a colleague, and both dead-end here
+                  unless the page says where to go. */}
+              <p className="text-muted-foreground text-xs">
+                {offerings.length === 0
+                  ? "No subjects on this class are allocated to you. "
+                  : "Subject not listed? "}
+                {canAllocate ? (
+                  <Link
+                    href={`/dashboard/class/${classId}/subjects`}
                     className="underline"
                   >
-                    Add a subject
-                  </a>{" "}
-                  first.
-                </p>
-              ) : (
-                <select
-                  value={offeringId}
-                  onChange={(e) => setOfferingId(e.target.value)}
-                  className="border-border h-9 rounded border bg-transparent px-2 text-sm"
-                >
-                  <option value="">Select a subject…</option>
-                  {offerings.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.code} — {o.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </label>
+                    Add one from the catalogue
+                  </Link>
+                ) : (
+                  "Ask the class coordinator to add it and allocate it to you."
+                )}
+              </p>
+            </div>
 
             <div>
               <p className="mb-2 text-sm font-medium">
