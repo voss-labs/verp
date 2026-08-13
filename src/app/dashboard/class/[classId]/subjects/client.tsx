@@ -37,6 +37,7 @@ export function SubjectsClient({
   classId,
   canAllocate,
   classYear,
+  semesters,
   offerings,
   staff,
   catalogue,
@@ -44,6 +45,8 @@ export function SubjectsClient({
   classId: string
   canAllocate: boolean
   classYear: string | null
+  /** The two semesters this cohort can actually be sitting. */
+  semesters: [number, number]
   offerings: Offering[]
   staff: Staff[]
   catalogue: CatalogueCourse[]
@@ -51,7 +54,10 @@ export function SubjectsClient({
   const router = useRouter()
   const [pending, start] = useTransition()
   const [query, setQuery] = useState("")
-  const [semester, setSemester] = useState(1)
+  // Defaulting to 1 filed a BE class's subject three years before that cohort
+  // sat it. The class knows which semesters it can be in; the form should not
+  // have to be told.
+  const [semester, setSemester] = useState(semesters[0])
 
   function allocate(offeringId: string, facultyId: string) {
     start(async () => {
@@ -220,16 +226,21 @@ export function SubjectsClient({
                     className="h-9"
                   />
                 </div>
-                <div className="grid w-20 gap-1.5">
-                  <label className="text-muted-foreground text-xs">Sem</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={8}
+                <div className="grid w-28 gap-1.5">
+                  <label className="text-muted-foreground text-xs">
+                    Semester
+                  </label>
+                  <select
                     value={semester}
                     onChange={(e) => setSemester(Number(e.target.value))}
-                    className="h-9"
-                  />
+                    className="border-input bg-background h-9 rounded border px-2 text-sm"
+                  >
+                    {semesters.map((n) => (
+                      <option key={n} value={n}>
+                        Semester {n}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
