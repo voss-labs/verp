@@ -26,6 +26,10 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-attention: var(--attention);
+  --color-attention-foreground: var(--attention-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -73,6 +77,14 @@
   --accent: oklch(0.955 0.008 260);
   --accent-foreground: oklch(0.22 0.03 260);
   --destructive: oklch(0.55 0.22 25);
+  /* Workflow status. destructive already covered "critical"; complete and
+     pending were being written as raw green-600 / amber-600 at each call site,
+     which drifted and could not be themed. Status must always carry text or an
+     icon too — colour alone never conveys meaning (spec 3.2). */
+  --success: oklch(0.52 0.15 150);
+  --success-foreground: oklch(0.985 0 0);
+  --attention: oklch(0.6 0.14 65);
+  --attention-foreground: oklch(0.985 0 0);
   --border: oklch(0.91 0.008 260);
   --input: oklch(0.91 0.008 260);
   /* Deep saturated blue - the brand */
@@ -110,6 +122,10 @@
   --card-foreground: oklch(0.96 0 0);
   --popover: oklch(0.19 0.015 260);
   --popover-foreground: oklch(0.96 0 0);
+  --success: oklch(0.62 0.15 150);
+  --success-foreground: oklch(0.14 0.01 260);
+  --attention: oklch(0.7 0.14 65);
+  --attention-foreground: oklch(0.14 0.01 260);
   --primary: oklch(0.92 0 0);
   --primary-foreground: oklch(0.19 0.015 260);
   --secondary: oklch(0.25 0.015 260);
@@ -171,4 +187,15 @@
       box-shadow 0.2s ease,
       border-color 0.2s ease;
   }
+}
+
+/* Academic identifiers — roll numbers, course codes, class keys, employee IDs.
+   They are compared column-to-column far more often than they are read as
+   prose, so they get the mono face and tabular figures wherever they appear
+   (spec 3.3). */
+.identifier {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  letter-spacing: -0.01em;
 }

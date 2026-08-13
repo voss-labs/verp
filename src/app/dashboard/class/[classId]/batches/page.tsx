@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 import { PageHeader } from "@/components/page-header"
+import { ClassTabs } from "../class-tabs"
+import { classTabs, classTrail } from "../class-context"
 import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
 import { expectedYear } from "@/lib/roll-number"
@@ -56,14 +58,17 @@ export default async function BatchesPage({
   ])
 
   const yr = expectedYear(cls.admissionYear, new Date()) ?? cls.admissionYear
+  const label = `${yr} · ${cls.departmentCode} · ${cls.division}`
   return (
     <>
       <PageHeader
         title={`Batches — ${yr} · ${cls.departmentCode} · ${cls.division}`}
+        trail={classTrail(cls, label)}
         parent="My classes"
         parentHref={`/dashboard/class/${classId}`}
       />
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
+        <ClassTabs tabs={classTabs(classId, user, { canAllocate })} />
         <BatchesClient
           classId={classId}
           offerings={offerings.map((o) => ({
