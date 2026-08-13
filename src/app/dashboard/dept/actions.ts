@@ -16,6 +16,12 @@ import {
 } from "@/db/queries/courses"
 import { graduateClassKey, ungraduateClassKey } from "@/db/queries/students"
 import {
+  createOffering,
+  listOfferingsForClass,
+  setOfferingFaculty,
+} from "@/db/queries/offerings"
+import { getFacultyById } from "@/db/queries/faculty"
+import {
   createClass,
   getClassByKey,
   getClassById,
@@ -23,7 +29,7 @@ import {
   listUnroutedRequests,
   routeRequestsToClass,
 } from "@/db/queries/classes"
-import { assignClassRole } from "@/db/queries/class-staff"
+import { assignClassRole, removeClassRole } from "@/db/queries/class-staff"
 import { createFaculty, getFacultyByEmail } from "@/db/queries/faculty"
 
 type Result = { error: string | null }
@@ -589,5 +595,122 @@ export async function bulkCreateCoursesAction(input: {
     }
   } catch (err) {
     return { error: getErrorMessage(err, "Could not import the courses") }
+  }
+}
+
+/**
+ * Give a teacher a subject on a specific division, in one step.
+ *
+ * Teacher-first, where the Subjects page is subject-first — the HOD is looking
+ * at their faculty and deciding what each of them takes. Both end at the same
+ * place, so neither is a second way of recording it.
+ *
+ * Appointing to the class is folded in because it is a precondition rather than
+ * a decision: allocating a subject to somebody not on the class was simply
+ * refused, which made the obvious action fail for a reason the HOD had to go to
+ * another page to fix.
+ */
+export async function assignSubjectToTeacherAction(input: {
+  classId: string
+  facultyId: string
+  courseId: string
+  semester: number
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "offering:create")
+    const cls = await getClassById(input.classId)
+    if (!cls) return { error: "No such class." }
+    if (!inDeptScope(user!, cls.departmentCode))
+      return { error: "That class is not in your scope." }
+
+    const course = await getCourseById(input.courseId)
+    if (!course) return { error: "No such course." }
+    if (course.departmentCode && course.departmentCode !== cls.departmentCode) {
+      return { error: "That course belongs to another department." }
+    }
+
+    const teacher = await getFacultyById(input.facultyId)
+    if (!teacher) return { error: "No such faculty member." }
+    if (teacher.department !== cls.departmentCode) {
+      // Cross-department teaching is real, but it should be a deliberate act on
+      // the class's staff list rather than a side effect of allocating a subject.
+      return {
+        error: `${teacher.firstName} is not in ${cls.departmentCode}. Add them to the class first.`,
+      }
+    }
+
+    // One offering per (course, class): if the subject is already on the class,
+    // this reallocates it rather than creating a duplicate.
+    const existing = (await listOfferingsForClass(input.classId)).find(
+      (o) => o.course.id === course.id
+    )
+
+    await assignClassRole(input.classId, input.facultyId, "tr", user!.facultyId)
+
+    if (existing) {
+      await setOfferingFaculty(existing.id, input.facultyId)
+    } else {
+      await createOffering({
+        courseId: course.id,
+        classId: input.classId,
+        facultyId: input.facultyId,
+        semester: input.semester,
+      })
+    }
+
+    await createAuditLog({
+      action: existing ? "offering.allocated" : "offering.created",
+      actorId: user!.id,
+      targetType: "class",
+      targetId: input.classId,
+      details: {
+        courseCode: course.courseCode,
+        facultyId: input.facultyId,
+        classKey: cls.classKey,
+      },
+    })
+    revalidatePath(`/dashboard/dept/${cls.departmentCode}`)
+    revalidatePath(`/dashboard/class/${input.classId}/subjects`)
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not assign the subject") }
+  }
+}
+
+/** Take a teacher off a class entirely. Their subjects become unallocated. */
+export async function removeClassRoleAction(input: {
+  classId: string
+  facultyId: string
+  role: "academic_coordinator" | "tr"
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "assignment:remove")
+    const cls = await getClassById(input.classId)
+    if (!cls) return { error: "No such class." }
+    if (!inDeptScope(user!, cls.departmentCode))
+      return { error: "That class is not in your scope." }
+
+    // Their subjects are released rather than left pointing at someone who is
+    // no longer on the class — an unallocated subject is visible and fixable,
+    // a ghost allocation is not.
+    const theirs = (await listOfferingsForClass(input.classId)).filter(
+      (o) => o.faculty?.id === input.facultyId
+    )
+    for (const o of theirs) await setOfferingFaculty(o.id, null)
+    await removeClassRole(input.classId, input.facultyId, input.role)
+
+    await createAuditLog({
+      action: "class.staff_removed",
+      actorId: user!.id,
+      targetType: "class",
+      targetId: input.classId,
+      details: { facultyId: input.facultyId, released: theirs.length },
+    })
+    revalidatePath(`/dashboard/dept/${cls.departmentCode}`)
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not remove them") }
   }
 }

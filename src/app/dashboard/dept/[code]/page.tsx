@@ -6,6 +6,7 @@ import { getDepartment } from "@/db/queries/departments"
 import { listClassesForDepts } from "@/db/queries/classes"
 import { listClassStaff } from "@/db/queries/class-staff"
 import { listActiveAppointments } from "@/db/queries/appointments"
+import { listCoursesForDepts } from "@/db/queries/courses"
 import { getFacultyByDepartments } from "@/db/queries/faculty"
 import {
   getStudentsByDepartments,
@@ -37,13 +38,14 @@ export default async function DepartmentDashboard({
   const dept = await getDepartment(deptCode)
   if (!dept) return notFound()
 
-  const [classes, faculty, students, appointments, graduated] =
+  const [classes, faculty, students, appointments, graduated, catalogue] =
     await Promise.all([
       listClassesForDepts([deptCode]),
       getFacultyByDepartments([deptCode]),
       getStudentsByDepartments([deptCode]),
       listActiveAppointments(),
       getGraduatedClassKeys(),
+      listCoursesForDepts([deptCode]),
     ])
   const staff = await listClassStaff(classes.map((c) => c.id))
   const now = new Date()
@@ -105,6 +107,23 @@ export default async function DepartmentDashboard({
       />
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <DeptDashboardClient
+          canAssign={
+            user.tier === "super_admin" || user.deptCodes.includes(deptCode)
+          }
+          courses={catalogue
+            .filter((c) => c.isActive)
+            .map((c) => ({
+              id: c.id,
+              code: c.courseCode,
+              name: c.courseName,
+              year: c.year,
+            }))}
+          classOptions={classes
+            .filter((c) => c.isActive)
+            .map((c) => ({
+              id: c.id,
+              label: `${expectedYear(c.admissionYear, now) ?? c.admissionYear} · ${c.division}`,
+            }))}
           dept={{ code: dept.code, name: dept.name, isActive: dept.isActive }}
           hod={
             mine.find((a) => a.appointment === "hod")
