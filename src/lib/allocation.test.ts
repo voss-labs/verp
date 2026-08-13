@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   canAllocate,
+  canReopenLock,
   canWriteOffering,
   type AllocationActor,
 } from "./allocation"
@@ -143,5 +144,51 @@ describe("division isolation", () => {
     }
     expect(canWriteOffering(coordA, "f-x", DIV_A, "CMPN")).toBe(true)
     expect(canWriteOffering(coordA, "f-y", DIV_B, "CMPN")).toBe(false)
+  })
+})
+
+describe("canReopenLock", () => {
+  const CLASS2 = "class-1"
+  const DEPT2 = "EXCS"
+  const teacherA: AllocationActor = {
+    tier: "faculty",
+    facultyId: "f-a",
+    deptCodes: [],
+    coordinatorClassIds: [],
+  }
+  const teacherB: AllocationActor = { ...teacherA, facultyId: "f-b" }
+
+  // The whole point of the change: locking your own marks must not require
+  // somebody else to undo it.
+  it("lets the teacher who locked it reopen it", () => {
+    expect(canReopenLock(teacherA, CLASS2, DEPT2, "f-a")).toBe(true)
+  })
+
+  it("still refuses a different teacher", () => {
+    expect(canReopenLock(teacherB, CLASS2, DEPT2, "f-a")).toBe(false)
+  })
+
+  it("lets the coordinator and the HOD reopen anybody's lock", () => {
+    const coord: AllocationActor = {
+      ...teacherB,
+      coordinatorClassIds: [CLASS2],
+    }
+    const hod2: AllocationActor = {
+      tier: "hod",
+      facultyId: "f-hod",
+      deptCodes: [DEPT2],
+      coordinatorClassIds: [],
+    }
+    expect(canReopenLock(coord, CLASS2, DEPT2, "f-a")).toBe(true)
+    expect(canReopenLock(hod2, CLASS2, DEPT2, "f-a")).toBe(true)
+  })
+
+  // Locks recorded before the owner was tracked carry null, and a teacher whose
+  // own facultyId is null must not match them.
+  it("does not let a null actor claim an unowned lock", () => {
+    expect(
+      canReopenLock({ ...teacherA, facultyId: null }, CLASS2, DEPT2, null)
+    ).toBe(false)
+    expect(canReopenLock(teacherA, CLASS2, DEPT2, null)).toBe(false)
   })
 })

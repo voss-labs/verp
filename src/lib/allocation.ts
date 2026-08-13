@@ -44,3 +44,24 @@ export function canWriteOffering(
   if (canAllocate(user, classId, deptCode)) return true
   return offeringFacultyId != null && offeringFacultyId === user.facultyId
 }
+
+/**
+ * Who may reopen a frozen marks component.
+ *
+ * The coordinator, the HOD and super_admin can, because reopening undoes a
+ * submission somebody else may already have acted on.
+ *
+ * So can whoever locked it. Freezing your own marks and then needing another
+ * person to undo it is friction with no safeguard behind it — correcting your
+ * own submission is not overriding anyone else's. What the rule protects
+ * against is teacher A reopening teacher B's work, and that still cannot happen.
+ */
+export function canReopenLock(
+  user: AllocationActor,
+  classId: string,
+  deptCode: string,
+  lockedByFacultyId: string | null
+): boolean {
+  if (canAllocate(user, classId, deptCode)) return true
+  return lockedByFacultyId != null && lockedByFacultyId === user.facultyId
+}
