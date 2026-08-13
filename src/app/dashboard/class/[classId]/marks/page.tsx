@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 import { PageHeader } from "@/components/page-header"
+import { ClassTabs } from "../class-tabs"
+import { classTabs, classTrail } from "../class-context"
 import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
 import { expectedYear } from "@/lib/roll-number"
@@ -94,10 +96,12 @@ export default async function MarksPage({
     <>
       <PageHeader
         title={`Marks — ${label}`}
+        trail={classTrail(cls, label)}
         parent="My classes"
         parentHref={`/dashboard/class/${classId}`}
       />
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
+        <ClassTabs tabs={classTabs(classId, user, { canAllocate })} />
         <MarksClient
           classId={classId}
           canAllocate={canAllocate}

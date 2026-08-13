@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 import { PageHeader } from "@/components/page-header"
+import { ClassTabs } from "../class-tabs"
+import { classTabs, classTrail } from "../class-context"
 import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
 import { expectedYear } from "@/lib/roll-number"
@@ -34,6 +36,7 @@ export default async function SubjectsPage({
   if (!inScope) redirect("/dashboard/class")
 
   const yr = expectedYear(cls.admissionYear, new Date())
+  const label = `${yr} · ${cls.departmentCode} · ${cls.division}`
   const [offerings, staff, catalogue] = await Promise.all([
     listOfferingsForClass(classId),
     listClassStaff([classId]),
@@ -45,10 +48,12 @@ export default async function SubjectsPage({
     <>
       <PageHeader
         title={`Subjects — ${yr ?? cls.admissionYear} · ${cls.departmentCode} · ${cls.division}`}
+        trail={classTrail(cls, label)}
         parent="My classes"
         parentHref={`/dashboard/class/${classId}`}
       />
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
+        <ClassTabs tabs={classTabs(classId, user, { canAllocate })} />
         <SubjectsClient
           classId={classId}
           canAllocate={canAllocate}

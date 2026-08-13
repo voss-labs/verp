@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 import { PageHeader } from "@/components/page-header"
+import { ClassTabs } from "../class-tabs"
+import { classTabs, classTrail } from "../class-context"
 import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
 import { expectedYear } from "@/lib/roll-number"
@@ -23,6 +25,10 @@ export default async function ResultsPage({
 
   const cls = await getClassById(classId)
   if (!cls) return notFound()
+  const canAllocate =
+    user.tier === "super_admin" ||
+    (user.tier === "hod" && user.deptCodes.includes(cls.departmentCode)) ||
+    user.coordinatorClassIds.includes(classId)
   const inScope =
     user.tier === "super_admin" ||
     user.classIds.includes(classId) ||
@@ -87,14 +93,17 @@ export default async function ResultsPage({
   })
 
   const yr = expectedYear(cls.admissionYear, new Date()) ?? cls.admissionYear
+  const label = `${yr} · ${cls.departmentCode} · ${cls.division}`
   return (
     <>
       <PageHeader
         title={`Results — ${yr} · ${cls.departmentCode} · ${cls.division}`}
+        trail={classTrail(cls, label)}
         parent="My classes"
         parentHref={`/dashboard/class/${classId}`}
       />
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
+        <ClassTabs tabs={classTabs(classId, user, { canAllocate })} />
         <ResultsClient rows={table} classLabel={`${cls.classKey}`} />
       </div>
     </>
