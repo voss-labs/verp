@@ -1,40 +1,73 @@
-import { and, eq, sql } from "drizzle-orm"
+import { and, eq, isNull, sql } from "drizzle-orm"
 import { db } from "@/db"
 import { attendance, courseOfferings, courses } from "@/db/schema"
 
 type Entry = {
   studentId: string
   classId: string
+  courseOfferingId: string | null
   sessionDate: string
   sessionSlot: string
   status: "present" | "absent" | "late" | "excused"
   recordedByFacultyId: string | null
 }
 
-// One row per (student, date, slot); re-recording a session overwrites it.
+const overwrite = {
+  status: sql`excluded.status`,
+  recordedByFacultyId: sql`excluded.recorded_by_faculty_id`,
+  updatedAt: new Date(),
+}
+
+/**
+ * One row per (student, date, slot, subject); re-recording a session overwrites
+ * it, because a teacher correcting a mistake is the common case.
+ *
+ * Two partial unique indexes back that identity — one for subject registers,
+ * one for class-level ones — so the insert has to name the matching index for
+ * Postgres to resolve a conflict against it. Naming the wrong one does not fall
+ * back to an update: it raises a duplicate-key error on the second save.
+ */
 export async function upsertAttendance(entries: Entry[]) {
-  if (entries.length === 0) return
-  await db
-    .insert(attendance)
-    .values(entries)
-    .onConflictDoUpdate({
-      target: [
-        attendance.studentId,
-        attendance.sessionDate,
-        attendance.sessionSlot,
-      ],
-      set: {
-        status: sql`excluded.status`,
-        recordedByFacultyId: sql`excluded.recorded_by_faculty_id`,
-        updatedAt: new Date(),
-      },
-    })
+  const subject = entries.filter((e) => e.courseOfferingId !== null)
+  const classLevel = entries.filter((e) => e.courseOfferingId === null)
+
+  if (subject.length > 0) {
+    await db
+      .insert(attendance)
+      .values(subject)
+      .onConflictDoUpdate({
+        target: [
+          attendance.studentId,
+          attendance.sessionDate,
+          attendance.sessionSlot,
+          attendance.courseOfferingId,
+        ],
+        targetWhere: sql`course_offering_id IS NOT NULL`,
+        set: overwrite,
+      })
+  }
+
+  if (classLevel.length > 0) {
+    await db
+      .insert(attendance)
+      .values(classLevel)
+      .onConflictDoUpdate({
+        target: [
+          attendance.studentId,
+          attendance.sessionDate,
+          attendance.sessionSlot,
+        ],
+        targetWhere: sql`course_offering_id IS NULL`,
+        set: overwrite,
+      })
+  }
 }
 
 export async function getAttendanceForSession(
   classId: string,
   sessionDate: string,
-  sessionSlot: string
+  sessionSlot: string,
+  courseOfferingId: string | null
 ) {
   return db
     .select({
@@ -46,7 +79,12 @@ export async function getAttendanceForSession(
       and(
         eq(attendance.classId, classId),
         eq(attendance.sessionDate, sessionDate),
-        eq(attendance.sessionSlot, sessionSlot)
+        eq(attendance.sessionSlot, sessionSlot),
+        // A subject's register and the class-level one are different sessions
+        // on the same day; reading them together would show one as the other.
+        courseOfferingId
+          ? eq(attendance.courseOfferingId, courseOfferingId)
+          : isNull(attendance.courseOfferingId)
       )
     )
 }

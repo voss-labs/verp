@@ -7,6 +7,7 @@ import { can } from "@/lib/rbac"
 import { expectedYear } from "@/lib/roll-number"
 import { getClassById } from "@/db/queries/classes"
 import { getStudentsByClassKeys } from "@/db/queries/students"
+import { listOfferingsForClass } from "@/db/queries/offerings"
 import { getAttendanceForSession } from "@/db/queries/attendance"
 import { AttendanceClient } from "./client"
 
@@ -19,7 +20,7 @@ export default async function AttendancePage({
   searchParams,
 }: {
   params: Promise<{ classId: string }>
-  searchParams: Promise<{ date?: string; slot?: string }>
+  searchParams: Promise<{ date?: string; slot?: string; offering?: string }>
 }) {
   const { classId } = await params
   const sp = await searchParams
@@ -39,12 +40,20 @@ export default async function AttendancePage({
     (user.tier === "hod" && user.deptCodes.includes(cls.departmentCode))
   if (!inScope) redirect("/dashboard/class")
 
-  const date = sp.date || new Date().toISOString().slice(0, 10)
+  // The college's date, not UTC. toISOString() rolls over at 05:30 IST and
+  // would open tomorrow's register during an early-morning lecture.
+  const date =
+    sp.date ||
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(
+      new Date()
+    )
   const slot = sp.slot || "1"
+  const offeringId = sp.offering || null
 
-  const [students, existing] = await Promise.all([
+  const [students, existing, offerings] = await Promise.all([
     getStudentsByClassKeys([cls.classKey]),
-    getAttendanceForSession(classId, date, slot),
+    getAttendanceForSession(classId, date, slot, offeringId),
+    listOfferingsForClass(classId),
   ])
   const marked: Record<string, string> = {}
   for (const e of existing) marked[e.studentId] = e.status
@@ -66,6 +75,12 @@ export default async function AttendancePage({
           classId={classId}
           date={date}
           slot={slot}
+          offeringId={offeringId}
+          offerings={offerings.map((o) => ({
+            id: o.id,
+            code: o.course.courseCode,
+            name: o.course.courseName,
+          }))}
           students={students.map((s) => ({
             id: s.id,
             name: `${s.firstName} ${s.lastName}`.trim(),

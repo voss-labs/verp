@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/page-header"
 import { getSessionUser } from "@/lib/session"
 import { getMarksForStudent } from "@/db/queries/marks"
+import { getAttendanceBySubject } from "@/db/queries/attendance"
 import { computeCgpa, groupBySemester } from "@/lib/sgpi"
 import { MyMarksClient } from "./client"
 
@@ -13,7 +14,10 @@ export default async function MyMarksPage() {
   // Staff have no marks of their own; the dashboard is where they belong.
   if (!user.studentId) redirect("/dashboard")
 
-  const rows = await getMarksForStudent(user.studentId)
+  const [rows, attendance] = await Promise.all([
+    getMarksForStudent(user.studentId),
+    getAttendanceBySubject(user.studentId),
+  ])
   // Only published subjects count toward SGPI and CGPA. An unpublished subject
   // is work in progress; folding it into an average would present a figure that
   // moves every time a teacher saves, and that nobody has declared final.
@@ -63,6 +67,7 @@ export default async function MyMarksPage() {
         <MyMarksClient
           cgpa={cgpa}
           semesters={semesters}
+          attendance={attendance}
           awaiting={rows
             .filter((m) => m.courseOffering.publishedAt == null)
             .map((m) => ({

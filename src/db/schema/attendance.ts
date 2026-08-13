@@ -5,8 +5,9 @@ import {
   date,
   timestamp,
   index,
-  unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core"
+import { sql } from "drizzle-orm"
 import { students } from "./students"
 import { classes } from "./classes"
 import { courseOfferings } from "./offerings"
@@ -46,11 +47,17 @@ export const attendance = pgTable(
       .defaultNow(),
   },
   (t) => [
-    unique("attendance_student_session_uniq").on(
-      t.studentId,
-      t.sessionDate,
-      t.sessionSlot
-    ),
+    // The subject is part of what identifies a session. Without it, two
+    // subjects taught in the same slot on the same day collided on this key and
+    // the second register silently overwrote the first. Postgres treats NULLs
+    // as distinct in a unique index, so the class-level form (no offering) is
+    // kept unique by the partial index below instead.
+    uniqueIndex("attendance_student_subject_session_uniq")
+      .on(t.studentId, t.sessionDate, t.sessionSlot, t.courseOfferingId)
+      .where(sql`course_offering_id IS NOT NULL`),
+    uniqueIndex("attendance_student_class_session_uniq")
+      .on(t.studentId, t.sessionDate, t.sessionSlot)
+      .where(sql`course_offering_id IS NULL`),
     index("attendance_class_date_idx").on(t.classId, t.sessionDate),
     index("attendance_student_idx").on(t.studentId),
   ]

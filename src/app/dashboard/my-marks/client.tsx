@@ -24,9 +24,18 @@ export function MyMarksClient({
   cgpa,
   semesters,
   awaiting,
+  attendance,
 }: {
   cgpa: CgpaResult
   semesters: Semester[]
+  attendance: {
+    offeringId: string | null
+    code: string
+    name: string
+    present: number
+    total: number
+    percent: number | null
+  }[]
   awaiting: { code: string; name: string; semester: number }[]
 }) {
   if (semesters.length === 0) {
@@ -37,6 +46,7 @@ export function MyMarksClient({
             ? "No results have been published yet."
             : "No marks recorded yet. They appear here once your teachers enter them."}
         </p>
+        <SubjectAttendance rows={attendance} />
         <AwaitingPublication subjects={awaiting} />
       </div>
     )
@@ -68,6 +78,7 @@ export function MyMarksClient({
         />
       </div>
 
+      <SubjectAttendance rows={attendance} />
       <AwaitingPublication subjects={awaiting} />
 
       {semesters.map((sem) => {
@@ -346,5 +357,66 @@ function Cell({
         </>
       )}
     </td>
+  )
+}
+
+/**
+ * Attendance per subject, with the 75% rule stated where it applies.
+ *
+ * A single overall percentage cannot answer the question a student actually
+ * has, because the rule is enforced per subject: 80% overall hides a subject
+ * sitting at 60%, and the student finds out when they are barred from the exam.
+ */
+function SubjectAttendance({
+  rows,
+}: {
+  rows: {
+    offeringId: string | null
+    code: string
+    name: string
+    present: number
+    total: number
+    percent: number | null
+  }[]
+}) {
+  if (rows.length === 0) return null
+  return (
+    <div className="border-border rounded border p-4">
+      <p className="text-sm font-medium">Attendance</p>
+      <p className="text-muted-foreground mt-0.5 text-xs">
+        VIT requires 75% in each subject. Late counts as present.
+      </p>
+      <ul className="mt-3 flex flex-col gap-2">
+        {rows.map((r) => {
+          const short = r.percent != null && r.percent < 75
+          return (
+            <li
+              key={r.offeringId ?? "class"}
+              className="flex items-center gap-2 text-sm"
+            >
+              <span className="identifier">{r.code}</span>
+              <span className="truncate">{r.name}</span>
+              <span className="text-muted-foreground ml-auto shrink-0 text-xs tabular-nums">
+                {r.present}/{r.total}
+              </span>
+              <span
+                className={
+                  short
+                    ? "text-destructive w-16 shrink-0 text-right text-sm font-medium tabular-nums"
+                    : "w-16 shrink-0 text-right text-sm font-medium tabular-nums"
+                }
+              >
+                {r.percent == null ? "—" : `${r.percent}%`}
+                {/* The number alone is not the warning — colour never carries
+                    meaning by itself. */}
+              </span>
+              {short && (
+                <span className="text-destructive shrink-0 text-xs">Short</span>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }

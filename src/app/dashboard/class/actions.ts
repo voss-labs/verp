@@ -156,6 +156,8 @@ export async function saveAttendanceAction(input: {
   classId: string
   sessionDate: string
   sessionSlot: string
+  /** The subject this register is for. Null is a class-level session. */
+  offeringId?: string | null
   marks: { studentId: string; status: AttStatus }[]
 }): Promise<Result> {
   try {
@@ -177,9 +179,20 @@ export async function saveAttendanceAction(input: {
     )
     if (!attScope.ok) return { error: attScope.reason }
 
+    // A register named for a subject has to be a subject of this class,
+    // otherwise the class scope check above is worked around by pointing at
+    // another class's offering.
+    const offeringId = input.offeringId ?? null
+    if (offeringId) {
+      const offering = await getOfferingById(offeringId)
+      if (!offering || offering.classId !== input.classId)
+        return { error: "That subject is not taught in this class." }
+    }
+
     const entries = input.marks.map((m) => ({
       studentId: m.studentId,
       classId: input.classId,
+      courseOfferingId: offeringId,
       sessionDate: input.sessionDate,
       sessionSlot: input.sessionSlot,
       status: m.status,
@@ -195,6 +208,7 @@ export async function saveAttendanceAction(input: {
       details: {
         date: input.sessionDate,
         slot: input.sessionSlot,
+        offeringId,
         count: entries.length,
       },
     })
