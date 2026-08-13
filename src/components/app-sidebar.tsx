@@ -37,6 +37,8 @@ const DOMAIN_ICON: Record<string, React.ReactNode> = {
 }
 import { useSessionUser, useCan } from "@/components/session-provider"
 import { buildNavigation } from "@/lib/navigation"
+import { openCommandPalette } from "@/components/command-palette"
+import { SearchIcon } from "lucide-react"
 import { VossMark } from "@/components/voss-logo"
 
 // MVP surface only: roster and identity. Marks / attendance / courses come back
@@ -90,6 +92,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
+        <SidebarMenu className="px-2">
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={openCommandPalette}
+              tooltip="Search (⌘K)"
+            >
+              <SearchIcon />
+              <span>Search</span>
+              <kbd className="text-muted-foreground ml-auto text-[10px] group-data-[collapsible=icon]:hidden">
+                ⌘K
+              </kbd>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <NavMain items={navItems} />
       </SidebarContent>
       <SidebarFooter>

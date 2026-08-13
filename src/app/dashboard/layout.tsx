@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
+import { CommandPalette } from "@/components/command-palette"
 import { SessionProvider } from "@/components/session-provider"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { getSessionUser, isUnbound } from "@/lib/session"
@@ -39,6 +40,9 @@ export default async function DashboardLayout({
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>{children}</SidebarInset>
+        {/* Mounted once at the layout so Cmd+K works from every page, rather
+            than each page remembering to include it. */}
+        <CommandPalette />
       </SidebarProvider>
     </SessionProvider>
   )
