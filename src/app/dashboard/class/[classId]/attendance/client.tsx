@@ -29,15 +29,21 @@ type Student = {
   status: Mark
 }
 
+type Offering = { id: string; code: string; name: string }
+
 export function AttendanceClient({
   classId,
   date,
   slot,
+  offeringId,
+  offerings,
   students,
 }: {
   classId: string
   date: string
   slot: string
+  offeringId: string | null
+  offerings: Offering[]
   students: Student[]
 }) {
   const router = useRouter()
@@ -55,8 +61,21 @@ export function AttendanceClient({
       Object.fromEntries(students.map((s) => [s.id, m[s.id] ?? status]))
     )
 
-  const goDate = (d: string) =>
-    router.push(`/dashboard/class/${classId}/attendance?date=${d}&slot=${slot}`)
+  // Date, slot and subject together identify the session, so changing any of
+  // them navigates rather than mutating what is on screen: a half-marked
+  // register must not silently become another session's.
+  const go = (next: {
+    date?: string
+    slot?: string
+    offering?: string | null
+  }) => {
+    const d = next.date ?? date
+    const s = next.slot ?? slot
+    const o = next.offering === undefined ? offeringId : next.offering
+    const q = new URLSearchParams({ date: d, slot: s })
+    if (o) q.set("offering", o)
+    router.push(`/dashboard/class/${classId}/attendance?${q}`)
+  }
 
   const markedCount = students.filter((s) => marks[s.id] != null).length
   const remaining = students.length - markedCount
@@ -74,6 +93,7 @@ export function AttendanceClient({
         classId,
         sessionDate: date,
         sessionSlot: slot,
+        offeringId,
         // Only what somebody actually marked. Sending the unmarked as present
         // is what produced a full register from an untouched page.
         marks: students
@@ -97,9 +117,26 @@ export function AttendanceClient({
           <Input
             type="date"
             value={date}
-            onChange={(e) => e.target.value && goDate(e.target.value)}
+            onChange={(e) => e.target.value && go({ date: e.target.value })}
             className="h-9 w-44"
           />
+        </div>
+        <div className="grid gap-1.5">
+          <label className="text-muted-foreground text-xs">Session</label>
+          <select
+            value={offeringId ?? ""}
+            onChange={(e) => go({ offering: e.target.value || null })}
+            className="border-input bg-background h-9 rounded border px-2 text-sm"
+          >
+            {/* A register with no subject is the homeroom one. Naming it keeps
+                it distinct from a subject whose register has not been taken. */}
+            <option value="">Class session (no subject)</option>
+            {offerings.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.code} — {o.name}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="flex items-center gap-2">
           <Button
