@@ -6,7 +6,6 @@ import { type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button-variants"
 
-
 function Button({
   className,
   variant = "default",
