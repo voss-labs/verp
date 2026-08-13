@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { getSessionUser, type SessionUser } from "@/lib/session"
 import { authorize } from "@/lib/rbac"
+import { studentsInClass } from "@/lib/scope"
 import { canAllocate, canReopenLock, canWriteOffering } from "@/lib/allocation"
 import { getErrorMessage } from "@/lib/error-utils"
 import { parseRollNumber, expectedYear } from "@/lib/roll-number"
@@ -162,21 +163,27 @@ export async function saveAttendanceAction(input: {
     const { ok, cls } = await classInScope(user!, input.classId)
     if (!ok || !cls) return { error: "That class is not in your scope." }
 
-    // Only students actually in this class can be marked — a forged studentId is
-    // dropped, not written.
+    // Only students actually in this class can be marked. The whole request is
+    // refused rather than the offending rows dropped: a partial write looks
+    // successful, so a forged id would leave no trace and a genuine bug would
+    // look like attendance that quietly went missing.
     const roster = new Set(
       (await getStudentsByClassKeys([cls.classKey])).map((s) => s.id)
     )
-    const entries = input.marks
-      .filter((m) => roster.has(m.studentId))
-      .map((m) => ({
-        studentId: m.studentId,
-        classId: input.classId,
-        sessionDate: input.sessionDate,
-        sessionSlot: input.sessionSlot,
-        status: m.status,
-        recordedByFacultyId: user!.facultyId,
-      }))
+    const attScope = studentsInClass(
+      roster,
+      input.marks.map((m) => m.studentId)
+    )
+    if (!attScope.ok) return { error: attScope.reason }
+
+    const entries = input.marks.map((m) => ({
+      studentId: m.studentId,
+      classId: input.classId,
+      sessionDate: input.sessionDate,
+      sessionSlot: input.sessionSlot,
+      status: m.status,
+      recordedByFacultyId: user!.facultyId,
+    }))
     await upsertAttendance(entries)
 
     await createAuditLog({
@@ -298,6 +305,19 @@ export async function saveMarksAction(input: {
     // Enforced here and not only in the UI: the grid is the polite reminder,
     // this is the actual guarantee — a stale tab or a direct call must not slip
     // a mark past a submitted component.
+    // The caller's authority over the subject says nothing about WHOSE marks
+    // the payload names. Without this, a teacher holding one class could attach
+    // marks from their offering to a student in another — and getMarksForStudent
+    // reads by student id alone, so it would surface in that student's record.
+    const roster = new Set(
+      (await getStudentsByClassKeys([cls.classKey])).map((s) => s.id)
+    )
+    const scope = studentsInClass(
+      roster,
+      input.rows.map((r) => r.studentId)
+    )
+    if (!scope.ok) return { error: scope.reason }
+
     const lockRows = await getLockedComponents(input.offeringId)
     const locked = lockRows.map((l) => l.component)
     const rows = input.rows.map((r) => ({
@@ -475,6 +495,17 @@ export async function assignBatchAction(input: {
     ) {
       return { error: "That subject is allocated to another teacher." }
     }
+
+    // A batch belongs to one offering on one class, so its members must come
+    // from that class. batch_assignments only checks that both rows exist, so
+    // nothing below this would catch a student from another division.
+    const cls2 = await getClassById(offering.classId)
+    if (!cls2) return { error: "No such class." }
+    const roster = new Set(
+      (await getStudentsByClassKeys([cls2.classKey])).map((s) => s.id)
+    )
+    const scope = studentsInClass(roster, input.studentIds)
+    if (!scope.ok) return { error: scope.reason }
 
     await assignStudentsToBatch({
       batchId: input.batchId,

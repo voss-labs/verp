@@ -3,6 +3,7 @@ import { z } from "zod"
 import { apiError, apiSuccess } from "@/lib/api-response"
 import { getErrorMessage } from "@/lib/error-utils"
 import { getSessionUser, isStaff } from "@/lib/session"
+import { rollsInScope } from "@/lib/scope"
 import { tryClassKeyFromRoll } from "@/lib/class-key"
 import { createStudent, createAuditLog } from "@/db/queries"
 import { db } from "@/db"
@@ -52,11 +53,39 @@ export async function POST(req: NextRequest) {
     // ── 2. Check DB for already-existing roll numbers ─────────────────────
     const allRollNumbers = rows.map((r) => r.rollNumber)
     const existingInDb = await db
-      .select({ rollNumber: students.rollNumber })
+      .select({
+        rollNumber: students.rollNumber,
+        classKey: students.classKey,
+      })
       .from(students)
       .where(inArray(students.rollNumber, allRollNumbers))
 
     const dbConflicts = new Set(existingInDb.map((s) => s.rollNumber))
+
+    // Being staff says nothing about WHICH roster you may write. Without this a
+    // TR holding one class could post rows creating students for another
+    // department entirely — and Import roster is shown to every faculty user,
+    // so it was not an unreachable path.
+    //
+    // Scope is judged on the roll, never on the department and division sent
+    // beside it: those are descriptive fields the payload controls, while the
+    // roll encodes the cohort and cannot disagree with itself. Where a student
+    // already exists their stored class key wins, because a repeater's roll
+    // cannot express the cohort they actually sit in.
+    const scope = rollsInScope(
+      user!,
+      allRollNumbers,
+      new Map(existingInDb.map((s) => [s.rollNumber.toUpperCase(), s.classKey]))
+    )
+    if (!scope.ok) {
+      // The batch fails whole rather than importing the in-scope part: a
+      // half-applied roster is harder to reason about than a refused one, and a
+      // forged batch should leave a refusal rather than a partial success.
+      return apiError(
+        `${scope.reason}${scope.offending.length ? " " + scope.offending.join(", ") : ""}`,
+        403
+      )
+    }
 
     // ── 3. Classify rows into valid / errored ─────────────────────────────
     type RowError = { row: number; field: string; message: string }
