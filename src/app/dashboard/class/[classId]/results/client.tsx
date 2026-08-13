@@ -191,7 +191,9 @@ export function ResultsClient({
                   Credits
                 </Th>
                 <th className="px-3 py-2 text-left font-medium">Semesters</th>
-                <th className="px-3 py-2 text-left font-medium"></th>
+                <th className="px-3 py-2 text-left font-medium">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-border divide-y">

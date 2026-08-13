@@ -229,7 +229,9 @@ export function ImportClient({
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-muted-foreground text-xs">
             <tr className="[&>th]:px-2 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
-              <th className="w-8"></th>
+              <th className="w-8">
+                <span className="sr-only">Include</span>
+              </th>
               <th className="w-24">Code</th>
               <th>Name</th>
               <th className="w-28">Type</th>

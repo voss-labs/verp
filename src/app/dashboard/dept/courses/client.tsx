@@ -186,7 +186,11 @@ export function CoursesClient({
                 <th className="w-32">Marks split</th>
                 <th className="w-20">In use</th>
                 <th className="w-20">Status</th>
-                {canEdit && <th className="w-28"></th>}
+                {canEdit && (
+                  <th className="w-28">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-border divide-y">

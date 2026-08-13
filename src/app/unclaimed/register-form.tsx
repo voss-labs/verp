@@ -84,8 +84,8 @@ export function RegisterForm({
       )}
 
       <div className="mt-6 flex flex-col gap-4">
-        <div className="grid gap-1.5">
-          <label className="text-xs font-medium">Roll number</label>
+        <label className="grid gap-1.5">
+          <span className="text-xs font-medium">Roll number</span>
           <Input
             value={rollNumber}
             onChange={(e) => setRollNumber(e.target.value.toUpperCase())}
@@ -106,23 +106,23 @@ export function RegisterForm({
               That doesn&rsquo;t look like a valid roll number.
             </p>
           )}
-        </div>
+        </label>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="grid gap-1.5">
-            <label className="text-xs font-medium">First name</label>
+          <label className="grid gap-1.5">
+            <span className="text-xs font-medium">First name</span>
             <Input
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
             />
-          </div>
-          <div className="grid gap-1.5">
-            <label className="text-xs font-medium">Last name</label>
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-xs font-medium">Last name</span>
             <Input
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
             />
-          </div>
+          </label>
         </div>
 
         <Button

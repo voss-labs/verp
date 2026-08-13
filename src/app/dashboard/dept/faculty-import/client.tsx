@@ -88,8 +88,8 @@ export function FacultyImportClient({
     <div className="flex flex-col gap-5">
       <div className="border-border flex flex-col gap-4 rounded border p-4">
         {departments.length > 1 && (
-          <div className="grid max-w-xs gap-1.5">
-            <label className="text-muted-foreground text-xs">Department</label>
+          <label className="grid max-w-xs gap-1.5">
+            <span className="text-muted-foreground text-xs">Department</span>
             <select
               value={deptCode}
               onChange={(e) => {
@@ -104,15 +104,16 @@ export function FacultyImportClient({
                 </option>
               ))}
             </select>
-          </div>
+          </label>
         )}
 
-        <div className="grid gap-1.5">
-          <label className="text-muted-foreground text-xs">
+        <label className="grid gap-1.5">
+          <span className="text-muted-foreground text-xs">
             Faculty CSV (name, email, employee ID)
-          </label>
+          </span>
           <input
             type="file"
+            aria-label="Faculty CSV (name, email, employee ID)"
             accept=".csv,text/csv"
             onChange={(e) => {
               const f = e.target.files?.[0]
@@ -120,13 +121,13 @@ export function FacultyImportClient({
             }}
             className="file:border-border file:bg-muted text-sm file:mr-3 file:rounded file:border file:px-3 file:py-1.5 file:text-sm"
           />
-        </div>
+        </label>
 
         <div className="flex flex-wrap items-end gap-3">
-          <div className="grid gap-1.5">
-            <label className="text-muted-foreground text-xs">
+          <label className="grid gap-1.5">
+            <span className="text-muted-foreground text-xs">
               Assign to class (optional)
-            </label>
+            </span>
             <select
               value={assignClassId}
               onChange={(e) => setAssignClassId(e.target.value)}
@@ -139,10 +140,10 @@ export function FacultyImportClient({
                 </option>
               ))}
             </select>
-          </div>
+          </label>
           {assignClassId && (
-            <div className="grid gap-1.5">
-              <label className="text-muted-foreground text-xs">As</label>
+            <label className="grid gap-1.5">
+              <span className="text-muted-foreground text-xs">As</span>
               <select
                 value={assignRole}
                 onChange={(e) => setAssignRole(e.target.value as Role)}
@@ -151,7 +152,7 @@ export function FacultyImportClient({
                 <option value="tr">TR</option>
                 <option value="academic_coordinator">Coordinator</option>
               </select>
-            </div>
+            </label>
           )}
         </div>
         {assignClassId && (

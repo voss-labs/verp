@@ -202,6 +202,12 @@ export function ImportClient() {
   if (!preview) {
     return (
       <div
+        // A drop target, named as a region rather than left as a bare div with
+        // handlers. Dropping is a pointer gesture with no keyboard equivalent
+        // to add; the keyboard path is the button inside, which opens the same
+        // picker the drop would feed.
+        role="region"
+        aria-label="Upload a roster"
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault()
@@ -225,6 +231,7 @@ export function ImportClient() {
         <input
           ref={fileInput}
           type="file"
+          aria-label="Roster spreadsheet"
           accept=".xlsx,.xls"
           className="hidden"
           onChange={(e) => {
