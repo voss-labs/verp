@@ -50,6 +50,7 @@ export default async function MarksImportPage({
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <ImportClient
           classId={classId}
+          canAllocate={canAllocate}
           offerings={offerings.map((o) => ({
             id: o.id,
             code: o.course.courseCode,
