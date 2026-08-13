@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { getSessionUser, type SessionUser } from "@/lib/session"
 import { authorize } from "@/lib/rbac"
+import { canAllocate, canWriteOffering } from "@/lib/allocation"
 import { getErrorMessage } from "@/lib/error-utils"
 import { parseRollNumber, expectedYear } from "@/lib/roll-number"
 import { createAuditLog } from "@/db/queries"
@@ -41,38 +42,6 @@ type AttStatus = "present" | "absent" | "late" | "excused"
 
 // A class is in scope if the caller coordinates/teaches it (classIds), is the HOD
 // of its department, or is super_admin.
-/**
- * Who may allocate a class's subjects.
- *
- * The coordinator owns the class — they already approve its onboarding and
- * record its attendance — so deciding which TR teaches what belongs with them,
- * plus the HOD above and super_admin above that. A plain TR is deliberately not
- * included: they enter marks for the subjects they are given, and letting them
- * mint subjects is how the same course ends up on a class twice under two
- * spellings.
- */
-function canAllocate(user: SessionUser, classId: string, deptCode: string) {
-  return (
-    user.tier === "super_admin" ||
-    (user.tier === "hod" && user.deptCodes.includes(deptCode)) ||
-    user.coordinatorClassIds.includes(classId)
-  )
-}
-
-/**
- * Who may write a subject's marks: the teacher it was allocated to, or anyone
- * senior enough to cover for them. An unallocated subject falls to the
- * coordinator rather than to whoever finds it first.
- */
-function canWriteMarks(
-  user: SessionUser,
-  offeringFacultyId: string | null,
-  classId: string,
-  deptCode: string
-) {
-  if (canAllocate(user, classId, deptCode)) return true
-  return offeringFacultyId != null && offeringFacultyId === user.facultyId
-}
 
 async function classInScope(user: SessionUser, classId: string) {
   const cls = await getClassById(classId)
@@ -315,7 +284,7 @@ export async function saveMarksAction(input: {
     const { ok, cls } = await classInScope(user!, offering.classId)
     if (!ok || !cls) return { error: "That class is not in your scope." }
     if (
-      !canWriteMarks(
+      !canWriteOffering(
         user!,
         offering.facultyId,
         offering.classId,
@@ -448,8 +417,20 @@ export async function createBatchAction(input: {
     authorize(user, "marks:write")
     const offering = await getOfferingById(input.offeringId)
     if (!offering) return { error: "No such subject." }
-    const { ok } = await classInScope(user!, offering.classId)
-    if (!ok) return { error: "That class is not in your scope." }
+    const { ok, cls } = await classInScope(user!, offering.classId)
+    if (!ok || !cls) return { error: "That class is not in your scope." }
+    // A batch belongs to one offering, so it is the teacher's to arrange for
+    // exactly the same reason its marks are.
+    if (
+      !canWriteOffering(
+        user!,
+        offering.facultyId,
+        offering.classId,
+        cls.departmentCode
+      )
+    ) {
+      return { error: "That subject is allocated to another teacher." }
+    }
     const name = input.name.trim().toUpperCase()
     if (!name) return { error: "A batch name is required." }
 
@@ -479,8 +460,18 @@ export async function assignBatchAction(input: {
     if (!batch) return { error: "No such batch." }
     const offering = await getOfferingById(batch.courseOfferingId)
     if (!offering) return { error: "No such subject." }
-    const { ok } = await classInScope(user!, offering.classId)
-    if (!ok) return { error: "That class is not in your scope." }
+    const { ok, cls } = await classInScope(user!, offering.classId)
+    if (!ok || !cls) return { error: "That class is not in your scope." }
+    if (
+      !canWriteOffering(
+        user!,
+        offering.facultyId,
+        offering.classId,
+        cls.departmentCode
+      )
+    ) {
+      return { error: "That subject is allocated to another teacher." }
+    }
 
     await assignStudentsToBatch({
       batchId: input.batchId,
@@ -512,8 +503,18 @@ export async function removeFromBatchAction(input: {
     if (!batch) return { error: "No such batch." }
     const offering = await getOfferingById(batch.courseOfferingId)
     if (!offering) return { error: "No such subject." }
-    const { ok } = await classInScope(user!, offering.classId)
-    if (!ok) return { error: "That class is not in your scope." }
+    const { ok, cls } = await classInScope(user!, offering.classId)
+    if (!ok || !cls) return { error: "That class is not in your scope." }
+    if (
+      !canWriteOffering(
+        user!,
+        offering.facultyId,
+        offering.classId,
+        cls.departmentCode
+      )
+    ) {
+      return { error: "That subject is allocated to another teacher." }
+    }
 
     await removeStudentFromBatch(input)
     revalidatePath(`/dashboard/class/${offering.classId}/batches`)
