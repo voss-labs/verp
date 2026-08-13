@@ -4,7 +4,7 @@ import { ClassTabs } from "../class-tabs"
 import { classTabs, classTrail } from "../class-context"
 import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
-import { expectedYear } from "@/lib/roll-number"
+import { expectedYear, semestersForClass } from "@/lib/roll-number"
 import { getClassById } from "@/db/queries/classes"
 import { listClassStaff } from "@/db/queries/class-staff"
 import { listOfferingsForClass } from "@/db/queries/offerings"
@@ -58,6 +58,7 @@ export default async function SubjectsPage({
           classId={classId}
           canAllocate={canAllocate}
           classYear={yr ?? null}
+          semesters={semestersForClass(cls.admissionYear, new Date()) ?? [1, 2]}
           offerings={offerings.map((o) => ({
             id: o.id,
             code: o.course.courseCode,

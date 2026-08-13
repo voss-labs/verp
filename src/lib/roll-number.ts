@@ -170,3 +170,35 @@ export function currentYear(
     return storedYear
   }
 }
+
+/**
+ * The two semesters a programme year covers.
+ *
+ * A BE student sits semesters 7 and 8; putting their subject in "Semester 1"
+ * is not a small display slip, it files the result under a year they finished
+ * three years ago. The subject form defaulted to 1 because that was the lowest
+ * number, not because anything derived it.
+ */
+export function semestersForYear(year: string): [number, number] | null {
+  switch (year) {
+    case "FE":
+      return [1, 2]
+    case "SE":
+      return [3, 4]
+    case "TE":
+      return [5, 6]
+    case "BE":
+      return [7, 8]
+    default:
+      return null
+  }
+}
+
+/** The semesters a class can plausibly be taught, given when it was admitted. */
+export function semestersForClass(
+  admissionYear: number,
+  on: Date = new Date()
+): [number, number] | null {
+  const year = expectedYear(admissionYear, on)
+  return year ? semestersForYear(year) : null
+}

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 import {
   currentYear,
   expectedYear,
+  semestersForClass,
+  semestersForYear,
   isValidRollNumber,
   looksLikeRoll,
   parseRollNumber,
@@ -114,5 +116,39 @@ describe("currentYear", () => {
 
   it("falls back past BE, where there is no year left to compute", () => {
     expect(currentYear("21108A0001", "BE", on)).toBe("BE")
+  })
+})
+
+describe("semestersForYear", () => {
+  it("maps each programme year to its two semesters", () => {
+    expect(semestersForYear("FE")).toEqual([1, 2])
+    expect(semestersForYear("SE")).toEqual([3, 4])
+    expect(semestersForYear("TE")).toEqual([5, 6])
+    expect(semestersForYear("BE")).toEqual([7, 8])
+  })
+
+  it("returns null for anything that is not a programme year", () => {
+    expect(semestersForYear("Graduated")).toBeNull()
+    expect(semestersForYear("")).toBeNull()
+  })
+})
+
+describe("semestersForClass", () => {
+  const on = new Date("2026-08-01")
+
+  // The bug this exists to prevent: a BE class's subject filed under semester 1,
+  // three years before that cohort sat it.
+  it("gives a 2023 cohort its final-year semesters", () => {
+    expect(semestersForClass(2023, on)).toEqual([7, 8])
+  })
+
+  it("advances with the cohort", () => {
+    expect(semestersForClass(2026, on)).toEqual([1, 2])
+    expect(semestersForClass(2025, on)).toEqual([3, 4])
+    expect(semestersForClass(2024, on)).toEqual([5, 6])
+  })
+
+  it("returns null past the final year, where there is no semester left", () => {
+    expect(semestersForClass(2022, on)).toBeNull()
   })
 })

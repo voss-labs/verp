@@ -97,7 +97,10 @@ export function MyMarksClient({
                       <th>Code</th>
                       <th>Subject</th>
                       <th className="w-16">Credits</th>
-                      <th className="w-16">Total</th>
+                      <th className="w-16">ISA</th>
+                      <th className="w-16">MSE</th>
+                      <th className="w-16">ESE</th>
+                      <th className="w-20">Total</th>
                       <th className="w-14">%</th>
                       <th className="w-16">Grade</th>
                       <th className="w-8"></th>
@@ -167,6 +170,16 @@ function SubjectRow({ subject }: { subject: Subject }) {
         <td className="font-mono text-xs">{subject.code}</td>
         <td>{subject.name}</td>
         <td className="tabular-nums">{subject.credits}</td>
+        {/* The components sit in the row rather than behind the expander: a
+            student checking a marksheet wants ISA and MSE at a glance, and
+            opening every subject to find them was the slow way round. */}
+        <Cell value={subject.marks.isa} max={subject.course.maxIsa} />
+        <Cell
+          value={hasMse ? c.finalMse : null}
+          max={subject.course.maxMse}
+          absent={!hasMse}
+        />
+        <Cell value={subject.marks.ese} max={subject.course.maxEse} />
         <td className="tabular-nums">
           {c.percentage == null ? "—" : `${c.total}/${subject.course.maxTotal}`}
         </td>
@@ -189,7 +202,7 @@ function SubjectRow({ subject }: { subject: Subject }) {
 
       {open && (
         <tr className="bg-muted/30">
-          <td colSpan={7} className="px-2 py-3">
+          <td colSpan={10} className="px-2 py-3">
             <div className="flex flex-wrap items-start gap-6 text-xs">
               <Part
                 label="ISA"
@@ -299,5 +312,39 @@ function AwaitingPublication({
         ))}
       </ul>
     </div>
+  )
+}
+
+/**
+ * One component's mark against its maximum.
+ *
+ * A blank is not a zero: "not entered" and "scored nothing" look identical as a
+ * bare 0, and a student reading their own marksheet must be able to tell them
+ * apart. A component the course does not have shows as a dash rather than an
+ * empty gap that reads like missing data.
+ */
+function Cell({
+  value,
+  max,
+  absent,
+}: {
+  value: number | null
+  max: number
+  absent?: boolean
+}) {
+  if (absent) {
+    return <td className="text-muted-foreground text-xs">—</td>
+  }
+  return (
+    <td className="tabular-nums">
+      {value == null ? (
+        <span className="text-muted-foreground text-xs">not entered</span>
+      ) : (
+        <>
+          {value}
+          <span className="text-muted-foreground text-xs">/{max}</span>
+        </>
+      )}
+    </td>
   )
 }
