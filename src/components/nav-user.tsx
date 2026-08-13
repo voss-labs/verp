@@ -111,6 +111,7 @@ export function NavUser({
               */}
               <DropdownMenuItem
                 render={
+                  // eslint-disable-next-line jsx-a11y/control-has-associated-label -- the link's text is this item's children, one level out
                   <a
                     href="https://accounts.vosslabs.org/account"
                     target="_blank"

@@ -115,7 +115,9 @@ export function MyMarksClient({
                       <th className="w-20">Total</th>
                       <th className="w-14">%</th>
                       <th className="w-16">Grade</th>
-                      <th className="w-8"></th>
+                      <th className="w-8">
+                        <span className="sr-only">Expand</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-border divide-y">
@@ -175,9 +177,27 @@ function SubjectRow({ subject }: { subject: Subject }) {
       <tr
         className={cn(
           "[&>td]:px-2 [&>td]:py-1.5",
-          entered && "hover:bg-muted/50 cursor-pointer"
+          entered &&
+            "hover:bg-muted/50 focus-visible:ring-ring cursor-pointer focus-visible:ring-2 focus-visible:outline-none"
         )}
-        onClick={() => entered && setOpen((o) => !o)}
+        // A student reading their own marks may well be doing it by keyboard or
+        // screen reader, so the expander cannot be pointer-only. aria-expanded
+        // is what announces that the row has more behind it — the ▸ glyph says
+        // that to sighted users and nothing to anyone else.
+        {...(entered
+          ? {
+              role: "button" as const,
+              tabIndex: 0,
+              "aria-expanded": open,
+              onClick: () => setOpen((o) => !o),
+              onKeyDown: (e: React.KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  setOpen((o) => !o)
+                }
+              },
+            }
+          : {})}
       >
         <td className="font-mono text-xs">{subject.code}</td>
         <td>{subject.name}</td>
@@ -193,7 +213,7 @@ function SubjectRow({ subject }: { subject: Subject }) {
         />
         <Cell value={subject.marks.ese} max={subject.course.maxEse} />
         <SubjectResultCells marks={subject.marks} course={subject.course} />
-        <td className="text-muted-foreground text-xs">
+        <td className="text-muted-foreground text-xs" aria-hidden="true">
           {entered ? (open ? "▾" : "▸") : ""}
         </td>
       </tr>

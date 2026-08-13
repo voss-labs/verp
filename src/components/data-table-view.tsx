@@ -125,17 +125,16 @@ export function DataTableView<TData, TValue>({
       ),
       cell: ({ row }) => (
         // The checkbox lives inside a row that may itself be clickable, so it
-        // has to keep its click: selecting a record must not also open it.
-        <span
+        // has to keep its own click and key: selecting a record must not also
+        // open it. Held on the control rather than a wrapper, which would be a
+        // span nothing can reach carrying handlers it does not own.
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(v) => row.toggleSelected(!!v)}
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
-        >
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(v) => row.toggleSelected(!!v)}
-            aria-label="Select row"
-          />
-        </span>
+          aria-label="Select row"
+        />
       ),
     }
     return [selectCol, ...columns]
@@ -401,17 +400,14 @@ export function DataTableView<TData, TValue>({
                   }
                 >
                   {selectable && (
-                    <span
-                      className="pt-0.5"
+                    <Checkbox
+                      className="mt-0.5"
+                      checked={row.getIsSelected()}
+                      onCheckedChange={(v) => row.toggleSelected(!!v)}
                       onClick={(e) => e.stopPropagation()}
                       onKeyDown={(e) => e.stopPropagation()}
-                    >
-                      <Checkbox
-                        checked={row.getIsSelected()}
-                        onCheckedChange={(v) => row.toggleSelected(!!v)}
-                        aria-label="Select record"
-                      />
-                    </span>
+                      aria-label="Select record"
+                    />
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{r.title}</p>

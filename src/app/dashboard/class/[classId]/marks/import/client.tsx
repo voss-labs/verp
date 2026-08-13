@@ -121,13 +121,14 @@ export function ImportClient({
     <div className="flex flex-col gap-5">
       {/* Step 1 — upload */}
       <div className="border-border flex flex-wrap items-end gap-3 rounded border p-4">
-        <div className="grid gap-1.5">
-          <label className="text-muted-foreground text-xs">
+        <label className="grid gap-1.5">
+          <span className="text-muted-foreground text-xs">
             Marksheet file (PDF or Excel)
-          </label>
+          </span>
           <input
             ref={fileRef}
             type="file"
+            aria-label="Marksheet file (PDF or Excel)"
             accept=".pdf,.xlsx,.xls"
             onChange={(e) => {
               setFile(e.target.files?.[0] ?? null)
@@ -135,7 +136,7 @@ export function ImportClient({
             }}
             className="file:border-border file:bg-muted text-sm file:mr-3 file:rounded file:border file:px-3 file:py-1.5 file:text-sm"
           />
-        </div>
+        </label>
         <Button size="sm" disabled={!file || uploading} onClick={runPreview}>
           {uploading ? "Reading…" : "Preview"}
         </Button>
@@ -149,8 +150,8 @@ export function ImportClient({
         <>
           {/* Step 2 — map columns + pick subject */}
           <div className="border-border flex flex-col gap-4 rounded border p-4">
-            <div className="grid gap-1.5 sm:max-w-sm">
-              <label className="text-muted-foreground text-xs">Subject</label>
+            <label className="grid gap-1.5 sm:max-w-sm">
+              <span className="text-muted-foreground text-xs">Subject</span>
               {offerings.length === 0 ? (
                 <p className="text-muted-foreground text-sm">
                   No subjects yet.{" "}
@@ -176,7 +177,7 @@ export function ImportClient({
                   ))}
                 </select>
               )}
-            </div>
+            </label>
 
             <div>
               <p className="mb-2 text-sm font-medium">

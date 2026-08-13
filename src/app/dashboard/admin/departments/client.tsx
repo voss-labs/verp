@@ -86,24 +86,24 @@ export function DepartmentsClient({ departments }: { departments: Dept[] }) {
       )}
 
       <div className="flex flex-wrap items-end gap-2">
-        <div className="grid gap-1.5">
-          <label className="text-muted-foreground text-xs">Code</label>
+        <label className="grid gap-1.5">
+          <span className="text-muted-foreground text-xs">Code</span>
           <Input
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             placeholder="EXCS"
             className="h-9 w-28 font-mono uppercase"
           />
-        </div>
-        <div className="grid flex-1 gap-1.5">
-          <label className="text-muted-foreground text-xs">Name</label>
+        </label>
+        <label className="grid flex-1 gap-1.5">
+          <span className="text-muted-foreground text-xs">Name</span>
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Electronics & Computer Science"
             className="h-9"
           />
-        </div>
+        </label>
         <Button
           disabled={pending || !code || !name}
           onClick={() => create(code, name)}

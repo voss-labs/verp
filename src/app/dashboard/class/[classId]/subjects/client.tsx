@@ -215,21 +215,19 @@ export function SubjectsClient({
           ) : (
             <>
               <div className="flex items-end gap-2">
-                <div className="grid flex-1 gap-1.5">
-                  <label className="text-muted-foreground text-xs">
-                    Search
-                  </label>
+                <label className="grid flex-1 gap-1.5">
+                  <span className="text-muted-foreground text-xs">Search</span>
                   <Input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Code or name…"
                     className="h-9"
                   />
-                </div>
-                <div className="grid w-28 gap-1.5">
-                  <label className="text-muted-foreground text-xs">
+                </label>
+                <label className="grid w-28 gap-1.5">
+                  <span className="text-muted-foreground text-xs">
                     Semester
-                  </label>
+                  </span>
                   <select
                     value={semester}
                     onChange={(e) => setSemester(Number(e.target.value))}
@@ -241,7 +239,7 @@ export function SubjectsClient({
                       </option>
                     ))}
                   </select>
-                </div>
+                </label>
               </div>
 
               <div className="border-border divide-border max-h-[28rem] divide-y overflow-y-auto rounded border">

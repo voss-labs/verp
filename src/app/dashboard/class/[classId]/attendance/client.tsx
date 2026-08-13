@@ -112,17 +112,17 @@ export function AttendanceClient({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="grid gap-1.5">
-          <label className="text-muted-foreground text-xs">Date</label>
+        <label className="grid gap-1.5">
+          <span className="text-muted-foreground text-xs">Date</span>
           <Input
             type="date"
             value={date}
             onChange={(e) => e.target.value && go({ date: e.target.value })}
             className="h-9 w-44"
           />
-        </div>
-        <div className="grid gap-1.5">
-          <label className="text-muted-foreground text-xs">Session</label>
+        </label>
+        <label className="grid gap-1.5">
+          <span className="text-muted-foreground text-xs">Session</span>
           <select
             value={offeringId ?? ""}
             onChange={(e) => go({ offering: e.target.value || null })}
@@ -137,7 +137,7 @@ export function AttendanceClient({
               </option>
             ))}
           </select>
-        </div>
+        </label>
         <div className="flex w-full items-center gap-2 sm:w-auto">
           <Button
             variant="outline"

@@ -250,8 +250,8 @@ function CreateClass({
 
   return (
     <div className="border-border bg-muted/30 flex flex-wrap items-end gap-2 rounded-xl border p-3">
-      <div className="grid gap-1.5">
-        <label className="text-muted-foreground text-xs">Admission year</label>
+      <label className="grid gap-1.5">
+        <span className="text-muted-foreground text-xs">Admission year</span>
         <Input
           value={year}
           onChange={(e) => setYear(e.target.value.replace(/\D/g, ""))}
@@ -260,9 +260,9 @@ function CreateClass({
           maxLength={4}
           className="h-9 w-28"
         />
-      </div>
-      <div className="grid gap-1.5">
-        <label className="text-muted-foreground text-xs">Division</label>
+      </label>
+      <label className="grid gap-1.5">
+        <span className="text-muted-foreground text-xs">Division</span>
         <Select value={division} onValueChange={(v) => v && setDivision(v)}>
           <SelectTrigger className="h-9 w-24">
             <SelectValue />
@@ -275,7 +275,7 @@ function CreateClass({
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </label>
       <Button
         className="h-9"
         disabled={disabled || year.length !== 4}
@@ -314,8 +314,16 @@ function AddDeptFaculty({
   return (
     <div className="border-border bg-muted/30 flex flex-wrap items-end gap-2 rounded-xl border p-3">
       <div className="grid gap-1.5">
-        <label className="text-muted-foreground text-xs">Add faculty</label>
-        <div className="flex flex-wrap gap-2">
+        {/* A heading over four inputs, not a label for one of them. Each input
+            names itself with its placeholder; this names the set. */}
+        <span id="add-faculty-label" className="text-muted-foreground text-xs">
+          Add faculty
+        </span>
+        <div
+          role="group"
+          aria-labelledby="add-faculty-label"
+          className="flex flex-wrap gap-2"
+        >
           <Input
             placeholder="First name"
             value={f.firstName}

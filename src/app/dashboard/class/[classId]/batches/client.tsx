@@ -104,15 +104,15 @@ export function BatchesClient({
       </div>
 
       <div className="flex flex-wrap items-end gap-2">
-        <div className="grid gap-1.5">
-          <label className="text-muted-foreground text-xs">New batch</label>
+        <label className="grid gap-1.5">
+          <span className="text-muted-foreground text-xs">New batch</span>
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="B1"
             className="h-9 w-32"
           />
-        </div>
+        </label>
         <Button size="sm" disabled={pending || !name.trim()} onClick={addBatch}>
           Add batch
         </Button>
