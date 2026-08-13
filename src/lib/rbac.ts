@@ -179,6 +179,19 @@ export const ROLE_DEFAULTS: Record<
     "onboarding:read",
     "attendance:read",
     "marks:read",
+    // Cover authority. An HOD does not routinely enter marks or take a
+    // register — allocation is their job — but when a teacher is absent
+    // mid-term somebody senior has to be able to finish the work, and the
+    // department head is who the college holds responsible for it.
+    //
+    // This was previously read-only, which left the product contradicting
+    // itself: allocation.ts already let an HOD write any subject in their
+    // department, the Subjects page told users "Coordinators and the HOD can
+    // write any of them", and the capability table then redirected them away.
+    // Scope still bounds it to their own department.
+    "attendance:write",
+    "marks:write",
+    "marks:lock",
   ],
   faculty: [
     "class:read",
