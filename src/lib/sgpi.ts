@@ -190,3 +190,30 @@ export function groupBySemester(
     entries,
   }))
 }
+
+/**
+ * How far along a subject's marking is.
+ *
+ * "Nothing entered yet" and "graded 0" are different facts, and a bare dash
+ * says neither. The distinction has to exist in one place because three screens
+ * render it: a student reading their own marksheet, a coordinator scanning a
+ * results table, and the overview counting what is outstanding. Deriving it
+ * separately in each is how they came to disagree — the dashboard showed 0/75
+ * for the subject My marks showed as a dash.
+ *
+ * "partial" carries a real total, but a provisional one: the two MSEs average
+ * into a single component only once both exist, so a subject with one MSE in
+ * genuinely sums lower than the student has scored. That total is worth showing
+ * and must never be shown unlabelled.
+ */
+export type MarksState = "empty" | "partial" | "graded"
+
+export function marksState(marks: MarksInput, course: CourseInfo): MarksState {
+  if (computeMarks(marks, course).gradePoint != null) return "graded"
+  const entered =
+    marks.isa != null ||
+    marks.mse1 != null ||
+    marks.mse2 != null ||
+    marks.ese != null
+  return entered ? "partial" : "empty"
+}

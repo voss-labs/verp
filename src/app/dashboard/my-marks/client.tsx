@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { computeMarks, type CgpaResult, type CourseInfo } from "@/lib/sgpi"
+import { SubjectResultCells } from "@/components/subject-result"
 
 type Subject = {
   code: string
@@ -191,21 +192,7 @@ function SubjectRow({ subject }: { subject: Subject }) {
           absent={!hasMse}
         />
         <Cell value={subject.marks.ese} max={subject.course.maxEse} />
-        <td className="tabular-nums">
-          {c.percentage == null ? "—" : `${c.total}/${subject.course.maxTotal}`}
-        </td>
-        <td className="text-muted-foreground tabular-nums">
-          {c.percentage ?? "—"}
-        </td>
-        <td>
-          {c.gradePoint == null ? (
-            <span className="text-muted-foreground">—</span>
-          ) : c.gradePoint === "Fail" ? (
-            <Badge variant="destructive">Fail</Badge>
-          ) : (
-            <Badge variant="outline">{c.gradePoint}</Badge>
-          )}
-        </td>
+        <SubjectResultCells marks={subject.marks} course={subject.course} />
         <td className="text-muted-foreground text-xs">
           {entered ? (open ? "▾" : "▸") : ""}
         </td>
