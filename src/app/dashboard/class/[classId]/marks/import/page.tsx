@@ -27,7 +27,16 @@ export default async function MarksImportPage({
     (user.tier === "hod" && user.deptCodes.includes(cls.departmentCode))
   if (!inScope) redirect("/dashboard/class")
 
-  const offerings = await listOfferingsForClass(classId)
+  // Same rule as the marks grid: a coordinator or HOD runs the whole timetable,
+  // a TR gets the subjects handed to them. Offering the rest would let someone
+  // do the work of a full import before being told the subject is not theirs.
+  const canAllocate =
+    user.tier === "super_admin" ||
+    (user.tier === "hod" && user.deptCodes.includes(cls.departmentCode)) ||
+    user.coordinatorClassIds.includes(classId)
+  const offerings = canAllocate
+    ? await listOfferingsForClass(classId)
+    : await listOfferingsForClass(classId, user.facultyId ?? undefined)
   const yr = expectedYear(cls.admissionYear, new Date()) ?? cls.admissionYear
   const label = `${yr} · ${cls.departmentCode} · ${cls.division}`
 

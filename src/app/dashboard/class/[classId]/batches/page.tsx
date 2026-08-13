@@ -34,9 +34,18 @@ export default async function BatchesPage({
 
   // Batches only make sense for a lab: a theory lecture is delivered to the
   // whole division at once, so splitting it would be an empty ceremony.
-  const offerings = (await listOfferingsForClass(classId)).filter(
-    (o) => o.course.courseType !== "theory"
-  )
+  // Same rule as the marks grid: a coordinator or HOD runs the whole timetable,
+  // a TR gets the subjects handed to them. Offering the rest would let someone
+  // do the work of a full import before being told the subject is not theirs.
+  const canAllocate =
+    user.tier === "super_admin" ||
+    (user.tier === "hod" && user.deptCodes.includes(cls.departmentCode)) ||
+    user.coordinatorClassIds.includes(classId)
+  const offerings = (
+    canAllocate
+      ? await listOfferingsForClass(classId)
+      : await listOfferingsForClass(classId, user.facultyId ?? undefined)
+  ).filter((o) => o.course.courseType !== "theory")
   const selected = offeringId
     ? offerings.find((o) => o.id === offeringId)
     : offerings[0]
