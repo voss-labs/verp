@@ -44,6 +44,7 @@ const adminNav = [
     icon: <Building2Icon />,
     items: [
       { title: "Classes", url: "/dashboard/dept" },
+      { title: "Appoint faculty", url: "/dashboard/dept/appoint" },
       { title: "Course catalogue", url: "/dashboard/dept/courses" },
     ],
   },
@@ -98,6 +99,7 @@ const superAdminNav = [
     // is the way in, since the nav cannot know the codes without a fetch.
     items: [
       { title: "All departments", url: "/dashboard/dept" },
+      { title: "Appoint faculty", url: "/dashboard/dept/appoint" },
       { title: "Course catalogue", url: "/dashboard/dept/courses" },
     ],
   },
