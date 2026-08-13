@@ -53,7 +53,13 @@ interface DataTableViewProps<TData, TValue> {
   // Dropdown filters built from the values actually present in the data.
   // Counts come from TanStack's faceted row model, so no extra queries are
   // needed and the numbers always match what the table is showing.
-  facets?: { columnId: string; label: string }[]
+  // format turns a stored value into what a person calls it: the column holds
+  // "super_admin", the filter has to offer "Super-admin".
+  facets?: {
+    columnId: string
+    label: string
+    format?: (value: string) => string
+  }[]
   exportConfig?: {
     filename: string
     onExport: (data: TData[], format: "csv" | "xlsx") => Promise<void>
@@ -63,6 +69,18 @@ interface DataTableViewProps<TData, TValue> {
   // checkbox column.
   rowId?: (row: TData) => string
   bulkBar?: (ids: string[], clear: () => void) => React.ReactNode
+  // Opening a record. A drawer keeps the list, its filters and its scroll
+  // position behind it, so comparing two records is two clicks rather than
+  // four page loads.
+  onRowClick?: (row: TData) => void
+  // How one record reads when there is no room for a table. A phone cannot
+  // show eight columns, and a horizontally scrolling table hides the columns
+  // that matter behind the ones that do not.
+  mobileRow?: (row: TData) => {
+    title: React.ReactNode
+    subtitle?: React.ReactNode
+    meta?: { label: string; value: React.ReactNode }[]
+  }
 }
 
 export function DataTableView<TData, TValue>({
@@ -75,6 +93,8 @@ export function DataTableView<TData, TValue>({
   exportConfig,
   rowId,
   bulkBar,
+  onRowClick,
+  mobileRow,
 }: DataTableViewProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -99,11 +119,18 @@ export function DataTableView<TData, TValue>({
         />
       ),
       cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(v) => row.toggleSelected(!!v)}
-          aria-label="Select row"
-        />
+        // The checkbox lives inside a row that may itself be clickable, so it
+        // has to keep its click: selecting a record must not also open it.
+        <span
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(v) => row.toggleSelected(!!v)}
+            aria-label="Select row"
+          />
+        </span>
       ),
     }
     return [selectCol, ...columns]
@@ -138,6 +165,25 @@ export function DataTableView<TData, TValue>({
     globalFilterFn: "includesString",
     state: { sorting, columnFilters, globalFilter, rowSelection },
   })
+
+  // A row that opens a record has to be operable without a pointer. Giving it
+  // the button role and Enter/Space rather than a nested <button> keeps the
+  // cells' own links and checkboxes working, which a wrapping button would
+  // swallow.
+  const rowHandlers = (row: TData) =>
+    onRowClick
+      ? {
+          role: "button" as const,
+          tabIndex: 0,
+          onClick: () => onRowClick(row),
+          onKeyDown: (e: React.KeyboardEvent) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              onRowClick(row)
+            }
+          },
+        }
+      : {}
 
   const showSearch = Boolean(globalSearch || searchKey)
   const selectedIds = table.getSelectedRowModel().rows.map((r) => r.id)
@@ -186,6 +232,7 @@ export function DataTableView<TData, TValue>({
                 .sort((a, b) => String(a).localeCompare(String(b)))
               if (options.length === 0) return null
               const value = (column.getFilterValue() as string) ?? ALL
+              const label = facet.format ?? ((v: string) => v)
 
               return (
                 <Select
@@ -205,7 +252,7 @@ export function DataTableView<TData, TValue>({
                     <span className="truncate">
                       {value === ALL
                         ? `All ${facet.label.toLowerCase()}`
-                        : `${value} (${counts.get(value) ?? 0})`}
+                        : `${label(value)} (${counts.get(value) ?? 0})`}
                     </span>
                   </SelectTrigger>
                   <SelectContent>
@@ -214,7 +261,7 @@ export function DataTableView<TData, TValue>({
                     </SelectItem>
                     {options.map((option) => (
                       <SelectItem key={option} value={option}>
-                        {option} ({counts.get(option)})
+                        {label(option)} ({counts.get(option)})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -270,7 +317,13 @@ export function DataTableView<TData, TValue>({
           </div>
         </div>
       )}
-      <div className="bg-card rounded-lg border">
+      <div
+        className={
+          mobileRow
+            ? "bg-card hidden rounded-lg border sm:block"
+            : "bg-card overflow-x-auto rounded-lg border"
+        }
+      >
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -291,7 +344,15 @@ export function DataTableView<TData, TValue>({
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow
+                  key={row.id}
+                  {...rowHandlers(row.original)}
+                  className={
+                    onRowClick
+                      ? "focus-visible:ring-ring cursor-pointer focus-visible:ring-2 focus-visible:outline-none"
+                      : undefined
+                  }
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(
@@ -315,6 +376,62 @@ export function DataTableView<TData, TValue>({
           </TableBody>
         </Table>
       </div>
+      {mobileRow && (
+        <div className="flex flex-col gap-2 sm:hidden">
+          {table.getRowModel().rows.length === 0 ? (
+            <p className="text-muted-foreground py-8 text-center text-sm">
+              No results.
+            </p>
+          ) : (
+            table.getRowModel().rows.map((row) => {
+              const r = mobileRow(row.original)
+              return (
+                <div
+                  key={row.id}
+                  {...rowHandlers(row.original)}
+                  className={
+                    onRowClick
+                      ? "bg-card focus-visible:ring-ring flex items-start gap-3 rounded-lg border p-3 focus-visible:ring-2 focus-visible:outline-none"
+                      : "bg-card flex items-start gap-3 rounded-lg border p-3"
+                  }
+                >
+                  {selectable && (
+                    <span
+                      className="pt-0.5"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      <Checkbox
+                        checked={row.getIsSelected()}
+                        onCheckedChange={(v) => row.toggleSelected(!!v)}
+                        aria-label="Select record"
+                      />
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{r.title}</p>
+                    {r.subtitle && (
+                      <p className="text-muted-foreground truncate text-xs">
+                        {r.subtitle}
+                      </p>
+                    )}
+                    {r.meta && r.meta.length > 0 && (
+                      <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                        {r.meta.map((m) => (
+                          <div key={m.label} className="flex gap-1.5 text-xs">
+                            <dt className="text-muted-foreground">{m.label}</dt>
+                            <dd>{m.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    )}
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <p className="text-muted-foreground text-xs font-medium tabular-nums">
           {table.getFilteredRowModel().rows.length} record(s)

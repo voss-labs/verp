@@ -1,8 +1,11 @@
 "use client"
 
+import { useState } from "react"
 import { DataTableView } from "@/components/data-table-view"
+import { RecordDrawer } from "@/components/record-drawer"
 import {
   facultyColumns,
+  ROLE_LABEL,
   type FacultyRow,
 } from "@/components/columns/faculty-columns"
 
@@ -10,6 +13,8 @@ import { exportTableCsv, exportTableXlsx } from "@/lib/xlsx-export"
 import { downloadBase64File } from "@/lib/utils"
 
 export function FacultyClient({ data }: { data: FacultyRow[] }) {
+  const [open, setOpen] = useState<FacultyRow | null>(null)
+
   const handleExport = async (
     filteredData: FacultyRow[],
     format: "csv" | "xlsx"
@@ -54,15 +59,65 @@ export function FacultyClient({ data }: { data: FacultyRow[] }) {
     }
   }
   return (
-    <DataTableView
-      columns={facultyColumns}
-      data={data}
-      globalSearch
-      searchPlaceholder="Search faculty..."
-      exportConfig={{
-        filename: "Faculty",
-        onExport: handleExport,
-      }}
-    />
+    <>
+      <DataTableView
+        columns={facultyColumns}
+        data={data}
+        globalSearch
+        searchPlaceholder="Search faculty..."
+        facets={[
+          { columnId: "department", label: "Department" },
+          {
+            columnId: "role",
+            label: "Role",
+            format: (v) => ROLE_LABEL[v as FacultyRow["role"]] ?? v,
+          },
+        ]}
+        exportConfig={{
+          filename: "Faculty",
+          onExport: handleExport,
+        }}
+        onRowClick={setOpen}
+        mobileRow={(f) => ({
+          title: `${f.firstName} ${f.lastName}`.trim(),
+          subtitle: f.email,
+          meta: [
+            { label: "ID", value: f.employeeId },
+            { label: "Dept", value: f.department },
+            { label: "Role", value: ROLE_LABEL[f.role] },
+          ],
+        })}
+      />
+
+      <RecordDrawer
+        open={open !== null}
+        onClose={() => setOpen(null)}
+        title={open ? `${open.firstName} ${open.lastName}`.trim() : ""}
+        subtitle={open?.email}
+        badges={
+          open
+            ? [
+                { label: ROLE_LABEL[open.role] },
+                ...(open.isActive
+                  ? []
+                  : [{ label: "Inactive", tone: "critical" as const }]),
+              ]
+            : undefined
+        }
+        facts={
+          open
+            ? [
+                { label: "Employee ID", value: open.employeeId, mono: true },
+                { label: "Department", value: open.department },
+                { label: "Role", value: ROLE_LABEL[open.role] },
+                {
+                  label: "Status",
+                  value: open.isActive ? "Active" : "Inactive",
+                },
+              ]
+            : undefined
+        }
+      />
+    </>
   )
 }
