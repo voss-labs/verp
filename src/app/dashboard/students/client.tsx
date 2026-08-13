@@ -14,6 +14,7 @@ import Link from "next/link"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Trash2Icon, UploadIcon } from "lucide-react"
 import { RecordDrawer } from "@/components/record-drawer"
+import { RecordHistory } from "@/components/record-history"
 import { bulkDeactivateStudentsAction } from "./actions"
 
 export function StudentsClient({
@@ -185,7 +186,9 @@ export function StudentsClient({
             </Link>
           )
         }
-      />
+      >
+        <RecordHistory targetType="student" targetId={open?.id ?? null} />
+      </RecordDrawer>
     </>
   )
 }

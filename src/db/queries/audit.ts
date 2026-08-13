@@ -68,3 +68,37 @@ export async function getAuditActionTypes() {
     .orderBy(auditLogs.action)
   return rows.map((r) => r.action)
 }
+
+/**
+ * Recent events about one record, for the contextual history in a drawer
+ * (spec 5.4).
+ *
+ * Keyed on (targetType, targetId), which idx_audit_logs_target already covers.
+ * Bulk actions are logged against the plural type with no targetId — a roster
+ * import is an event about the import, not about each of two hundred students —
+ * so they correctly do not surface here.
+ */
+export async function getRecordHistory(
+  targetType: string,
+  targetId: string,
+  limit = 10
+) {
+  return db
+    .select({
+      id: auditLogs.id,
+      action: auditLogs.action,
+      actorName: user.name,
+      details: auditLogs.details,
+      createdAt: auditLogs.createdAt,
+    })
+    .from(auditLogs)
+    .leftJoin(user, eq(auditLogs.actorId, user.id))
+    .where(
+      and(
+        eq(auditLogs.targetType, targetType),
+        eq(auditLogs.targetId, targetId)
+      )
+    )
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(limit)
+}
