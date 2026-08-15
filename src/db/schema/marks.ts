@@ -7,7 +7,9 @@ import {
   timestamp,
   index,
   unique,
+  check,
 } from "drizzle-orm/pg-core"
+import { sql } from "drizzle-orm"
 import { courseOfferings } from "./offerings"
 import { students } from "./students"
 import { faculty } from "./faculty"
@@ -43,6 +45,14 @@ export const marks = pgTable(
   (t) => [
     unique("marks_offering_student_uniq").on(t.courseOfferingId, t.studentId),
     index("marks_student_idx").on(t.studentId),
+    // The per-course maxima live on `courses`, so the database cannot check an
+    // upper bound from here — the application does that. Non-negativity holds
+    // for every component of every course, and it is the half that stops a
+    // crafted write from quietly poisoning an average.
+    check("marks_isa_non_negative", sql`${t.isa} IS NULL OR ${t.isa} >= 0`),
+    check("marks_mse1_non_negative", sql`${t.mse1} IS NULL OR ${t.mse1} >= 0`),
+    check("marks_mse2_non_negative", sql`${t.mse2} IS NULL OR ${t.mse2} >= 0`),
+    check("marks_ese_non_negative", sql`${t.ese} IS NULL OR ${t.ese} >= 0`),
   ]
 )
 

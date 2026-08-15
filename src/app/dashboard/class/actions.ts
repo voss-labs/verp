@@ -4,6 +4,13 @@ import { revalidatePath } from "next/cache"
 import { getSessionUser, type SessionUser } from "@/lib/session"
 import { authorize } from "@/lib/rbac"
 import { studentsInClass } from "@/lib/scope"
+import {
+  type Component,
+  incompleteMessage,
+  incompleteStudents,
+  requiredComponents,
+  validateMarks,
+} from "@/lib/marks-integrity"
 import { canAllocate, canReopenLock, canWriteOffering } from "@/lib/allocation"
 import { getErrorMessage } from "@/lib/error-utils"
 import { parseRollNumber, expectedYear } from "@/lib/roll-number"
@@ -70,6 +77,15 @@ export async function approveEnrollmentAction(input: {
 
     const { ok, cls } = await classInScope(user!, req.classId)
     if (!ok || !cls) return { error: "That class is not in your scope." }
+    // Admitting somebody to a class is governance, not teaching. Every teacher
+    // assigned to the class held this, so any of them could admit a student to
+    // a cohort they do not run.
+    if (!canAllocate(user!, req.classId, cls.departmentCode)) {
+      return {
+        error:
+          "Only the class coordinator, the HOD, or an admin can decide enrolment requests.",
+      }
+    }
 
     if (await getStudentByRollNumber(req.rollNumber)) {
       await updateRequest(req.id, {
@@ -128,7 +144,14 @@ export async function rejectEnrollmentAction(input: {
       return { error: "This request is not pending." }
     if (!req.classId) return { error: "This request is not routed to a class." }
 
-    const { ok } = await classInScope(user!, req.classId)
+    const { ok, cls } = await classInScope(user!, req.classId)
+    if (!cls) return { error: "That class is not in your scope." }
+    if (!canAllocate(user!, req.classId, cls.departmentCode)) {
+      return {
+        error:
+          "Only the class coordinator, the HOD, or an admin can decide enrolment requests.",
+      }
+    }
     if (!ok) return { error: "That class is not in your scope." }
 
     const reason = input.reason.trim() || "Not recognised for this class"
@@ -187,6 +210,19 @@ export async function saveAttendanceAction(input: {
       const offering = await getOfferingById(offeringId)
       if (!offering || offering.classId !== input.classId)
         return { error: "That subject is not taught in this class." }
+      // Belonging to the class is not enough. A subject register is that
+      // teacher's record of their own lecture; a colleague filling it in is the
+      // same mistake as entering their marks, and the same rule settles it.
+      if (
+        !canWriteOffering(
+          user!,
+          offering.facultyId,
+          input.classId,
+          cls.departmentCode
+        )
+      ) {
+        return { error: "That subject is allocated to another teacher." }
+      }
     }
 
     const entries = input.marks.map((m) => ({
@@ -333,6 +369,13 @@ export async function saveMarksAction(input: {
     )
     if (!scope.ok) return { error: scope.reason }
 
+    // The number inputs carry min/max, but that is a courtesy to whoever is
+    // typing. This is the guarantee: a crafted request previously stored a
+    // negative mark, or one above the component maximum, and every average
+    // computed from it downstream was silently wrong.
+    const valid = validateMarks(input.rows, offering.course)
+    if (!valid.ok) return { error: valid.reason }
+
     const lockRows = await getLockedComponents(input.offeringId)
     const locked = lockRows.map((l) => l.component)
     const rows = input.rows.map((r) => ({
@@ -385,6 +428,31 @@ export async function saveMarksAction(input: {
  * acted on. A TR who spots a typo asks the coordinator; that conversation is the
  * point, not an obstacle.
  */
+/**
+ * Roster-wide completeness for an offering.
+ *
+ * Asked of the roster, not of the marks table. Counting rows in `marks` answers
+ * "how many students has somebody touched", and the question that decides
+ * whether a result may be frozen or shown is "is anybody still unmarked".
+ */
+async function rosterIncomplete(
+  offeringId: string,
+  classKey: string,
+  course: { maxIsa: number; maxMse: number; maxEse: number },
+  components: Component[]
+) {
+  const [roster, existing] = await Promise.all([
+    getStudentsByClassKeys([classKey]),
+    getMarksForOffering(offeringId),
+  ])
+  const byStudent = new Map(existing.map((m) => [m.studentId, m]))
+  return incompleteStudents(
+    roster.map((r) => r.id),
+    byStudent,
+    components
+  )
+}
+
 export async function setMarksLockAction(input: {
   offeringId: string
   component: string
@@ -402,6 +470,36 @@ export async function setMarksLockAction(input: {
     if (!offering) return { error: "No such subject." }
     const { ok, cls } = await classInScope(user!, offering.classId)
     if (!ok || !cls) return { error: "That class is not in your scope." }
+
+    // Freezing somebody else's subject is a write to it. This checked class
+    // membership only, so any teacher on the class could submit a colleague's
+    // marks on their behalf — the one thing locking is supposed to make
+    // unambiguous.
+    if (
+      !canWriteOffering(
+        user!,
+        offering.facultyId,
+        offering.classId,
+        cls.departmentCode
+      )
+    ) {
+      return { error: "That subject is allocated to another teacher." }
+    }
+
+    if (input.locked) {
+      // Locking says "these figures are final". It cannot be true of a
+      // component nobody has entered — and once locked, publication accepted
+      // it, so a blank register reached students as a completed result.
+      const missing = await rosterIncomplete(
+        input.offeringId,
+        cls.classKey,
+        offering.course,
+        [component]
+      )
+      if (missing.length > 0) {
+        return { error: incompleteMessage(missing, "Lock") }
+      }
+    }
 
     if (!input.locked) {
       const held = (await getLockedComponents(input.offeringId)).find(
@@ -657,8 +755,7 @@ export async function setPublishedAction(input: {
     }
 
     if (input.published) {
-      const required: LockComponent[] =
-        offering.course.maxMse > 0 ? ["isa", "mse", "ese"] : ["isa", "ese"]
+      const required = requiredComponents(offering.course)
       const locked = (await getLockedComponents(input.offeringId)).map(
         (l) => l.component
       )
@@ -667,6 +764,20 @@ export async function setPublishedAction(input: {
         return {
           error: `Lock ${open.join(", ").toUpperCase()} before publishing — publishing says these marks are final.`,
         }
+      }
+
+      // Checked again here rather than trusted from the locks. Locks predating
+      // this rule exist — the live EC33T offering was locked and published over
+      // an almost entirely blank register, and every student behind it was
+      // shown a finished semester worth zero credits.
+      const missing = await rosterIncomplete(
+        input.offeringId,
+        cls.classKey,
+        offering.course,
+        required
+      )
+      if (missing.length > 0) {
+        return { error: incompleteMessage(missing, "Publish") }
       }
     }
 
