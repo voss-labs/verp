@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/page-header"
-import { getSessionUser, isStaff } from "@/lib/session"
+import { getSessionUser } from "@/lib/session"
+import { can } from "@/lib/rbac"
 import { ImportClient } from "./client"
 
 export const dynamic = "force-dynamic"
@@ -9,7 +10,7 @@ export default async function ImportStudentsPage() {
   // Server-side guard. The API re-checks too — this just avoids rendering the
   // page for someone who can't use it.
   const user = await getSessionUser()
-  if (!isStaff(user)) redirect("/dashboard")
+  if (!user || !can(user, "student:update")) redirect("/dashboard")
 
   return (
     <>

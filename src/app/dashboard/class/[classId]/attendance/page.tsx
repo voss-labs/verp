@@ -9,6 +9,7 @@ import { getClassById } from "@/db/queries/classes"
 import { getStudentsByClassKeys } from "@/db/queries/students"
 import { listOfferingsForClass } from "@/db/queries/offerings"
 import { getAttendanceForSession } from "@/db/queries/attendance"
+import { canWriteOffering } from "@/lib/allocation"
 import { AttendanceClient } from "./client"
 
 type Status = "present" | "absent" | "late" | "excused"
@@ -50,11 +51,19 @@ export default async function AttendancePage({
   const slot = sp.slot || "1"
   const offeringId = sp.offering || null
 
-  const [students, existing, offerings] = await Promise.all([
+  const [students, existing, allOfferings] = await Promise.all([
     getStudentsByClassKeys([cls.classKey]),
     getAttendanceForSession(classId, date, slot, offeringId),
     listOfferingsForClass(classId),
   ])
+
+  // Offering every subject to every teacher on the class invited them to take a
+  // register they are not allowed to save — the action refuses it, so the only
+  // thing the extra options produced was a dead end. Coordinators, HODs and
+  // admins keep the full list: covering an absent colleague is their job.
+  const offerings = allOfferings.filter((o) =>
+    canWriteOffering(user, o.facultyId, classId, cls.departmentCode)
+  )
   const marked: Record<string, string> = {}
   for (const e of existing) marked[e.studentId] = e.status
 

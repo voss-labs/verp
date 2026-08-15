@@ -2,7 +2,8 @@ import { NextRequest } from "next/server"
 import ExcelJS from "exceljs"
 import { apiError, apiSuccess } from "@/lib/api-response"
 import { getErrorMessage } from "@/lib/error-utils"
-import { getSessionUser, isStaff } from "@/lib/session"
+import { getSessionUser } from "@/lib/session"
+import { can } from "@/lib/rbac"
 import {
   buildPreviewRows,
   detectHeaderRow,
@@ -34,7 +35,10 @@ export async function POST(req: NextRequest) {
     const user = await getSessionUser()
     // Faculty (TRs) run this, not just admins — uploading a division's roster is
     // the TR's job. isStaff is the allowlist; a roleless/student user is refused.
-    if (!isStaff(user)) return apiError("Forbidden", 403)
+    // Same capability the commit route requires. A preview reads the whole
+    // submitted sheet back to the caller, so gating it more loosely than the
+    // write would leak a roster to anyone with a staff account.
+    if (!user || !can(user, "student:update")) return apiError("Forbidden", 403)
 
     const form = await req.formData()
     const file = form.get("file")

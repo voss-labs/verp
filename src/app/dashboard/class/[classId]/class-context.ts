@@ -71,7 +71,10 @@ export function classTabs(
       href: `/dashboard/class/${classId}/subjects`,
     })
   }
-  if (can(user, "attendance:write") || can(user, "attendance:read")) {
+  // Write, not read. The destination is the register itself — an entry
+  // surface — and it redirects anyone without attendance:write, so offering it
+  // on read alone produced a tab that bounced you to the Overview.
+  if (can(user, "attendance:write")) {
     tabs.push({
       label: "Attendance",
       href: `/dashboard/class/${classId}/attendance`,

@@ -46,7 +46,12 @@ export function buildNavigation(ctx: NavContext): NavDomain[] {
   if (ctx.hasClasses || tier === "super_admin" || tier === "hod") {
     academics.push({ title: "Classes", url: "/dashboard/class" })
   }
-  if (can("course:read")) {
+  // The catalogue sits inside the department workspace, whose layout admits
+  // only an HOD or an admin. Offering it on course:read alone — which every
+  // teacher has — produced a link that bounced them to the Overview. A teacher
+  // still picks from the catalogue, on their class's Subjects page, which is
+  // where that choice belongs.
+  if (can("course:read") && (tier === "hod" || tier === "super_admin")) {
     academics.push({
       title: "Course catalogue",
       url: "/dashboard/dept/courses",

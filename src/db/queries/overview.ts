@@ -10,6 +10,8 @@
 
 import { and, eq, inArray, isNull, sql } from "drizzle-orm"
 import { db } from "@/db"
+import { completeCount } from "@/lib/marks-integrity"
+import type { MarksInput } from "@/lib/sgpi"
 import {
   classes,
   courseOfferings,
@@ -76,6 +78,9 @@ export async function getClassWork(
         facultyId: courseOfferings.facultyId,
         code: courses.courseCode,
         name: courses.courseName,
+        maxIsa: courses.maxIsa,
+        maxMse: courses.maxMse,
+        maxEse: courses.maxEse,
       })
       .from(courseOfferings)
       .innerJoin(courses, eq(courseOfferings.courseId, courses.id))
@@ -102,8 +107,10 @@ export async function getClassWork(
 
   const offeringIds = offerings.map((o) => o.id)
   const [rosterCounts, markCounts, todayMarked] = await Promise.all([
+    // Ids, not a count: completeness is asked per student, and the count falls
+    // out of the same rows.
     db
-      .select({ classKey: students.classKey, n: sql<number>`count(*)::int` })
+      .select({ id: students.id, classKey: students.classKey })
       .from(students)
       .where(
         and(
@@ -113,17 +120,24 @@ export async function getClassWork(
             rows.map((r) => r.classKey)
           )
         )
-      )
-      .groupBy(students.classKey),
+      ),
+    // Every mark for these offerings, not a count of rows. "89 of 89 entered"
+    // was reported for a register where almost every row was blank: a row is
+    // created the moment anybody touches a student, so counting rows answers
+    // "how many students has somebody opened" rather than "how many are
+    // marked".
     offeringIds.length
       ? db
           .select({
             offeringId: marksTable.courseOfferingId,
-            n: sql<number>`count(*)::int`,
+            studentId: marksTable.studentId,
+            isa: marksTable.isa,
+            mse1: marksTable.mse1,
+            mse2: marksTable.mse2,
+            ese: marksTable.ese,
           })
           .from(marksTable)
           .where(inArray(marksTable.courseOfferingId, offeringIds))
-          .groupBy(marksTable.courseOfferingId)
       : Promise.resolve([]),
     db
       .select({
@@ -144,10 +158,27 @@ export async function getClassWork(
     list: T[],
     pick: (t: T) => string | null
   ) => new Map(list.map((x) => [pick(x) ?? "", x.n]))
-  const roster = num(rosterCounts, (r) => r.classKey)
+  const rosterIds = new Map<string, string[]>()
+  for (const r of rosterCounts) {
+    const key = r.classKey ?? ""
+    const list = rosterIds.get(key) ?? []
+    list.push(r.id)
+    rosterIds.set(key, list)
+  }
   const marked = num(todayMarked, (r) => r.classId)
   const pending = num(requests, (r) => r.classId)
-  const entered = num(markCounts, (r) => r.offeringId)
+
+  // Marks grouped by offering, so completeness can be asked per student.
+  const marksByOffering = new Map<string, Map<string, MarksInput>>()
+  for (const m of markCounts) {
+    const key = m.offeringId ?? ""
+    let inner = marksByOffering.get(key)
+    if (!inner) {
+      inner = new Map()
+      marksByOffering.set(key, inner)
+    }
+    inner.set(m.studentId, m)
+  }
 
   return rows.map((c) => {
     const mine = offerings.filter(
@@ -168,14 +199,25 @@ export async function getClassWork(
       departmentCode: c.departmentCode,
       role:
         facultyId === null ? "admin" : isCoord ? "academic_coordinator" : "tr",
-      students: roster.get(c.classKey) ?? 0,
+      students: (rosterIds.get(c.classKey) ?? []).length,
       pendingRequests: pending.get(c.id) ?? 0,
       markedToday: marked.get(c.id) ?? 0,
       mySubjects: mine.map((o) => ({
         id: o.id,
         code: o.code,
         name: o.name,
-        entered: entered.get(o.id) ?? 0,
+        entered: completeCount(
+          rosterIds.get(c.classKey) ?? [],
+          marksByOffering.get(o.id) ?? new Map(),
+          {
+            courseType: "theory",
+            credits: 0,
+            maxIsa: o.maxIsa,
+            maxMse: o.maxMse,
+            maxEse: o.maxEse,
+            maxTotal: o.maxIsa + o.maxMse + o.maxEse,
+          }
+        ),
       })),
       unallocatedSubjects: offerings.filter(
         (o) => o.classId === c.id && o.facultyId === null

@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge"
 import { getSessionUser } from "@/lib/session"
 import { expectedYear } from "@/lib/roll-number"
 import { getClassesByIds } from "@/db/queries/onboarding"
+import { listClassesForDepts } from "@/db/queries/classes"
+import { listDepartments } from "@/db/queries/departments"
 
 export const dynamic = "force-dynamic"
 
@@ -12,7 +14,17 @@ export default async function ClassIndexPage() {
   const user = await getSessionUser()
   if (!user) redirect("/login")
 
-  const classes = await getClassesByIds(user.classIds)
+  // An HOD holds no class assignments — their scope is the department — so this
+  // listed nothing and told them to ask their HOD, which is themselves. A
+  // super-admin holds neither, and saw the same empty page.
+  const deptScope =
+    user.tier === "super_admin"
+      ? (await listDepartments()).filter((d) => d.isActive).map((d) => d.code)
+      : user.deptCodes
+  const classes =
+    user.tier === "hod" || user.tier === "super_admin"
+      ? await listClassesForDepts(deptScope)
+      : await getClassesByIds(user.classIds)
   const now = new Date()
 
   return (

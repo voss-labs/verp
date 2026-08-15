@@ -2,7 +2,8 @@ import { NextRequest } from "next/server"
 import { z } from "zod"
 import { apiError, apiSuccess } from "@/lib/api-response"
 import { getErrorMessage } from "@/lib/error-utils"
-import { getSessionUser, isStaff } from "@/lib/session"
+import { getSessionUser } from "@/lib/session"
+import { can } from "@/lib/rbac"
 import { rollsInScope } from "@/lib/scope"
 import { tryClassKeyFromRoll } from "@/lib/class-key"
 import { createStudent, createAuditLog } from "@/db/queries"
@@ -31,8 +32,11 @@ const importBodySchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const user = await getSessionUser()
-    // Faculty (TRs) commit their roster, not just admins.
-    if (!isStaff(user)) return apiError("Forbidden", 403)
+    // Creating student records is a student write, and saying so is the point:
+    // isStaff() let any staff account through regardless of what the permission
+    // model said about them, so revoking student:update in the console changed
+    // nothing here. Scope is still checked per row below.
+    if (!user || !can(user, "student:update")) return apiError("Forbidden", 403)
 
     const body = await req.json()
     const parsed = importBodySchema.safeParse(body)
