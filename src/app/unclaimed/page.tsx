@@ -3,6 +3,7 @@ import { ClockIcon, AlertTriangleIcon } from "lucide-react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { getSessionUser, isUnbound } from "@/lib/session"
+import { devAuthProps } from "@/lib/dev-auth"
 import { getLatestRequestForUser } from "@/db/queries/onboarding"
 import { RegisterForm } from "./register-form"
 
@@ -20,12 +21,15 @@ export default async function UnclaimedPage() {
   if (!user) redirect("/login")
   if (!isUnbound(user)) redirect("/dashboard")
 
+  // Without this the "unplaced" persona is a trap: you land here, the shell has
+  // no switcher, and the only way back is deleting a cookie by hand.
+  const devAuth = await devAuthProps()
   const req = await getLatestRequestForUser(user.id)
   const showForm = !req || req.status === "rejected"
 
   return (
     <SidebarProvider>
-      <AppSidebar />
+      <AppSidebar devAuth={devAuth} />
       <SidebarInset>
         <div className="flex min-h-svh items-center justify-center p-6">
           <div className="w-full max-w-md">

@@ -10,18 +10,39 @@ VERP handles the core academic operations of the college: student records, facul
 - **Language**: TypeScript (strict mode)
 - **Database**: PostgreSQL on [Neon](https://neon.tech)
 - **ORM**: Drizzle ORM
-- **Auth**: Better Auth (email/password)
+- **Auth**: VOSS OIDC via Better Auth (VERP holds no credentials)
 - **Styling**: Tailwind CSS 4, shadcn/ui
 - **Validation**: Zod
 
 ## Getting Started
 
+### Contributing? Start here
+
+```bash
+git clone https://github.com/voss-labs/verp.git
+cd verp
+npm install
+npm run dev:setup
+npm run dev
+```
+
+One command, a Postgres container, and a college's worth of mock data. No Neon
+account and no VOSS credentials: you pick who you are — super-admin, HOD,
+coordinator, teacher, student — from a switcher in the sidebar, and every
+permission is still resolved from the database exactly as in production.
+
+Needs Docker running ([OrbStack](https://orbstack.dev) works and is lighter on
+a Mac). Full detail, including why this cannot reach production, is in
+[docs/local-dev.md](docs/local-dev.md).
+
 ### Prerequisites
 
 - Node.js 20+ (required by Next 16 / React 19)
-- A PostgreSQL database (we use [Neon](https://neon.tech) -- free tier works)
+- Docker, for the local database
+- Or, to run against a hosted database instead: a [Neon](https://neon.tech)
+  project and a VOSS client
 
-### Setup
+### Setup against a hosted database
 
 ```bash
 git clone https://github.com/voss-labs/verp.git

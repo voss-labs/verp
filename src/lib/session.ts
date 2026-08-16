@@ -1,6 +1,7 @@
 import { headers } from "next/headers"
 import { and, eq, or } from "drizzle-orm"
 import { auth } from "@/lib/auth"
+import { devIdentity } from "@/lib/dev-auth"
 import { db } from "@/db"
 import * as schema from "@/db/schema"
 import {
@@ -25,6 +26,17 @@ const SUPER_ADMIN_EMAILS = (process.env.SUPER_ADMIN_EMAILS ?? "")
  * code defaults overlaid with the super-admin's permission_overrides — super_admin
  * carries an empty set because `can()` short-circuits it to allow-all.
  */
+async function realIdentity() {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) return null
+  return {
+    id: session.user.id,
+    name: session.user.name,
+    email: session.user.email,
+    image: session.user.image ?? null,
+  }
+}
+
 export type SessionUser = {
   id: string
   name: string
@@ -82,16 +94,21 @@ async function capabilitiesFor(
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) return null
+  // Local development can name the actor with a cookie instead of completing an
+  // OAuth handshake nobody outside VOSS can complete. It substitutes these four
+  // fields and nothing else — every line below this point is the production
+  // path, resolving tier, scope and capabilities from real rows. See
+  // lib/dev-auth.ts for the three locks that keep it out of a deployed build.
+  const identity = (await devIdentity()) ?? (await realIdentity())
+  if (!identity) return null
 
-  const userId = session.user.id
-  const email = session.user.email.toLowerCase()
+  const userId = identity.id
+  const email = identity.email.toLowerCase()
   const base = {
     id: userId,
-    name: session.user.name,
-    email: session.user.email,
-    image: session.user.image ?? null,
+    name: identity.name,
+    email: identity.email,
+    image: identity.image,
   }
   const empty = {
     deptCodes: [] as string[],

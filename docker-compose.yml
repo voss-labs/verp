@@ -1,0 +1,27 @@
+# The local database. Nothing else runs in a container: the app itself is
+# happier as `npm run dev` on the host, where hot reload and the debugger work
+# without a bind mount in the way.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: verp-postgres
+    environment:
+      POSTGRES_USER: verp
+      POSTGRES_PASSWORD: verp
+      POSTGRES_DB: verp
+    ports:
+      # 5433 on the host: 5432 is usually taken by a Postgres somebody already
+      # runs, and a port clash is a confusing first five minutes.
+      - "5433:5432"
+    volumes:
+      - verp-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `npm run dev:setup` waits on this before migrating — the container
+      # accepts connections a moment before the database is ready for them.
+      test: ["CMD-SHELL", "pg_isready -U verp -d verp"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  verp-pgdata:
