@@ -6,10 +6,27 @@ VERP is a VOSS Labs project. Contributions are welcome from all Vidyalankar stud
 
 1. Fork the repo and clone your fork
 2. `npm install`
-3. `npm run setup` -- interactive wizard that walks you through Neon, writes `.env.local`, and runs migrations
+3. `npm run dev:setup`
 4. `npm run dev`
 
-The wizard is idempotent: re-run it any time to overwrite `.env.local` or just re-apply migrations. For manual setup steps and env var details, see [README.md](./README.md).
+You need Docker running -- [OrbStack](https://orbstack.dev) is lighter than
+Docker Desktop on a Mac and works unchanged.
+
+That is everything. `dev:setup` starts a Postgres container, applies the schema,
+and seeds a college's worth of mock data: three departments, all four
+year-cohorts, ~1,700 students. There is no sign-in step, because VERP
+authenticates through VOSS and you cannot register a VOSS client -- instead you
+pick who you are from a switcher in the sidebar: super-admin, HOD, coordinator,
+teacher, student, or somebody authenticated but on no roster.
+
+**The permissions are real.** Only authentication is bypassed. Which department
+and classes you can reach, and every capability you hold, are resolved from the
+database exactly as in production, so if you break a scope rule locally you will
+see it. [docs/local-dev.md](./docs/local-dev.md) explains how, and why none of
+it can reach a deployed build.
+
+To work against a hosted database instead -- your own Neon project and a VOSS
+client -- see [README.md](./README.md).
 
 ## Making Changes
 

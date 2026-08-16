@@ -30,12 +30,12 @@ unfollowable through no fault of anyone following them.
 3. Pushes the schema, then records the migration files as already applied
 4. Seeds a college's worth of mock data
 
-| Command | |
-|---|---|
-| `npm run dev:setup` | the whole thing, from nothing |
-| `npm run dev:seed` | rewrite the mock data |
-| `npm run dev:down` | stop the container, keep the data |
-| `npm run dev:reset` | destroy the data and start over |
+| Command             |                                   |
+| ------------------- | --------------------------------- |
+| `npm run dev:setup` | the whole thing, from nothing     |
+| `npm run dev:seed`  | rewrite the mock data             |
+| `npm run dev:down`  | stop the container, keep the data |
+| `npm run dev:reset` | destroy the data and start over   |
 
 ## The identity switcher
 
@@ -43,18 +43,18 @@ Ten people are seeded, and the switcher makes you one of them. There is no
 password because there is no sign-in — the cookie names a persona, and that is
 the only thing being faked.
 
-| | Role | Scope |
-|---|---|---|
-| Asha Deshpande | Super-admin | the whole institution |
-| Ravi Kulkarni | HOD | EXCS — two classes, cover authority |
-| Sunita Rane | HOD | EXTC — nothing in EXCS is visible |
-| Priya Nair | Coordinator | BE EXCS A — publishes, decides enrolment |
-| Mandar Patil | Teacher | BE EXCS A — Data Analytics only |
-| Kavita Joshi | Teacher | BE EXCS A — Computer Networks only |
-| Imran Shaikh | Teacher | BE EXCS B — a different division |
-| Neha Bhosale | Student | 23108A0001, has published results |
-| Omkar Sawant | Student | 23108A0002, nothing published yet |
-| Rohit Gaikwad | Unplaced | authenticated, on no roster |
+|                | Role        | Scope                                    |
+| -------------- | ----------- | ---------------------------------------- |
+| Asha Deshpande | Super-admin | the whole institution                    |
+| Ravi Kulkarni  | HOD         | EXCS — two classes, cover authority      |
+| Sunita Rane    | HOD         | EXTC — nothing in EXCS is visible        |
+| Priya Nair     | Coordinator | BE EXCS A — publishes, decides enrolment |
+| Mandar Patil   | Teacher     | BE EXCS A — Data Analytics only          |
+| Kavita Joshi   | Teacher     | BE EXCS A — Computer Networks only       |
+| Imran Shaikh   | Teacher     | BE EXCS B — a different division         |
+| Neha Bhosale   | Student     | 23108A0001, has published results        |
+| Omkar Sawant   | Student     | 23108A0002, nothing published yet        |
+| Rohit Gaikwad  | Unplaced    | authenticated, on no roster              |
 
 ### The permissions are real
 
@@ -66,7 +66,7 @@ tier you are, which departments and classes you can reach, and your whole
 capability set including any override an admin has set. The switcher substitutes
 those four fields and nothing else.
 
-So becoming the HOD of EXTC does not *grant* you EXTC. It makes you a person
+So becoming the HOD of EXTC does not _grant_ you EXTC. It makes you a person
 whose faculty row says so, and the same queries decide the rest. If you break a
 scope rule, this environment shows you — which a mock that returned a
 fabricated permission set could not.
@@ -143,6 +143,17 @@ the artifact is the same either way. To check that a change compiles:
 ```bash
 VERP_DEV_AUTH= npm run build
 ```
+
+## A note on `drizzle-kit push`
+
+`push` makes a database match `src/db/schema`, and to add a unique constraint to
+a table that already has rows it will **truncate that table**. It asks first —
+but the question is a prompt, `--force` does not answer it, and inside a script
+nobody sees it.
+
+That is worth knowing before you point any `db:` command at a database you care
+about. It is also why `dev:setup` refuses to run against anything but the local
+container, and why the seeder refuses any host that is not local.
 
 ## Working against the real thing
 
