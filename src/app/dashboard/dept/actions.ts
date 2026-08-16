@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { getSessionUser, type SessionUser } from "@/lib/session"
 import { authorize } from "@/lib/rbac"
+import { inDeptScope } from "@/lib/allocation"
 import { getErrorMessage } from "@/lib/error-utils"
 import { classKey, tryClassKeyFromRoll } from "@/lib/class-key"
 import { BRANCH_CODE_BY_DEPT, divisionsForBranch } from "@/lib/roll-number"
@@ -177,10 +178,6 @@ export async function bulkImportFacultyAction(input: {
 }
 
 // A dept is in scope if the caller is super_admin (all) or an HOD of it.
-function inDeptScope(user: SessionUser, deptCode: string): boolean {
-  return user.tier === "super_admin" || user.deptCodes.includes(deptCode)
-}
-
 export async function createClassAction(input: {
   deptCode: string
   admissionYear: number

@@ -65,3 +65,23 @@ export function canReopenLock(
   if (canAllocate(user, classId, deptCode)) return true
   return lockedByFacultyId != null && lockedByFacultyId === user.facultyId
 }
+
+/**
+ * Whether a department is the caller's to act in.
+ *
+ * The simplest of these rules, and the one that was missing where it mattered
+ * most. The department workspace applied it to everything; the administration
+ * console applied it to nothing — and two of that console's capabilities,
+ * faculty:create and faculty:update, are HOD defaults. An HOD could therefore
+ * add staff to a department that was not theirs, and deactivate anyone in the
+ * college, including another department's HOD.
+ *
+ * Stated here rather than in either file so there is one definition to reason
+ * about, the way canAllocate already is.
+ */
+export function inDeptScope(
+  user: Pick<AllocationActor, "tier" | "deptCodes">,
+  deptCode: string
+): boolean {
+  return user.tier === "super_admin" || user.deptCodes.includes(deptCode)
+}

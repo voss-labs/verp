@@ -29,6 +29,15 @@ export async function getRecordHistoryAction(input: {
     if (!user || !can(user, "audit:read")) {
       return { events: [], error: "Not permitted." }
     }
+    // Deliberately not narrowed by department or class. audit:read is a
+    // super-admin capability and no tier holds it by default, so the wildcard
+    // is the whole audience — and a super-admin sees everything regardless.
+    //
+    // The coupling is worth knowing before granting it downward from the
+    // permissions console: audit rows point at many entity types by id, so
+    // scoping them means resolving each type back to a department, and until
+    // that exists audit:read is institution-wide by construction rather than
+    // by oversight.
     const rows = await getRecordHistory(input.targetType, input.targetId)
     return {
       events: rows.map((r) => ({

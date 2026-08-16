@@ -663,6 +663,15 @@ export async function removeFromBatchAction(input: {
       return { error: "That subject is allocated to another teacher." }
     }
 
+    // The same roster check assignBatchAction makes. Adding a student was
+    // guarded and removing one was not, which is the kind of asymmetry that
+    // survives review because the reader checks the interesting direction.
+    const roster = new Set(
+      (await getStudentsByClassKeys([cls.classKey])).map((s) => s.id)
+    )
+    const scope = studentsInClass(roster, [input.studentId])
+    if (!scope.ok) return { error: scope.reason }
+
     await removeStudentFromBatch(input)
     revalidatePath(`/dashboard/class/${offering.classId}/batches`)
     return { error: null }
