@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { getSessionUser } from "@/lib/session"
+import { studentsInClass } from "@/lib/scope"
 import { authorize } from "@/lib/rbac"
 import { getErrorMessage } from "@/lib/error-utils"
 import { createAuditLog } from "@/db/queries"
@@ -21,20 +22,21 @@ export async function bulkDeactivateStudentsAction(input: {
     const user = await getSessionUser()
     authorize(user, "student:deactivate")
 
-    // Only ever act on students within the caller's scope — a forged id from
-    // outside their reach is silently dropped, not deactivated.
+    // Only ever act on students within the caller's scope.
     const scoped =
       user!.tier === "super_admin"
         ? await getAllStudents()
         : user!.tier === "hod"
           ? await getStudentsByDepartments(user!.deptCodes)
           : await getStudentsByClassKeys(user!.classKeys)
-    const allowed = new Set(scoped.map((s) => s.id))
-    const targets = input.ids.filter((id) => allowed.has(id))
-    if (targets.length === 0)
-      return { error: "None of the selected students are in your scope." }
+    // Rejected whole, not filtered. Dropping the out-of-scope ids and
+    // deactivating the rest reports success for an action that did something
+    // other than what was asked, and leaves nothing behind to find: the same
+    // rule the marks and attendance writes adopted.
+    const scope = studentsInClass(new Set(scoped.map((s) => s.id)), input.ids)
+    if (!scope.ok) return { error: scope.reason }
 
-    const count = await deactivateStudentsByIds(targets)
+    const count = await deactivateStudentsByIds(input.ids)
     await createAuditLog({
       action: "students.bulk_deactivated",
       actorId: user!.id,

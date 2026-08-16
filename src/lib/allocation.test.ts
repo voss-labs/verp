@@ -3,6 +3,7 @@ import {
   canAllocate,
   canReopenLock,
   canWriteOffering,
+  inDeptScope,
   type AllocationActor,
 } from "./allocation"
 
@@ -190,5 +191,40 @@ describe("canReopenLock", () => {
       canReopenLock({ ...teacherA, facultyId: null }, CLASS2, DEPT2, null)
     ).toBe(false)
     expect(canReopenLock(teacherA, CLASS2, DEPT2, null)).toBe(false)
+  })
+})
+
+describe("inDeptScope", () => {
+  const hod = (...depts: string[]) => ({
+    tier: "hod" as const,
+    deptCodes: depts,
+  })
+
+  it("lets an HOD act in their own department", () => {
+    expect(inDeptScope(hod("EXCS"), "EXCS")).toBe(true)
+  })
+
+  // The gap this closes: an HOD of one department creating or deactivating
+  // faculty in another, through the administration console.
+  it("stops an HOD acting in somebody else's department", () => {
+    expect(inDeptScope(hod("EXCS"), "EXTC")).toBe(false)
+  })
+
+  it("covers an HOD appointed over more than one department", () => {
+    expect(inDeptScope(hod("EXCS", "EXTC"), "EXTC")).toBe(true)
+  })
+
+  it("lets a super-admin act anywhere, holding no department at all", () => {
+    expect(inDeptScope({ tier: "super_admin", deptCodes: [] }, "EXTC")).toBe(
+      true
+    )
+  })
+
+  it("refuses a teacher, who has no department scope", () => {
+    expect(inDeptScope({ tier: "faculty", deptCodes: [] }, "EXCS")).toBe(false)
+  })
+
+  it("refuses an unplaced account", () => {
+    expect(inDeptScope({ tier: null, deptCodes: [] }, "EXCS")).toBe(false)
   })
 })

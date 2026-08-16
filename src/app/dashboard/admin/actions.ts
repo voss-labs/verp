@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { getSessionUser } from "@/lib/session"
+import { inDeptScope } from "@/lib/allocation"
 import {
   authorize,
   ROLE_DEFAULTS,
@@ -21,6 +22,7 @@ import {
   updateFaculty,
   deactivateFaculty,
   getFacultyByEmail,
+  getFacultyById,
 } from "@/db/queries/faculty"
 import { appointHod, appointCoordinator } from "@/db/queries/appointments"
 
@@ -101,6 +103,12 @@ export async function createFacultyAction(input: {
     if (!input.employeeId.trim()) return { error: "Employee ID is required." }
     if (!EMAIL_RE.test(email)) return { error: "A valid email is required." }
     if (!input.department) return { error: "Department is required." }
+    // faculty:create is an HOD default and the department comes from the
+    // payload, so without this an HOD could add staff to a department that is
+    // not theirs. The department workspace already checked; the console did not.
+    if (!inDeptScope(user!, input.department)) {
+      return { error: "That department is not yours to add faculty to." }
+    }
     if (await getFacultyByEmail(email))
       return { error: `A faculty with ${email} already exists.` }
 
@@ -155,6 +163,15 @@ export async function deactivateFacultyAction(input: {
   try {
     const user = await getSessionUser()
     authorize(user, "faculty:update")
+    // Scoped on the row's OWN department — the id is the whole payload here, so
+    // there is nothing caller-supplied to trust. faculty:update is an HOD
+    // default, so unscoped this deactivated anyone in the college, another
+    // department's HOD included.
+    const target = await getFacultyById(input.facultyId)
+    if (!target) return { error: "No such faculty member." }
+    if (!inDeptScope(user!, target.department)) {
+      return { error: "That faculty member is in another department." }
+    }
     await deactivateFaculty(input.facultyId)
     await createAuditLog({
       action: "faculty.deactivated",

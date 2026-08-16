@@ -29,12 +29,7 @@ import { eq } from "drizzle-orm"
 import { randomUUID } from "node:crypto"
 import * as schema from "../src/db/schema"
 import { isLocalPostgres } from "../src/db/driver"
-import {
-  DEV_PERSONAS,
-  DEV_CLASS_A,
-  DEV_CLASS_B,
-  DEV_CLASS_EXTC,
-} from "../src/lib/dev-personas"
+import { DEV_PERSONAS, DEV_CLASS_A, DEV_CLASS_B } from "../src/lib/dev-personas"
 
 const url = process.env.DATABASE_URL ?? ""
 
