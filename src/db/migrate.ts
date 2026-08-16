@@ -68,6 +68,17 @@ async function run() {
   // them — which is what a fresh local database wants, and what lets a
   // migration written tomorrow still run normally.
   if (process.argv.includes("--baseline")) {
+    // Same rule as the seeder: this rewrites the migration ledger, and doing
+    // that to a hosted database would tell it changes had been applied that
+    // never ran.
+    if (!isLocalPostgres(url)) {
+      console.error(
+        `Refusing to baseline ${new URL(url).hostname} — --baseline is for a ` +
+          "freshly pushed local database only."
+      )
+      await pool.end()
+      process.exit(1)
+    }
     for (const file of pending) {
       await pool.query("INSERT INTO _migrations (filename) VALUES ($1)", [file])
     }
