@@ -34,6 +34,20 @@ async function run() {
     process.exit(1)
   }
 
+  // Before makePool, deliberately. The first version of this check sat further
+  // down and had already connected and created _migrations by the time it
+  // refused — the same mistake, in the same shape, as the one that let a schema
+  // push reach a hosted database. A guard belongs above the thing it guards.
+  const baseline = process.argv.includes("--baseline")
+  if (baseline && !isLocalPostgres(url)) {
+    console.error(
+      `Refusing to baseline ${new URL(url).hostname} — --baseline records ` +
+        "migrations as applied without running them, which is only ever\n" +
+        "correct for a freshly pushed local database. Use `npm run db:migrate`."
+    )
+    process.exit(1)
+  }
+
   const pool = makePool(url)
 
   await pool.query(`
@@ -67,18 +81,7 @@ async function run() {
   // re-applying what is there. Baselining records them as done without running
   // them — which is what a fresh local database wants, and what lets a
   // migration written tomorrow still run normally.
-  if (process.argv.includes("--baseline")) {
-    // Same rule as the seeder: this rewrites the migration ledger, and doing
-    // that to a hosted database would tell it changes had been applied that
-    // never ran.
-    if (!isLocalPostgres(url)) {
-      console.error(
-        `Refusing to baseline ${new URL(url).hostname} — --baseline is for a ` +
-          "freshly pushed local database only."
-      )
-      await pool.end()
-      process.exit(1)
-    }
+  if (baseline) {
     for (const file of pending) {
       await pool.query("INSERT INTO _migrations (filename) VALUES ($1)", [file])
     }
