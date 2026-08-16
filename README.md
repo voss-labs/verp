@@ -42,6 +42,20 @@ a Mac). Full detail, including why this cannot reach production, is in
 - Or, to run against a hosted database instead: a [Neon](https://neon.tech)
   project and a VOSS client
 
+### Setting up a hosted database
+
+For a fresh Neon project:
+
+```bash
+npx drizzle-kit push   # creates the schema from src/db/schema
+npm run db:migrate     # applies the SQL migrations on top
+```
+
+`drizzle-kit push` truncates a table when it has to add a unique constraint to
+one that already holds rows. It asks first, but `--force` does not answer that
+prompt — so never point `db:push` at a database with data you need without
+reading what it says.
+
 ### Setup against a hosted database
 
 ```bash
@@ -112,26 +126,30 @@ Schema is defined in `src/db/schema/` using Drizzle ORM. Queries are organized b
 
 **Key commands:**
 
-| Command                     | Description                                |
-| --------------------------- | ------------------------------------------ |
-| `npm run db:push`           | Push schema changes to database            |
-| `npm run db:migrate`        | Run pending SQL migrations                 |
-| `npm run db:migrate:status` | Check migration status                     |
-| `npm run db:generate`       | Generate new migration from schema changes |
-| `npm run db:studio`         | Open Drizzle Studio (visual DB browser)    |
-| `npm run db:setup`          | Full setup (push + migrate)                |
+| Command                     | Description                                             |
+| --------------------------- | ------------------------------------------------------- |
+| `npm run db:push`           | Push schema changes to database (see the warning above) |
+| `npm run db:migrate`        | Run pending SQL migrations                              |
+| `npm run db:migrate:status` | Check migration status                                  |
+| `npm run db:generate`       | Generate new migration from schema changes              |
+| `npm run db:studio`         | Open Drizzle Studio (visual DB browser)                 |
+| `npm run db:setup`          | Full setup (push + migrate)                             |
 
 ## Scripts
 
-| Command             | Description                                               |
-| ------------------- | --------------------------------------------------------- |
-| `npm run setup`     | Interactive setup wizard (Neon + .env.local + migrations) |
-| `npm run dev`       | Start dev server with Turbopack                           |
-| `npm run build`     | Production build                                          |
-| `npm run lint`      | Run ESLint                                                |
-| `npm run typecheck` | Run TypeScript type checking                              |
-| `npm run format`    | Format code with Prettier                                 |
-| `npm run check`     | Run typecheck + lint + format check                       |
+| Command             | Description                                                 |
+| ------------------- | ----------------------------------------------------------- |
+| `npm run dev:setup` | Local Postgres container, schema and mock data — start here |
+| `npm run dev:seed`  | Rewrite the mock data                                       |
+| `npm run dev:down`  | Stop the container, keep its data                           |
+| `npm run dev:reset` | Destroy the container and its data, then set up again       |
+| `npm run setup`     | Interactive wizard for a hosted database (Neon + VOSS)      |
+| `npm run dev`       | Start dev server with Turbopack                             |
+| `npm run build`     | Production build                                            |
+| `npm run lint`      | Run ESLint                                                  |
+| `npm run typecheck` | Run TypeScript type checking                                |
+| `npm run format`    | Format code with Prettier                                   |
+| `npm run check`     | Run typecheck + lint + format check                         |
 
 ## Contributing
 
