@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { ClockIcon, AlertTriangleIcon } from "lucide-react"
 import { AppSidebar } from "@/components/app-sidebar"
+import { SessionProvider } from "@/components/session-provider"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { getSessionUser, isUnbound } from "@/lib/session"
 import { devAuthProps } from "@/lib/dev-auth"
@@ -27,37 +28,57 @@ export default async function UnclaimedPage() {
   const req = await getLatestRequestForUser(user.id)
   const showForm = !req || req.status === "rejected"
 
+  // AppSidebar reads the signed-in identity from context, so the shell has to
+  // provide it. This page rendered the sidebar without a provider from #82
+  // onward and threw on every visit — invisible because reaching it needs an
+  // account VOSS authenticated that VERP cannot place, which the dev switcher
+  // now makes reachable in one click.
   return (
-    <SidebarProvider>
-      <AppSidebar devAuth={devAuth} />
-      <SidebarInset>
-        <div className="flex min-h-svh items-center justify-center p-6">
-          <div className="w-full max-w-md">
-            {showForm ? (
-              <RegisterForm
-                email={user.email}
-                name={user.name}
-                rejection={
-                  req?.status === "rejected" ? req.rejectionReason : null
-                }
-              />
-            ) : req.status === "pending" ? (
-              <Status
-                icon={<ClockIcon className="size-5" />}
-                title="Waiting for approval"
-                body={`Your request for ${req.rollNumber} is with your class coordinator. You'll be linked automatically the moment they approve it.`}
-              />
-            ) : (
-              <Status
-                icon={<AlertTriangleIcon className="size-5" />}
-                title="Your class isn't set up yet"
-                body={`We have your details for ${req.rollNumber}, but your class has not been created in VERP yet. You'll be routed to your coordinator's queue automatically once it is — nothing more to do.`}
-              />
-            )}
+    <SessionProvider
+      session={{
+        name: user.name,
+        email: user.email,
+        image: user.image,
+        tier: user.tier,
+        facultyId: user.facultyId,
+        studentId: user.studentId,
+        deptCodes: user.deptCodes,
+        classIds: user.classIds,
+        coordinatorClassIds: user.coordinatorClassIds,
+        capabilities: [...user.capabilities],
+      }}
+    >
+      <SidebarProvider>
+        <AppSidebar devAuth={devAuth} />
+        <SidebarInset>
+          <div className="flex min-h-svh items-center justify-center p-6">
+            <div className="w-full max-w-md">
+              {showForm ? (
+                <RegisterForm
+                  email={user.email}
+                  name={user.name}
+                  rejection={
+                    req?.status === "rejected" ? req.rejectionReason : null
+                  }
+                />
+              ) : req.status === "pending" ? (
+                <Status
+                  icon={<ClockIcon className="size-5" />}
+                  title="Waiting for approval"
+                  body={`Your request for ${req.rollNumber} is with your class coordinator. You'll be linked automatically the moment they approve it.`}
+                />
+              ) : (
+                <Status
+                  icon={<AlertTriangleIcon className="size-5" />}
+                  title="Your class isn't set up yet"
+                  body={`We have your details for ${req.rollNumber}, but your class has not been created in VERP yet. You'll be routed to your coordinator's queue automatically once it is — nothing more to do.`}
+                />
+              )}
+            </div>
           </div>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+        </SidebarInset>
+      </SidebarProvider>
+    </SessionProvider>
   )
 }
 

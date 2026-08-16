@@ -5,6 +5,7 @@ import { CheckIcon, ChevronsUpDownIcon, FlaskConicalIcon } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -73,12 +74,17 @@ export function DevActorSwitcher({
             align="start"
             side="bottom"
             sideOffset={4}
-            className="w-(--radix-dropdown-menu-trigger-width) min-w-72"
+            className="max-h-[80vh] min-w-72 overflow-y-auto rounded-lg"
           >
-            <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
-              Development only. Authentication is bypassed; every permission
-              below is resolved from the database exactly as in production.
-            </DropdownMenuLabel>
+            {/* The label is Base UI's Menu.GroupLabel underneath, and it throws
+                outside a Menu.Group — a runtime-only failure that typecheck and
+                the build both pass. */}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
+                Development only. Authentication is bypassed; every permission
+                below is resolved from the database exactly as in production.
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
 
             {personas.map((p) => (
