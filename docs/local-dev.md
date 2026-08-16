@@ -134,6 +134,16 @@ coordinator  -> 307 /login
 The seeder has its own lock: it refuses to run against any host that is not
 local, because everything it does begins by deleting rows.
 
+## Building locally
+
+`npm run build` refuses while `VERP_DEV_AUTH` is set — the guard cannot tell a
+laptop's production build from a deployable one, and it should not try, because
+the artifact is the same either way. To check that a change compiles:
+
+```bash
+VERP_DEV_AUTH= npm run build
+```
+
 ## Working against the real thing
 
 Nothing stops you. Put your Neon and VOSS credentials in `.env.local` and drop

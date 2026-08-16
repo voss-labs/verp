@@ -5,8 +5,12 @@ import type { NextConfig } from "next"
 // at runtime is a bug report from a user; this is a build that never ships.
 if (process.env.NODE_ENV === "production" && process.env.VERP_DEV_AUTH) {
   throw new Error(
-    "VERP_DEV_AUTH is set for a production build. It bypasses sign-in and must " +
-      "never be present in a deployed environment — unset it and rebuild."
+    "VERP_DEV_AUTH is set for a production build.\n\n" +
+      "It bypasses sign-in, so it must never be present in anything deployable " +
+      "— including a build made on a laptop, since that artifact is what gets " +
+      "shipped.\n\n" +
+      "If you are only checking that your change compiles, build without it:\n" +
+      "  VERP_DEV_AUTH= npm run build\n"
   )
 }
 
