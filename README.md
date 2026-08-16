@@ -71,7 +71,7 @@ npm run setup
 2. Generates `BETTER_AUTH_SECRET` and writes `.env.local`
 3. Inspects the database (warns if it's not empty and not a previous verp install)
 4. Runs schema push + SQL migrations
-5. Lets you create one or more user accounts (admin / HoD / faculty (TR) / student) with hashed passwords seeded directly into the DB
+5. Seeds roster rows -- faculty and students -- that a VOSS sign-in later binds to. It creates no accounts and sets no passwords, because VERP has none to set
 
 Re-run any time -- it's idempotent. Pass `--ci` (or set `CI=true`) to skip prompts in non-interactive environments.
 
@@ -101,12 +101,52 @@ Required env vars:
 - `BETTER_AUTH_SECRET` -- a random secret (`openssl rand -base64 32`)
 - `BETTER_AUTH_URL` -- `http://localhost:3000` for local dev
 
+## Authentication
+
+VERP holds no credentials. [VOSS](https://accounts.vosslabs.org) is the identity
+provider and the only way in; Better Auth runs here as the relying party, signing
+VERP's own session cookie and the PKCE/state cookies for the OAuth handshake.
+
+There is no password to reset, no email to verify, and no sign-up form. Adding
+one would mean two doors into the same account with only one of them watched.
+
+**Signing in has two halves.** VOSS answers _who you are_ -- a one-time code to
+the real mailbox is the login, and the @vit.edu.in gate is enforced there. VERP
+then answers _who that is here_, by matching the verified email to a roster row:
+
+| Match                              | Result                                                          |
+| ---------------------------------- | --------------------------------------------------------------- |
+| A `faculty` row                    | that row's tier -- `super_admin`, `hod`, or `faculty`           |
+| A `students` row                   | the `student` tier, scoped to their own record                  |
+| An address in `SUPER_ADMIN_EMAILS` | `super_admin`, with or without a faculty row                    |
+| Nothing                            | no tier; the account lands on `/unclaimed` to request placement |
+
+That last row is the bootstrap seam: `SUPER_ADMIN_EMAILS` is how the first
+administrator gets in on an empty database, since nobody is on a roster yet.
+
+Binding runs on **every** sign-in, not only the first, so a student who signed in
+before their TR imported them is linked the next time they return rather than
+being stuck.
+
+### Capability and scope are separate
+
+Capability answers _may this tier do X at all_ -- `marks:write`, `audit:read`,
+one of 35 in the `Capability` union. Scope answers _on whose records_ -- an
+HOD's department codes, a coordinator's class ids, a student's own id. Both must
+pass. A teacher holding `marks:write` still cannot touch a class they are not
+assigned to, and a capability is never a scope.
+
+Defaults live in code (`src/lib/rbac.ts`) and a super-admin can grant or revoke
+over them per role or per user from `/dashboard/admin/roles`. `super_admin` is a
+wildcard that no override can reduce -- a permissions console that could lock out
+the only person able to fix it is a trap.
+
 ## Project Structure
 
 ```
 src/
   app/              Next.js pages and API routes
-    api/            REST endpoints (auth, marks, offerings)
+    api/            HTTP routes (auth callback, session, importers)
     dashboard/      Protected dashboard pages
     login/          Login page
   components/       React components
