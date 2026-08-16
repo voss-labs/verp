@@ -4,6 +4,7 @@ import { CommandPalette } from "@/components/command-palette"
 import { SessionProvider } from "@/components/session-provider"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { getSessionUser, isUnbound } from "@/lib/session"
+import { devAuthProps } from "@/lib/dev-auth"
 
 export const dynamic = "force-dynamic"
 
@@ -19,6 +20,10 @@ export default async function DashboardLayout({
   const user = await getSessionUser()
   if (!user) redirect("/login")
   if (isUnbound(user)) redirect("/unclaimed")
+
+  // Null unless this is a development machine with the flag on, and a null prop
+  // means the switcher and its persona list never reach the browser.
+  const devAuth = await devAuthProps()
 
   // Resolved once here and handed down, rather than every client component
   // fetching /api/me for itself.
@@ -38,7 +43,7 @@ export default async function DashboardLayout({
       }}
     >
       <SidebarProvider>
-        <AppSidebar />
+        <AppSidebar devAuth={devAuth} />
         <SidebarInset>{children}</SidebarInset>
         {/* Mounted once at the layout so Cmd+K works from every page, rather
             than each page remembering to include it. */}

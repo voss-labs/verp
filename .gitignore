@@ -39,6 +39,7 @@ yarn-error.log*
 .env*
 # ...but the example template must ship so contributors know what to set.
 !.env.example
+!.env.development.example
 
 # vercel
 .vercel
@@ -52,4 +53,6 @@ next-env.d.ts
 # trailing slash git never descends, so the negations below would not apply.
 /scripts/*
 !/scripts/setup.ts
+!/scripts/dev-setup.ts
+!/scripts/seed-dev.ts
 !/scripts/lib/

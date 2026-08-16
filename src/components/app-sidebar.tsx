@@ -40,12 +40,21 @@ import { buildNavigation } from "@/lib/navigation"
 import { openCommandPalette } from "@/components/command-palette"
 import { SearchIcon } from "lucide-react"
 import { VossMark } from "@/components/voss-logo"
+import { DevActorSwitcher } from "@/components/dev-actor-switcher"
+import type { DevPersona } from "@/lib/dev-personas"
 
 // MVP surface only: roster and identity. Marks / attendance / courses come back
 // with the features that own them, each adding its own nav.
 // Super-admin also gets the console — the door to every CRUD.
 // Coordinators/TRs own their classes: approve enrolments, manage the roster.
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  devAuth,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & {
+  // Resolved on the server, because the flag that enables it is not public. Null
+  // in every deployed environment, and then nothing below ships to the client.
+  devAuth?: { personas: DevPersona[]; current: string | null } | null
+}) {
   // Server-resolved, so the first paint already knows who this is. Reading it
   // from the session hook meant rendering "User" until a fetch returned, which
   // is what produced the identity flicker and the hydration mismatch.
@@ -90,6 +99,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        {devAuth && (
+          <DevActorSwitcher
+            personas={devAuth.personas}
+            current={devAuth.current}
+          />
+        )}
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu className="px-2">

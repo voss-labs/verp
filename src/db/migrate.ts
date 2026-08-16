@@ -1,12 +1,29 @@
 import { config } from "dotenv"
 config({ path: ".env.local" })
 
-import { Pool, neonConfig } from "@neondatabase/serverless"
-import ws from "ws"
 import * as fs from "fs"
 import * as path from "path"
+import { isLocalPostgres } from "./driver"
 
-neonConfig.webSocketConstructor = ws
+// A local container speaks the Postgres wire protocol and the Neon driver does
+// not, so the local case needs node-postgres. The hosted case is left on the
+// exact client it has always used: this script migrates production, and a
+// driver swap there would be a change nobody asked for riding along with a
+// developer-experience one.
+function makePool(url: string) {
+  if (isLocalPostgres(url)) {
+    /* eslint-disable @typescript-eslint/no-require-imports */
+    const { Pool: PgPool } = require("pg")
+    /* eslint-enable @typescript-eslint/no-require-imports */
+    return new PgPool({ connectionString: url })
+  }
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const { Pool: NeonPool, neonConfig } = require("@neondatabase/serverless")
+  const ws = require("ws")
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  neonConfig.webSocketConstructor = ws
+  return new NeonPool({ connectionString: url })
+}
 
 const MIGRATIONS_DIR = path.join(__dirname, "migrations")
 
@@ -17,7 +34,7 @@ async function run() {
     process.exit(1)
   }
 
-  const pool = new Pool({ connectionString: url })
+  const pool = makePool(url)
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS _migrations (
@@ -30,7 +47,9 @@ async function run() {
   const { rows: applied } = await pool.query(
     "SELECT filename FROM _migrations ORDER BY filename"
   )
-  const appliedSet = new Set(applied.map((r) => r.filename))
+  const appliedSet = new Set(
+    applied.map((r: { filename: string }) => r.filename)
+  )
 
   // A fresh checkout can have no migrations at all — that is a valid state, not
   // a crash. drizzle-kit push carries the schema; these files carry the rest.
@@ -42,6 +61,24 @@ async function run() {
     : []
 
   const pending = files.filter((f) => !appliedSet.has(f))
+
+  // `drizzle-kit push` builds the whole current schema in one step, so a
+  // database created that way is already at head and these files would be
+  // re-applying what is there. Baselining records them as done without running
+  // them — which is what a fresh local database wants, and what lets a
+  // migration written tomorrow still run normally.
+  if (process.argv.includes("--baseline")) {
+    for (const file of pending) {
+      await pool.query("INSERT INTO _migrations (filename) VALUES ($1)", [file])
+    }
+    console.log(
+      pending.length === 0
+        ? "Already baselined."
+        : `Baselined ${pending.length} migration(s) against the pushed schema.`
+    )
+    await pool.end()
+    return
+  }
 
   if (pending.length === 0) {
     console.log("No pending migrations.")
