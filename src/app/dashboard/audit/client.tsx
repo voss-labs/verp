@@ -36,6 +36,14 @@ import {
 import { exportTableCsv, exportTableXlsx } from "@/lib/xlsx-export"
 import { downloadBase64File } from "@/lib/utils"
 
+function when(iso: string) {
+  return new Date(iso).toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Kolkata",
+  })
+}
+
 type AuditLogEntry = {
   id: string
   action: string
@@ -97,7 +105,7 @@ export function AuditLogClient({
         "Details",
       ]
       const rows = filtered.map((log) => [
-        new Date(log.createdAt).toLocaleString(),
+        when(log.createdAt),
         log.action,
         log.actorName,
         log.targetType,
@@ -105,7 +113,9 @@ export function AuditLogClient({
         log.details ? JSON.stringify(log.details) : "",
       ])
 
-      const dateStr = new Date().toISOString().split("T")[0]
+      const dateStr = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+      }).format(new Date())
       const filename = `AuditLog_${dateStr}.${format}`
 
       let base64 = ""
@@ -226,7 +236,7 @@ export function AuditLogClient({
               filtered.map((log) => (
                 <TableRow key={log.id}>
                   <TableCell className="text-muted-foreground text-xs tabular-nums">
-                    {new Date(log.createdAt).toLocaleString()}
+                    {when(log.createdAt)}
                   </TableCell>
                   <TableCell>
                     <Badge

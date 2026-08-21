@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation"
+import pkg from "../../../package.json"
 import { AppSidebar } from "@/components/app-sidebar"
 import { CommandPalette } from "@/components/command-palette"
+import { ReportBugButton } from "@/components/report-bug"
+import { isBugReportConfigured } from "@/lib/bug-report-config"
 import { SessionProvider } from "@/components/session-provider"
 import type { ScopeClass, ScopeDept } from "@/components/session-provider"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
@@ -96,6 +99,9 @@ export default async function DashboardLayout({
         {/* Mounted once at the layout so Cmd+K works from every page, rather
             than each page remembering to include it. */}
         <CommandPalette />
+        {isBugReportConfigured() && (
+          <ReportBugButton appVersion={pkg.version} />
+        )}
       </SidebarProvider>
     </SessionProvider>
   )

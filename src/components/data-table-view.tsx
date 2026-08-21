@@ -545,7 +545,7 @@ export function DataTableView<TData, TValue>({
               })}
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 pr-14">
         <p className="text-muted-foreground text-xs font-medium tabular-nums">
           {total === 0
             ? "No records"

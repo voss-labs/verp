@@ -277,10 +277,21 @@ department-scoped path (`createDeptFacultyAction`) does check.
 | `bulkDeactivateStudentsAction`  | `students/actions.ts`   | `student:deactivate` | inline by tier; out-of-scope ids are **silently dropped**, not rejected |
 | `getRecordHistoryAction`        | `audit/actions.ts`      | `audit:read`         | none — any holder can read any record's history                         |
 | `submitEnrollmentRequestAction` | `onboarding/actions.ts` | none                 | session only, and only for an account with `tier: null`                 |
+| `reportBugAction`               | `report-bug.ts`         | none                 | session only — every tier, and capped at 5 a day per person             |
 
 `submitEnrollmentRequestAction` takes the identity from the session, never the
 form: the email is the VOSS-verified address and the roll is routed through
 `classKeyFromRoll`.
+
+`reportBugAction` is deliberately not capability-gated — a student hitting a
+crash is exactly who should be able to report it — but it is session-gated, and
+the reporter (name, email, tier, role, scope) is resolved from the session
+rather than read from the payload. It forwards to the Worker named by
+`VERP_BUG_REPORT_URL`, and audits `bug.reported` only once GitHub has the issue.
+That audit row is also the daily cap: five per person per Asia/Kolkata day, so a
+failed attempt costs the reporter nothing. With the variable unset the feature is
+off end to end — `isBugReportConfigured()` is false, the button never renders,
+and the action refuses.
 
 ## Errors
 

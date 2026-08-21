@@ -15,6 +15,8 @@ const fontMono = Geist_Mono({
   subsets: ["latin"],
 })
 
+const TOAST_CLEARANCE_FOR_BUG_BUTTON = { bottom: "5.5rem" }
+
 export const metadata: Metadata = {
   title: "VERP - Vidyalankar ERP",
   description: "Open-source ERP for Vidyalankar Institute of Technology",
@@ -35,7 +37,10 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <TooltipProvider>
             {children}
-            <Toaster />
+            <Toaster
+              offset={TOAST_CLEARANCE_FOR_BUG_BUTTON}
+              mobileOffset={TOAST_CLEARANCE_FOR_BUG_BUTTON}
+            />
           </TooltipProvider>
         </ThemeProvider>
       </body>
