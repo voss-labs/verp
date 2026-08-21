@@ -109,7 +109,13 @@ export function ImportClient({
       return
     }
     start(async () => {
-      const res = await saveMarksAction({ offeringId, rows })
+      const res = await saveMarksAction({
+        offeringId,
+        rows,
+        importFile: file
+          ? { name: file.name, size: file.size, totalRows: preview.totalRows }
+          : null,
+      })
       if (res.error) {
         toast.error(res.error)
         return

@@ -23,10 +23,16 @@ export const ROLE_LABEL: Record<FacultyRow["role"], string> = {
   faculty: "Faculty",
 }
 
+const QUIET_SUCCESS = "bg-success/10 text-success"
+const QUIET_ATTENTION = "bg-attention/10 text-attention"
+
 export const facultyColumns: ColumnDef<FacultyRow>[] = [
   {
     accessorKey: "employeeId",
     header: "Employee ID",
+    cell: ({ row }) => (
+      <span className="identifier">{row.getValue("employeeId")}</span>
+    ),
   },
   {
     id: "name",
@@ -50,7 +56,7 @@ export const facultyColumns: ColumnDef<FacultyRow>[] = [
     cell: ({ row }) => {
       const role = row.getValue("role") as FacultyRow["role"]
       return (
-        <Badge variant={role === "faculty" ? "outline" : "default"}>
+        <Badge variant={role === "faculty" ? "outline" : "secondary"}>
           {ROLE_LABEL[role]}
         </Badge>
       )
@@ -59,10 +65,16 @@ export const facultyColumns: ColumnDef<FacultyRow>[] = [
   {
     accessorKey: "isActive",
     header: "Status",
-    cell: ({ row }) => (
-      <Badge variant={row.getValue("isActive") ? "default" : "secondary"}>
-        {row.getValue("isActive") ? "Active" : "Inactive"}
-      </Badge>
-    ),
+    cell: ({ row }) => {
+      const active = Boolean(row.getValue("isActive"))
+      return (
+        <Badge
+          variant="secondary"
+          className={active ? QUIET_SUCCESS : QUIET_ATTENTION}
+        >
+          {active ? "Active" : "Inactive"}
+        </Badge>
+      )
+    },
   },
 ]

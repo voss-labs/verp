@@ -7,6 +7,7 @@ import { can } from "@/lib/rbac"
 import { rollsInScope } from "@/lib/scope"
 import { tryClassKeyFromRoll } from "@/lib/class-key"
 import { createStudent, createAuditLog } from "@/db/queries"
+import { createImportBatch } from "@/db/queries/import-batches"
 import { db } from "@/db"
 import { students } from "@/db/schema"
 import { inArray } from "drizzle-orm"
@@ -27,7 +28,18 @@ const importRowSchema = z.object({
 
 const importBodySchema = z.object({
   rows: z.array(importRowSchema).min(1, "No rows provided"),
+  file: z
+    .object({
+      name: z.string().min(1).max(255),
+      size: z.number().int().nonnegative().optional(),
+    })
+    .optional(),
 })
+
+function rosterScopeLabel(rows: { department: string }[]): string {
+  const depts = [...new Set(rows.map((r) => r.department.trim().toUpperCase()))]
+  return depts.length === 1 ? depts[0] : "institution"
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -85,10 +97,19 @@ export async function POST(req: NextRequest) {
       // The batch fails whole rather than importing the in-scope part: a
       // half-applied roster is harder to reason about than a refused one, and a
       // forged batch should leave a refusal rather than a partial success.
-      return apiError(
-        `${scope.reason}${scope.offending.length ? " " + scope.offending.join(", ") : ""}`,
-        403
-      )
+      const message = `${scope.reason}${scope.offending.length ? " " + scope.offending.join(", ") : ""}`
+      await createImportBatch({
+        kind: "roster",
+        fileName: parsed.data.file?.name ?? "(file name not sent)",
+        fileSize: parsed.data.file?.size ?? null,
+        rowCount: rows.length,
+        skippedCount: rows.length,
+        status: "failed",
+        errorSummary: message,
+        scopeLabel: rosterScopeLabel(rows),
+        actorUserId: user.id,
+      })
+      return apiError(message, 403)
     }
 
     // ── 3. Classify rows into valid / errored ─────────────────────────────
@@ -174,6 +195,25 @@ export async function POST(req: NextRequest) {
         },
       })
     }
+
+    await createImportBatch({
+      kind: "roster",
+      fileName: parsed.data.file?.name ?? "(file name not sent)",
+      fileSize: parsed.data.file?.size ?? null,
+      rowCount: rows.length,
+      insertedCount,
+      skippedCount: errors.length,
+      status: "committed",
+      errorSummary:
+        errors.length > 0
+          ? errors
+              .slice(0, 5)
+              .map((e) => `Row ${e.row}: ${e.message}`)
+              .join("; ")
+          : null,
+      scopeLabel: rosterScopeLabel(rows),
+      actorUserId: user.id,
+    })
 
     return apiSuccess({
       inserted: insertedCount,

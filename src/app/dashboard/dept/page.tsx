@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { DeniedToast } from "@/components/denied-toast"
 import { PageHeader } from "@/components/page-header"
 import { getSessionUser } from "@/lib/session"
 import { expectedYear } from "@/lib/roll-number"
@@ -11,7 +12,12 @@ import { DeptClient } from "./client"
 
 export const dynamic = "force-dynamic"
 
-export default async function DeptPage() {
+export default async function DeptPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ denied?: string }>
+}) {
+  const { denied } = await searchParams
   const user = await getSessionUser()
   if (!user) redirect("/login")
 
@@ -33,6 +39,7 @@ export default async function DeptPage() {
   return (
     <>
       <PageHeader title="My department" />
+      {denied && <DeniedToast scope={denied} />}
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <DeptClient
           departments={depts.map((d) => ({ code: d.code, name: d.name }))}

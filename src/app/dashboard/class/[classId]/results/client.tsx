@@ -1,7 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { GraduationCapIcon, SearchXIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { EmptyState } from "@/components/empty-state"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -154,9 +156,19 @@ export function ResultsClient({
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          No students in this class yet.
-        </p>
+        <EmptyState
+          icon={GraduationCapIcon}
+          variant="dashed"
+          title="No students in this class yet"
+          description="Import the roster, or approve the pending enrolment requests on the Overview tab, and results appear here."
+        />
+      ) : view.length === 0 ? (
+        <EmptyState
+          icon={SearchXIcon}
+          variant="dashed"
+          title="No students match that search"
+          description="Clear the search box to see the whole class again."
+        />
       ) : (
         <div className="border-border overflow-x-auto rounded border">
           <table className="w-full text-sm">
@@ -199,7 +211,7 @@ export function ResultsClient({
             <tbody className="divide-border divide-y">
               {view.map((r) => (
                 <tr key={r.studentId} className="[&>td]:px-3 [&>td]:py-1.5">
-                  <td className="font-mono text-xs">{r.rollNumber}</td>
+                  <td className="identifier">{r.rollNumber}</td>
                   <td className="whitespace-nowrap">{r.name}</td>
                   <td className="tabular-nums">
                     {r.hasFail ? (
@@ -213,15 +225,14 @@ export function ResultsClient({
                   <td className="tabular-nums">{r.totalCredits}</td>
                   <td className="tabular-nums">{r.semesters}</td>
                   <td>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
+                    <button
+                      type="button"
+                      className="text-blue disabled:text-muted-foreground text-xs underline-offset-2 hover:underline disabled:no-underline"
                       disabled={r.subjects.length === 0}
                       onClick={() => setOpen(r)}
                     >
                       Breakdown
-                    </Button>
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -235,7 +246,7 @@ export function ResultsClient({
           <DialogHeader>
             <DialogTitle>
               {open?.name}{" "}
-              <span className="text-muted-foreground font-mono text-xs">
+              <span className="text-muted-foreground identifier">
                 {open?.rollNumber}
               </span>
             </DialogTitle>
@@ -273,7 +284,7 @@ function Breakdown({ row }: { row: Row }) {
             <tbody className="divide-border divide-y">
               {subjects.map((s) => (
                 <tr key={s.code} className="[&>td]:px-2 [&>td]:py-1">
-                  <td className="font-mono text-xs">{s.code}</td>
+                  <td className="identifier">{s.code}</td>
                   <td>{s.name}</td>
                   <SubjectResultCells marks={s.marks} course={s.course} />
                 </tr>

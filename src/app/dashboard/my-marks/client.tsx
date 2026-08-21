@@ -1,25 +1,36 @@
 "use client"
 
 import { useState } from "react"
-import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { computeMarks, type CgpaResult, type CourseInfo } from "@/lib/sgpi"
-import { SubjectResultCells } from "@/components/subject-result"
+import { ChevronRightIcon, CopyIcon, GraduationCapIcon } from "lucide-react"
 
-type Subject = {
-  code: string
-  name: string
-  credits: number
-  marks: {
-    isa: number | null
-    mse1: number | null
-    mse2: number | null
-    ese: number | null
-  }
-  course: CourseInfo
-}
-type Semester = { semester: number; subjects: Subject[] }
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/components/empty-state"
+import { MarksSplitBar } from "@/components/marks-split-bar"
+import { StatCard, StatCardRow } from "@/components/stat-card"
+import { SubjectResultCells } from "@/components/subject-result"
+import { marksState, type CgpaResult } from "@/lib/sgpi"
+import { cn } from "@/lib/utils"
+
+import { SubjectDrawer, type OpenSubject } from "./subject-drawer"
+import {
+  MASKED_COLUMNS,
+  buildBlocks,
+  copyBlock,
+  exportBlock,
+  schemeLegend,
+  schemeSegments,
+  type AttendanceRow,
+  type Awaiting,
+  type Block,
+  type Semester,
+  type Subject,
+} from "./table"
+
+const HEAD_ROW =
+  "text-muted-foreground [&>th]:bg-surface [&>th]:sticky [&>th]:top-0 [&>th]:z-10 [&>th]:px-3 [&>th]:py-2 [&>th]:text-left [&>th]:text-xs [&>th]:font-medium [&>th]:whitespace-nowrap [&>th]:shadow-[inset_0_-1px_0_var(--border)]"
+
+const BODY_ROW = "[&>td]:px-3 [&>td]:py-2 [&>td]:whitespace-nowrap"
 
 export function MyMarksClient({
   cgpa,
@@ -29,401 +40,317 @@ export function MyMarksClient({
 }: {
   cgpa: CgpaResult
   semesters: Semester[]
-  attendance: {
-    offeringId: string | null
-    code: string
-    name: string
-    present: number
-    total: number
-    percent: number | null
-  }[]
-  awaiting: { code: string; name: string; semester: number }[]
+  attendance: AttendanceRow[]
+  awaiting: Awaiting[]
 }) {
-  if (semesters.length === 0) {
+  const [open, setOpen] = useState<OpenSubject | null>(null)
+  const blocks = buildBlocks(semesters, awaiting, cgpa)
+  const sessions = attendance.reduce((sum, r) => sum + r.total, 0)
+  const attended = attendance.reduce((sum, r) => sum + r.present, 0)
+  const overall = sessions > 0 ? Math.round((attended / sessions) * 100) : null
+
+  if (blocks.length === 0 && attendance.length === 0) {
     return (
-      <div className="flex flex-col gap-4">
-        <p className="text-muted-foreground text-sm">
-          {awaiting.length > 0
-            ? "No results have been published yet."
-            : "No marks recorded yet. They appear here once your teachers enter them."}
-        </p>
-        <SubjectAttendance rows={attendance} />
-        <AwaitingPublication subjects={awaiting} />
-      </div>
+      <EmptyState
+        variant="dashed"
+        icon={GraduationCapIcon}
+        title="No marks yet"
+        description="Your results appear here once your teachers enter them and the class coordinator publishes them."
+      />
     )
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Stat
+    <div className="flex flex-col gap-6">
+      <StatCardRow>
+        <StatCard
           label="CGPA"
-          // A fail anywhere makes an aggregate misleading rather than merely
-          // low, so it is withheld instead of quietly averaged away.
           value={cgpa.hasFail ? "—" : (cgpa.cgpa?.toFixed(2) ?? "—")}
-          hint={
+          detail={
             cgpa.hasFail
-              ? "pending a re-attempt"
-              : `${cgpa.totalCredits} credits`
+              ? "Withheld pending a re-attempt"
+              : `Across ${cgpa.totalCredits} credits`
           }
         />
-        <Stat
-          label="Semesters"
-          value={String(cgpa.completedSemesters)}
-          hint="completed"
-        />
-        <Stat
+        <StatCard
           label="Credit points"
           value={String(cgpa.totalCreditPoints)}
-          hint="earned"
+          detail="Earned so far"
         />
+        <StatCard
+          label="Semesters"
+          value={String(cgpa.completedSemesters)}
+          detail="Completed"
+        />
+        <StatCard
+          label="Attendance"
+          value={overall == null ? "—" : `${overall}%`}
+          tone={overall != null && overall < 75 ? "attention" : "default"}
+          detail={
+            sessions === 0
+              ? "No sessions recorded"
+              : `${attended} of ${sessions} sessions`
+          }
+        />
+      </StatCardRow>
+
+      {blocks.map((block) => (
+        <SemesterBlock
+          key={block.semester}
+          block={block}
+          onOpen={(subject) => setOpen({ subject, semester: block.semester })}
+        />
+      ))}
+
+      <AttendanceTable rows={attendance} />
+
+      <SubjectDrawer open={open} onClose={() => setOpen(null)} />
+    </div>
+  )
+}
+
+function SemesterBlock({
+  block,
+  onOpen,
+}: {
+  block: Block
+  onOpen: (subject: Subject) => void
+}) {
+  const failed = block.sgpi?.hasFail === true
+
+  return (
+    <section className="bg-card overflow-hidden rounded-lg border">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-3 py-2">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold">Semester {block.semester}</h2>
+          <Badge variant={failed ? "destructive" : "outline"}>
+            {failed
+              ? "SGPI withheld"
+              : `SGPI ${block.sgpi?.sgpi?.toFixed(2) ?? "—"}`}
+          </Badge>
+        </div>
+        {block.scheme && (
+          <div className="flex items-center gap-2">
+            <MarksSplitBar
+              compact
+              className="w-20"
+              total={block.scheme.maxTotal}
+              segments={schemeSegments(block.scheme)}
+            />
+            <span className="identifier text-muted-foreground">
+              {schemeLegend(block.scheme)}
+            </span>
+          </div>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => copyBlock(block)}>
+            <CopyIcon className="mr-1.5 size-3.5" />
+            Copy table
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportBlock(block, "csv")}
+          >
+            CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportBlock(block, "xlsx")}
+          >
+            Excel
+          </Button>
+        </div>
       </div>
 
-      <SubjectAttendance rows={attendance} />
-      <AwaitingPublication subjects={awaiting} />
-
-      {semesters.map((sem) => {
-        const result = cgpa.perSemester.find((p) => p.semester === sem.semester)
-        return (
-          <Card key={sem.semester}>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base font-semibold">
-                Semester {sem.semester}
-              </CardTitle>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground">SGPI</span>
-                <Badge
-                  variant={result?.sgpi.hasFail ? "destructive" : "outline"}
-                >
-                  {result?.sgpi.hasFail
-                    ? "Fail"
-                    : (result?.sgpi.sgpi?.toFixed(2) ?? "—")}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="text-muted-foreground text-xs">
-                    <tr className="[&>th]:px-2 [&>th]:py-1.5 [&>th]:text-left [&>th]:font-medium">
-                      <th>Code</th>
-                      <th>Subject</th>
-                      <th className="w-16">Credits</th>
-                      <th className="w-16">ISA</th>
-                      <th className="w-16">MSE</th>
-                      <th className="w-16">ESE</th>
-                      <th className="w-20">Total</th>
-                      <th className="w-14">%</th>
-                      <th className="w-16">Grade</th>
-                      <th className="w-8">
-                        <span className="sr-only">Expand</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-border divide-y">
-                    {sem.subjects.map((s) => (
-                      <SubjectRow key={s.code} subject={s} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )
-      })}
-    </div>
-  )
-}
-
-function Stat({
-  label,
-  value,
-  hint,
-}: {
-  label: string
-  value: string
-  hint: string
-}) {
-  return (
-    <div className="border-border rounded border p-4">
-      <p className="text-muted-foreground text-sm">{label}</p>
-      <p className="text-2xl font-semibold tabular-nums">{value}</p>
-      <p className="text-muted-foreground text-xs">{hint}</p>
-    </div>
-  )
-}
-
-/**
- * A subject, expandable to the component marks behind its total.
- *
- * A student checking against their own answer sheet needs ISA, both MSEs and
- * the ESE separately — a single total says what they scored but not where, and
- * "why is my total 62" is the actual question. Collapsed by default so a full
- * semester still reads at a glance, and only expandable once something has been
- * entered, since an empty breakdown answers nothing.
- */
-function SubjectRow({ subject }: { subject: Subject }) {
-  const [open, setOpen] = useState(false)
-  const c = computeMarks(subject.marks, subject.course)
-  const hasMse = subject.course.maxMse > 0
-  const entered =
-    subject.marks.isa != null ||
-    subject.marks.mse1 != null ||
-    subject.marks.mse2 != null ||
-    subject.marks.ese != null
-
-  return (
-    <>
-      <tr
-        className={cn(
-          "[&>td]:px-2 [&>td]:py-1.5",
-          entered &&
-            "hover:bg-muted/50 focus-visible:ring-ring cursor-pointer focus-visible:ring-2 focus-visible:outline-none"
-        )}
-        // A student reading their own marks may well be doing it by keyboard or
-        // screen reader, so the expander cannot be pointer-only. aria-expanded
-        // is what announces that the row has more behind it — the ▸ glyph says
-        // that to sighted users and nothing to anyone else.
-        {...(entered
-          ? {
-              role: "button" as const,
-              tabIndex: 0,
-              "aria-expanded": open,
-              onClick: () => setOpen((o) => !o),
-              onKeyDown: (e: React.KeyboardEvent) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault()
-                  setOpen((o) => !o)
-                }
-              },
-            }
-          : {})}
-      >
-        <td className="font-mono text-xs">{subject.code}</td>
-        <td>{subject.name}</td>
-        <td className="tabular-nums">{subject.credits}</td>
-        {/* The components sit in the row rather than behind the expander: a
-            student checking a marksheet wants ISA and MSE at a glance, and
-            opening every subject to find them was the slow way round. */}
-        <Cell value={subject.marks.isa} max={subject.course.maxIsa} />
-        <Cell
-          value={hasMse ? c.finalMse : null}
-          max={subject.course.maxMse}
-          absent={!hasMse}
-        />
-        <Cell value={subject.marks.ese} max={subject.course.maxEse} />
-        <SubjectResultCells marks={subject.marks} course={subject.course} />
-        <td className="text-muted-foreground text-xs" aria-hidden="true">
-          {entered ? (open ? "▾" : "▸") : ""}
-        </td>
-      </tr>
-
-      {open && (
-        <tr className="bg-muted/30">
-          <td colSpan={10} className="px-2 py-3">
-            <div className="flex flex-wrap items-start gap-6 text-xs">
-              <Part
-                label="ISA"
-                value={subject.marks.isa}
-                max={subject.course.maxIsa}
-              />
-              {hasMse && (
-                <>
-                  <Part
-                    label="MSE 1"
-                    value={subject.marks.mse1}
-                    max={subject.course.maxMse}
-                  />
-                  <Part
-                    label="MSE 2"
-                    value={subject.marks.mse2}
-                    max={subject.course.maxMse}
-                  />
-                  {/* The two MSEs average into one component, so the figure that
-                      actually enters the total is shown rather than leaving the
-                      arithmetic looking wrong. */}
-                  <Part
-                    label="MSE counted"
-                    value={c.finalMse}
-                    max={subject.course.maxMse}
-                  />
-                </>
-              )}
-              <Part
-                label="ESE"
-                value={subject.marks.ese}
-                max={subject.course.maxEse}
-              />
-              <div className="ml-auto text-right">
-                <p className="text-muted-foreground">Total</p>
-                <p className="font-medium tabular-nums">
-                  {c.total}/{subject.course.maxTotal}
-                </p>
-              </div>
-            </div>
-            {c.percentage == null && (
-              <p className="text-muted-foreground mt-3">
-                Not every component is in yet, so no grade is calculated. This
-                is what your teachers have entered so far.
-              </p>
+      <div className="max-h-[60svh] overflow-auto">
+        <table className="w-full min-w-[48rem] text-sm">
+          <thead>
+            <tr className={HEAD_ROW}>
+              <th className="w-24">Code</th>
+              <th>Subject</th>
+              <th className="w-16">Credits</th>
+              <th className="w-20">ISA</th>
+              <th className="w-20">MSE 1</th>
+              <th className="w-20">MSE 2</th>
+              <th className="w-20">ESE</th>
+              <th className="w-24">Total</th>
+              <th className="w-16">%</th>
+              <th className="w-32">Grade</th>
+              <th className="w-8">
+                <span className="sr-only">Breakdown</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-border divide-y">
+            {block.rows.map((row) =>
+              row.subject ? (
+                <SubjectRow
+                  key={row.code}
+                  subject={row.subject}
+                  onOpen={onOpen}
+                />
+              ) : (
+                <AwaitingRow key={row.code} code={row.code} name={row.name} />
+              )
             )}
-          </td>
-        </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+function SubjectRow({
+  subject,
+  onOpen,
+}: {
+  subject: Subject
+  onOpen: (subject: Subject) => void
+}) {
+  const hasMse = subject.course.maxMse > 0
+  const entered = marksState(subject.marks, subject.course) !== "empty"
+
+  return (
+    <tr
+      className={cn(
+        BODY_ROW,
+        entered &&
+          "hover:bg-muted/50 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2"
       )}
-    </>
+      {...(entered
+        ? {
+            role: "button" as const,
+            tabIndex: 0,
+            "aria-haspopup": "dialog" as const,
+            "aria-label": `${subject.code} breakdown`,
+            onClick: () => onOpen(subject),
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key !== "Enter" && e.key !== " ") return
+              e.preventDefault()
+              onOpen(subject)
+            },
+          }
+        : {})}
+    >
+      <td className="identifier">{subject.code}</td>
+      <td className="max-w-[18rem] truncate whitespace-normal">
+        {subject.name}
+      </td>
+      <td className="tabular-nums">{subject.credits}</td>
+      <ComponentCell value={subject.marks.isa} max={subject.course.maxIsa} />
+      <ComponentCell
+        value={hasMse ? subject.marks.mse1 : null}
+        max={subject.course.maxMse}
+      />
+      <ComponentCell
+        value={hasMse ? subject.marks.mse2 : null}
+        max={subject.course.maxMse}
+      />
+      <ComponentCell value={subject.marks.ese} max={subject.course.maxEse} />
+      <SubjectResultCells marks={subject.marks} course={subject.course} />
+      <td className="text-muted-foreground">
+        {entered && <ChevronRightIcon className="size-3.5" aria-hidden />}
+      </td>
+    </tr>
   )
 }
 
-function Part({
-  label,
-  value,
-  max,
-}: {
-  label: string
-  value: number | null
-  max: number
-}) {
+function AwaitingRow({ code, name }: { code: string; name: string }) {
   return (
-    <div>
-      <p className="text-muted-foreground">{label}</p>
-      <p className="font-medium tabular-nums">
-        {value == null ? (
-          <span className="text-muted-foreground font-normal">not entered</span>
-        ) : (
-          `${value}/${max}`
-        )}
-      </p>
-    </div>
+    <tr className={BODY_ROW}>
+      <td className="identifier">{code}</td>
+      <td className="max-w-[18rem] truncate whitespace-normal">{name}</td>
+      {MASKED_COLUMNS.map((column) => (
+        <td key={column} className="text-muted-foreground">
+          —
+        </td>
+      ))}
+      <td>
+        <Badge variant="outline" className="text-muted-foreground font-normal">
+          Awaiting publication
+        </Badge>
+      </td>
+      <td>
+        <span className="sr-only">No breakdown yet</span>
+      </td>
+    </tr>
   )
 }
 
-/**
- * Subjects a student is taking whose results are not published.
- *
- * Naming them matters: silence looks like the subject was forgotten, and a
- * student who can see four of their six subjects will assume the other two are
- * lost rather than pending. Marks are deliberately not shown — an unpublished
- * figure is not a result, and showing it would make publication meaningless.
- */
-function AwaitingPublication({
-  subjects,
-}: {
-  subjects: { code: string; name: string; semester: number }[]
-}) {
-  if (subjects.length === 0) return null
-  return (
-    <div className="border-border rounded border p-4">
-      <p className="text-sm font-medium">Awaiting publication</p>
-      <p className="text-muted-foreground mt-0.5 text-xs">
-        Your teachers are still entering or finalising these. They appear with a
-        grade once the class coordinator publishes them.
-      </p>
-      <ul className="mt-3 flex flex-col gap-1.5">
-        {subjects.map((s) => (
-          <li key={s.code} className="flex items-center gap-2 text-sm">
-            <span className="identifier">{s.code}</span>
-            <span className="truncate">{s.name}</span>
-            <span className="text-muted-foreground ml-auto text-xs">
-              Semester {s.semester}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-/**
- * One component's mark against its maximum.
- *
- * A blank is not a zero: "not entered" and "scored nothing" look identical as a
- * bare 0, and a student reading their own marksheet must be able to tell them
- * apart. A component the course does not have shows as a dash rather than an
- * empty gap that reads like missing data.
- */
-function Cell({
-  value,
-  max,
-  absent,
-}: {
-  value: number | null
-  max: number
-  absent?: boolean
-}) {
-  if (absent) {
-    return <td className="text-muted-foreground text-xs">—</td>
+function ComponentCell({ value, max }: { value: number | null; max: number }) {
+  if (max <= 0) {
+    return <td className="text-muted-foreground">—</td>
   }
   return (
-    <td className="tabular-nums">
-      {value == null ? (
-        <span className="text-muted-foreground text-xs">not entered</span>
-      ) : (
-        <>
-          {value}
-          <span className="text-muted-foreground text-xs">/{max}</span>
-        </>
-      )}
+    <td className="identifier">
+      {value == null ? <span className="text-muted-foreground">—</span> : value}
+      <span className="text-muted-foreground">/{max}</span>
     </td>
   )
 }
 
-/**
- * Attendance per subject, with the 75% rule stated where it applies.
- *
- * A single overall percentage cannot answer the question a student actually
- * has, because the rule is enforced per subject: 80% overall hides a subject
- * sitting at 60%, and the student finds out when they are barred from the exam.
- */
-function SubjectAttendance({
-  rows,
-}: {
-  rows: {
-    offeringId: string | null
-    code: string
-    name: string
-    present: number
-    total: number
-    percent: number | null
-  }[]
-}) {
+function AttendanceTable({ rows }: { rows: AttendanceRow[] }) {
   if (rows.length === 0) return null
+
   return (
-    <div className="border-border rounded border p-4">
-      <p className="text-sm font-medium">Attendance</p>
-      <p className="text-muted-foreground mt-0.5 text-xs">
-        VIT requires 75% in each subject. Late counts as present.
-      </p>
-      <ul className="mt-3 flex flex-col gap-2">
-        {rows.map((r) => {
-          const short = r.percent != null && r.percent < 75
-          return (
-            <li
-              key={r.offeringId ?? "class"}
-              className="flex items-center gap-2 text-sm"
-            >
-              <span className="identifier">{r.code}</span>
-              <span className="truncate">{r.name}</span>
-              <span className="text-muted-foreground ml-auto shrink-0 text-xs tabular-nums">
-                {r.present}/{r.total}
-              </span>
-              <span
-                className={
-                  short
-                    ? "text-destructive w-16 shrink-0 text-right text-sm font-medium tabular-nums"
-                    : "w-16 shrink-0 text-right text-sm font-medium tabular-nums"
-                }
-              >
-                {r.percent == null ? "—" : `${r.percent}%`}
-                {/* The number alone is not the warning — colour never carries
-                    meaning by itself. */}
-              </span>
-              {short && (
-                <span className="text-destructive shrink-0 text-xs">Short</span>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-    </div>
+    <section className="bg-card overflow-hidden rounded-lg border">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b px-3 py-2">
+        <h2 className="text-sm font-semibold">Attendance</h2>
+        <p className="text-muted-foreground text-xs">
+          VIT requires 75% in each subject. Late counts as present.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[32rem] text-sm">
+          <thead>
+            <tr className={HEAD_ROW}>
+              <th className="w-24">Code</th>
+              <th>Subject</th>
+              <th className="w-28">Sessions</th>
+              <th className="w-16">%</th>
+              <th className="w-24">Standing</th>
+            </tr>
+          </thead>
+          <tbody className="divide-border divide-y">
+            {rows.map((r) => {
+              const short = r.percent != null && r.percent < 75
+              return (
+                <tr key={r.offeringId ?? "class"} className={BODY_ROW}>
+                  <td className="identifier">{r.code}</td>
+                  <td className="max-w-[18rem] truncate whitespace-normal">
+                    {r.name}
+                  </td>
+                  <td className="identifier">
+                    {r.present}
+                    <span className="text-muted-foreground">/{r.total}</span>
+                  </td>
+                  <td
+                    className={cn(
+                      "font-medium tabular-nums",
+                      short && "text-attention"
+                    )}
+                  >
+                    {r.percent == null ? "—" : `${r.percent}%`}
+                  </td>
+                  <td>
+                    {short ? (
+                      <Badge variant="outline" className="text-attention">
+                        Short
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">
+                        Meets 75%
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }

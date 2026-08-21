@@ -12,7 +12,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command"
 import { useSessionUser, useCan } from "@/components/session-provider"
-import { buildNavigation } from "@/lib/navigation"
+import { buildActions, buildNavigation } from "@/lib/navigation"
 
 /**
  * Opening the palette from a visible control.
@@ -36,10 +36,11 @@ export function openCommandPalette() {
  * through a tree they have to re-read every time. Typing three letters is the
  * whole interaction.
  *
- * Entries come from buildNavigation, the same function the sidebar renders,
- * rather than a second list. A palette with its own list is a list that will
- * disagree: it would keep offering a page after a capability was revoked, and
- * land the user on a Forbidden screen the sidebar had already stopped showing.
+ * Entries come from buildNavigation and buildActions, reading the same context
+ * the sidebar renders from, rather than a second list. A palette with its own
+ * list is a list that will disagree: it would keep offering a page after a
+ * capability was revoked, and land the user on a Forbidden screen the sidebar
+ * had already stopped showing.
  */
 export function CommandPalette() {
   const router = useRouter()
@@ -64,12 +65,15 @@ export function CommandPalette() {
     }
   }, [])
 
-  const domains = buildNavigation({
+  const navContext = {
     tier: session.tier,
     can,
     isCoordinator: session.coordinatorClassIds.length > 0,
     hasClasses: session.classIds.length > 0,
-  })
+    classIds: session.classIds,
+  }
+  const sections = buildNavigation(navContext)
+  const actions = buildActions(navContext)
 
   const go = (url: string) => {
     setOpen(false)
@@ -86,20 +90,35 @@ export function CommandPalette() {
       <CommandInput placeholder="Go to…" />
       <CommandList>
         <CommandEmpty>Nothing matches that.</CommandEmpty>
-        {domains.map((d) => (
-          <CommandGroup key={d.domain} heading={d.domain}>
-            {d.items.map((item) => (
+        {actions.length > 0 && (
+          <CommandGroup heading="Actions">
+            {actions.map((a) => (
               <CommandItem
-                // The domain is part of the search text, so "people roster"
-                // finds the roster even though the link is called "Student
-                // roster" — people search for where a thing lives as often as
-                // for what it is called.
+                key={a.url}
+                value={`actions ${a.title} ${a.hint} ${a.url}`}
+                onSelect={() => go(a.url)}
+              >
+                {a.title}
+                <CommandShortcut>{a.hint}</CommandShortcut>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+        {sections.map((section, index) => (
+          <CommandGroup
+            key={section.label ?? index}
+            heading={section.label ?? "Navigation"}
+          >
+            {section.items.map((item) => (
+              <CommandItem
                 key={item.url}
-                value={`${d.domain} ${item.title} ${item.url}`}
+                value={`${section.label ?? ""} ${item.title} ${item.url}`}
                 onSelect={() => go(item.url)}
               >
                 {item.title}
-                <CommandShortcut>{d.domain}</CommandShortcut>
+                {section.label && (
+                  <CommandShortcut>{section.label}</CommandShortcut>
+                )}
               </CommandItem>
             ))}
           </CommandGroup>

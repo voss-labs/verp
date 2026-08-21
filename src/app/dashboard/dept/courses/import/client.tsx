@@ -52,9 +52,11 @@ export function ImportClient({
   // a guess where a two-click answer is certain.
   const [year, setYear] = useState("FE")
   const [rows, setRows] = useState<Row[] | null>(null)
-  const [meta, setMeta] = useState<{ fileName: string; pages: number } | null>(
-    null
-  )
+  const [meta, setMeta] = useState<{
+    fileName: string
+    fileSize: number
+    pages: number
+  } | null>(null)
   const [picked, setPicked] = useState<Set<string>>(new Set())
 
   async function upload(file: File) {
@@ -73,7 +75,11 @@ export function ImportClient({
       }
       const parsed = json.data.courses as Row[]
       setRows(parsed)
-      setMeta({ fileName: json.data.fileName, pages: json.data.pages })
+      setMeta({
+        fileName: json.data.fileName,
+        fileSize: file.size,
+        pages: json.data.pages,
+      })
       // Pre-select only rows whose name came from a labelled "Course Name:"
       // field. Names recovered from the scheme table agree with those only
       // about half the time, and a wrong name that looks filled in never gets
@@ -105,6 +111,7 @@ export function ImportClient({
       const res = await bulkCreateCoursesAction({
         departmentCode: dept,
         year,
+        file: meta ? { name: meta.fileName, size: meta.fileSize } : null,
         courses: chosen.map((c) => ({
           courseCode: c.courseCode,
           courseName: c.courseName,

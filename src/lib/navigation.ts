@@ -1,131 +1,251 @@
-// Navigation derived from capabilities and scope, not from a role array.
-//
-// The sidebar previously held four hardcoded lists, one per tier. Every new
-// page meant editing each of them, they drifted (a coordinator and a plain TR
-// are both `faculty` and saw an identical menu despite different
-// responsibilities), and a capability granted through an override changed what
-// the server allowed without changing what the product offered.
-//
-// Domains come from the spec's stable information architecture: the same entity
-// appears in the same place for everyone, and only the scope differs.
-
 import type { Capability } from "@/lib/rbac"
 
-export type NavLink = { title: string; url: string }
-export type NavDomain = { domain: string; url: string; items: NavLink[] }
+export type NavIcon =
+  | "overview"
+  | "students"
+  | "faculty"
+  | "departments"
+  | "roles"
+  | "audit"
+  | "imports"
+  | "console"
+  | "classes"
+  | "courses"
+  | "dept"
+  | "appoint"
+  | "marks"
+
+export type NavItem = { title: string; url: string; icon: NavIcon }
+export type NavSection = {
+  label?: string
+  trailing?: boolean
+  items: NavItem[]
+}
+export type NavAction = { title: string; url: string; hint: string }
 
 export type NavContext = {
   tier: "super_admin" | "hod" | "faculty" | "student" | null
   can: (c: Capability) => boolean
-  /** Someone coordinates at least one class — a responsibility, not a tier. */
   isCoordinator: boolean
   hasClasses: boolean
+  isTeacher?: boolean
+  classIds?: string[]
 }
 
-export function buildNavigation(ctx: NavContext): NavDomain[] {
-  const { can, tier } = ctx
-  const domains: NavDomain[] = []
+const OVERVIEW: NavItem = {
+  title: "Overview",
+  url: "/dashboard",
+  icon: "overview",
+}
 
-  domains.push({
-    domain: "Overview",
-    url: "/dashboard",
-    items: [{ title: "Overview", url: "/dashboard" }],
-  })
+const canImport = (can: NavContext["can"]) =>
+  can("student:update") ||
+  can("faculty:create") ||
+  can("course:create") ||
+  can("marks:write")
 
-  // A student's whole product is their own record.
-  if (tier === "student") {
-    domains.push({
-      domain: "My academics",
-      url: "/dashboard/my-marks",
-      items: [{ title: "Marks & SGPI", url: "/dashboard/my-marks" }],
-    })
-    return domains
-  }
-
-  const academics: NavLink[] = []
-  if (ctx.hasClasses || tier === "super_admin" || tier === "hod") {
-    academics.push({ title: "Classes", url: "/dashboard/class" })
-  }
-  // The catalogue sits inside the department workspace, whose layout admits
-  // only an HOD or an admin. Offering it on course:read alone — which every
-  // teacher has — produced a link that bounced them to the Overview. A teacher
-  // still picks from the catalogue, on their class's Subjects page, which is
-  // where that choice belongs.
-  if (can("course:read") && (tier === "hod" || tier === "super_admin")) {
-    academics.push({
-      title: "Course catalogue",
-      url: "/dashboard/dept/courses",
-    })
-  }
-  if (academics.length) {
-    domains.push({
-      domain: "Academics",
-      url: academics[0].url,
-      items: academics,
-    })
-  }
-
-  const org: NavLink[] = []
-  if (can("dept:read"))
-    org.push({ title: "Departments", url: "/dashboard/dept" })
-  // Appointing is assignment work; offering it without both halves would lead
-  // to a page whose actions are refused.
-  if (can("assignment:create") && can("offering:create")) {
-    org.push({ title: "Appoint faculty", url: "/dashboard/dept/appoint" })
-  }
-  if (org.length) {
-    domains.push({ domain: "Organization", url: org[0].url, items: org })
-  }
-
-  const people: NavLink[] = []
+function superAdminSections(can: NavContext["can"]): NavSection[] {
+  const primary: NavItem[] = [OVERVIEW]
   if (can("student:read")) {
-    people.push({ title: "Student roster", url: "/dashboard/students" })
+    primary.push({
+      title: "Students",
+      url: "/dashboard/students",
+      icon: "students",
+    })
   }
   if (can("faculty:read")) {
-    people.push({ title: "Faculty", url: "/dashboard/faculty" })
-  }
-  if (people.length) {
-    domains.push({ domain: "People", url: people[0].url, items: people })
-  }
-
-  const imports: NavLink[] = []
-  if (can("student:update")) {
-    imports.push({ title: "Import roster", url: "/dashboard/students/import" })
-  }
-  if (can("faculty:create")) {
-    imports.push({
-      title: "Import faculty",
-      url: "/dashboard/dept/faculty-import",
+    primary.push({
+      title: "Faculty",
+      url: "/dashboard/faculty",
+      icon: "faculty",
     })
   }
-  if (imports.length) {
-    domains.push({ domain: "Import", url: imports[0].url, items: imports })
-  }
-
-  const admin: NavLink[] = []
-  if (tier === "super_admin") {
-    admin.push({ title: "Console", url: "/dashboard/admin" })
-    admin.push({ title: "Departments", url: "/dashboard/admin/departments" })
-    admin.push({ title: "Faculty", url: "/dashboard/admin/faculty" })
-  }
+  primary.push({
+    title: "Departments",
+    url: "/dashboard/admin/departments",
+    icon: "departments",
+  })
   if (can("permission:manage")) {
-    admin.push({ title: "Roles & permissions", url: "/dashboard/admin/roles" })
+    primary.push({
+      title: "Roles & permissions",
+      url: "/dashboard/admin/roles",
+      icon: "roles",
+    })
   }
   if (can("audit:read")) {
-    admin.push({ title: "Activity log", url: "/dashboard/audit" })
+    primary.push({
+      title: "Activity log",
+      url: "/dashboard/audit",
+      icon: "audit",
+    })
   }
-  if (admin.length) {
-    domains.push({ domain: "Administration", url: admin[0].url, items: admin })
+  if (canImport(can)) {
+    primary.push({
+      title: "Import center",
+      url: "/dashboard/imports",
+      icon: "imports",
+    })
   }
+  primary.push({ title: "Console", url: "/dashboard/admin", icon: "console" })
 
-  return domains
+  const department: NavItem[] = [
+    { title: "Classes", url: "/dashboard/class", icon: "classes" },
+  ]
+  if (can("course:read")) {
+    department.push({
+      title: "Course catalogue",
+      url: "/dashboard/dept/courses",
+      icon: "courses",
+    })
+  }
+  department.push({
+    title: "Department console",
+    url: "/dashboard/dept",
+    icon: "dept",
+  })
+
+  return [
+    { items: primary },
+    { label: "Department access", trailing: true, items: department },
+  ]
 }
 
-/**
- * What this person is in the class or department they are looking at, rather
- * than which row their tier sits in. A faculty member can coordinate one class
- * and merely teach another, and the header should say which.
- */
+function hodSections(ctx: NavContext): NavSection[] {
+  const { can } = ctx
+  const primary: NavItem[] = [
+    OVERVIEW,
+    { title: "Classes", url: "/dashboard/dept", icon: "classes" },
+  ]
+  if (can("assignment:create") && can("offering:create")) {
+    primary.push({
+      title: "Appoint faculty",
+      url: "/dashboard/dept/appoint",
+      icon: "appoint",
+    })
+  }
+  if (can("course:read")) {
+    primary.push({
+      title: "Course catalogue",
+      url: "/dashboard/dept/courses",
+      icon: "courses",
+    })
+  }
+  if (can("student:read")) {
+    primary.push({
+      title: "Students",
+      url: "/dashboard/students",
+      icon: "students",
+    })
+  }
+  if (can("faculty:read")) {
+    primary.push({
+      title: "Faculty",
+      url: "/dashboard/faculty",
+      icon: "faculty",
+    })
+  }
+  if (canImport(can)) {
+    primary.push({
+      title: "Import center",
+      url: "/dashboard/imports",
+      icon: "imports",
+    })
+  }
+
+  const sections: NavSection[] = [{ items: primary }]
+  if (ctx.hasClasses) {
+    sections.push({
+      label: "Teaching",
+      trailing: true,
+      items: [
+        { title: "My classes", url: "/dashboard/class", icon: "classes" },
+      ],
+    })
+  }
+  return sections
+}
+
+function facultySections(ctx: NavContext): NavSection[] {
+  const { can } = ctx
+  const classIds = ctx.classIds ?? []
+  const primary: NavItem[] = [OVERVIEW]
+
+  if (classIds.length === 1) {
+    primary.push({
+      title: "My class",
+      url: `/dashboard/class/${classIds[0]}`,
+      icon: "classes",
+    })
+  } else if (ctx.hasClasses || classIds.length > 1) {
+    primary.push({
+      title: "My classes",
+      url: "/dashboard/class",
+      icon: "classes",
+    })
+  }
+  if (canImport(can)) {
+    primary.push({
+      title: "Import center",
+      url: "/dashboard/imports",
+      icon: "imports",
+    })
+  }
+  return [{ items: primary }]
+}
+
+export function buildNavigation(ctx: NavContext): NavSection[] {
+  switch (ctx.tier) {
+    case "student":
+      return [
+        {
+          items: [
+            OVERVIEW,
+            { title: "My marks", url: "/dashboard/my-marks", icon: "marks" },
+          ],
+        },
+      ]
+    case "super_admin":
+      return superAdminSections(ctx.can)
+    case "hod":
+      return hodSections(ctx)
+    case "faculty":
+      return facultySections(ctx)
+    default:
+      return [{ items: [OVERVIEW] }]
+  }
+}
+
+/** Quick actions from the same context as buildNavigation, gated by the same capabilities the pages check. */
+export function buildActions(ctx: NavContext): NavAction[] {
+  const { can } = ctx
+  const actions: NavAction[] = []
+  const classId = ctx.classIds?.[0]
+
+  if (classId && can("attendance:write")) {
+    actions.push({
+      title: "Take attendance",
+      url: `/dashboard/class/${classId}/attendance`,
+      hint: "Today's register",
+    })
+  }
+  if (classId && can("marks:write")) {
+    actions.push({
+      title: "Enter marks",
+      url: `/dashboard/class/${classId}/marks`,
+      hint: "Marks grid",
+    })
+  }
+  if (can("student:update")) {
+    actions.push({
+      title: "Import roster",
+      url: "/dashboard/students/import",
+      hint: "Spreadsheet",
+    })
+  }
+  return actions
+}
+
+/** The responsibility this person holds, not the tier row they sit in. */
 export function contextualRole(ctx: NavContext): string {
   switch (ctx.tier) {
     case "super_admin":
@@ -135,7 +255,8 @@ export function contextualRole(ctx: NavContext): string {
     case "student":
       return "Student"
     case "faculty":
-      return ctx.isCoordinator ? "Coordinator" : "Teacher"
+      if (!ctx.isCoordinator) return "Teacher"
+      return ctx.isTeacher ? "Teacher · Coordinator" : "Coordinator"
     default:
       return "Pending"
   }

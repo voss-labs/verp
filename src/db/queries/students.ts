@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm"
 import { db } from "@/db"
-import { students } from "@/db/schema"
+import { classes, courseOfferings, courses, marks, students } from "@/db/schema"
+import { getAttendanceBySubject } from "./attendance"
 
 // Coordinator scope: the students of a class are exactly those whose roll-derived
 // class_key matches the class — no stored link to populate or drift.
@@ -86,6 +87,90 @@ export async function getAllStudents(filters?: {
       asc(students.firstName),
     ],
   })
+}
+
+export type StudentProfileSubject = {
+  offeringId: string
+  semester: number
+  code: string
+  name: string
+  courseType: string
+  credits: number
+  maxIsa: number
+  maxMse: number
+  maxEse: number
+  maxTotal: number
+  isa: number | null
+  mse1: number | null
+  mse2: number | null
+  ese: number | null
+  published: boolean
+}
+
+export type StudentProfileClass = {
+  id: string
+  classKey: string
+  admissionYear: number
+  departmentCode: string
+  division: string
+}
+
+export type StudentProfile = {
+  class: StudentProfileClass | null
+  subjects: StudentProfileSubject[]
+  attendance: Awaited<ReturnType<typeof getAttendanceBySubject>>
+}
+
+export async function getStudentProfile(student: {
+  id: string
+  classKey: string | null
+}): Promise<StudentProfile> {
+  const [cls, rows, attendance] = await Promise.all([
+    student.classKey
+      ? db.query.classes.findFirst({
+          where: eq(classes.classKey, student.classKey),
+          columns: {
+            id: true,
+            classKey: true,
+            admissionYear: true,
+            departmentCode: true,
+            division: true,
+          },
+        })
+      : undefined,
+    db
+      .select({
+        offeringId: courseOfferings.id,
+        semester: courseOfferings.semester,
+        publishedAt: courseOfferings.publishedAt,
+        code: courses.courseCode,
+        name: courses.courseName,
+        courseType: courses.courseType,
+        credits: courses.credits,
+        maxIsa: courses.maxIsa,
+        maxMse: courses.maxMse,
+        maxEse: courses.maxEse,
+        maxTotal: courses.maxTotal,
+        isa: marks.isa,
+        mse1: marks.mse1,
+        mse2: marks.mse2,
+        ese: marks.ese,
+      })
+      .from(marks)
+      .innerJoin(
+        courseOfferings,
+        eq(marks.courseOfferingId, courseOfferings.id)
+      )
+      .innerJoin(courses, eq(courseOfferings.courseId, courses.id))
+      .where(eq(marks.studentId, student.id)),
+    getAttendanceBySubject(student.id),
+  ])
+
+  const subjects = rows
+    .map(({ publishedAt, ...r }) => ({ ...r, published: publishedAt != null }))
+    .sort((a, b) => a.semester - b.semester || a.code.localeCompare(b.code))
+
+  return { class: cls ?? null, subjects, attendance }
 }
 
 export async function createStudent(data: typeof students.$inferInsert) {

@@ -25,7 +25,7 @@ export default async function MarksImportPage({
     user.tier === "super_admin" ||
     user.classIds.includes(classId) ||
     (user.tier === "hod" && user.deptCodes.includes(cls.departmentCode))
-  if (!inScope) redirect("/dashboard/class")
+  if (!inScope) redirect("/dashboard/class?denied=class")
 
   // Same rule as the marks grid: a coordinator or HOD runs the whole timetable,
   // a TR gets the subjects handed to them. Offering the rest would let someone

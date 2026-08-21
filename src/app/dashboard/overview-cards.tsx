@@ -2,7 +2,10 @@ import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { buttonVariants } from "@/components/ui/button-variants"
+import {
+  buttonVariants,
+  type ButtonVariants,
+} from "@/components/ui/button-variants"
 import { cn } from "@/lib/utils"
 
 /**
@@ -46,24 +49,6 @@ export function Attention({
   )
 }
 
-export function Stat({
-  label,
-  value,
-  hint,
-}: {
-  label: string
-  value: string
-  hint?: string
-}) {
-  return (
-    <div className="border-border rounded border p-4">
-      <p className="text-muted-foreground text-sm">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
-      {hint && <p className="text-muted-foreground mt-0.5 text-xs">{hint}</p>}
-    </div>
-  )
-}
-
 export function WorkCard({
   title,
   subtitle,
@@ -74,7 +59,11 @@ export function WorkCard({
   title: React.ReactNode
   subtitle?: string
   href?: string
-  action?: { label: string; href: string }
+  action?: {
+    label: string
+    href: string
+    variant?: ButtonVariants["variant"]
+  }
   children?: React.ReactNode
 }) {
   return (
@@ -97,7 +86,10 @@ export function WorkCard({
         {action && (
           <Link
             href={action.href}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
+            className={buttonVariants({
+              variant: action.variant ?? "outline",
+              size: "sm",
+            })}
           >
             {action.label}
           </Link>

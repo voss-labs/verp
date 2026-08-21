@@ -1,8 +1,12 @@
+import Link from "next/link"
 import { PageHeader } from "@/components/page-header"
+import { StatCard, StatCardRow } from "@/components/stat-card"
+import { can } from "@/lib/rbac"
 import { listPendingRequestsForClass } from "@/db/queries/onboarding"
 import { listClassStaff } from "@/db/queries/class-staff"
 import { getStudentsByClassKeys } from "@/db/queries/students"
 import { listOfferingsForClass } from "@/db/queries/offerings"
+import { countClassTeachers } from "@/lib/allocation"
 import { QueueClient } from "./queue-client"
 import { ClassTabs } from "./class-tabs"
 import { classTabs, classTrail, requireClassContext } from "./class-context"
@@ -26,9 +30,13 @@ export default async function ClassOverviewPage({
   ])
 
   const coordinator = staff.find((s) => s.role === "academic_coordinator")
-  const teachers = staff.filter((s) => s.role === "tr")
+  const teacherCount = countClassTeachers(
+    staff,
+    offerings.map((o) => o.faculty?.id ?? null)
+  )
   const unallocated = offerings.filter((o) => !o.faculty).length
   const unclaimed = roster.filter((s) => !s.authUserId).length
+  const canReachDept = can(user, "dept:read")
 
   return (
     <>
@@ -47,28 +55,48 @@ export default async function ClassOverviewPage({
         />
 
         {/* Who runs this class, stated before the work it needs. */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Fact label="Class key" value={cls.classKey} mono />
-          <Fact
+        <StatCardRow>
+          <StatCard
+            label="Class key"
+            value={<span className="identifier">{cls.classKey}</span>}
+          />
+          <StatCard
             label="Coordinator"
+            tone={coordinator ? "default" : "attention"}
             value={
-              coordinator
-                ? `${coordinator.firstName} ${coordinator.lastName}`.trim()
-                : "Unassigned"
+              coordinator ? (
+                <span className="text-base font-medium">
+                  {`${coordinator.firstName} ${coordinator.lastName}`.trim()}
+                </span>
+              ) : (
+                <span className="flex flex-col gap-1">
+                  <span className="text-base font-medium">Unassigned</span>
+                  {canReachDept && (
+                    <Link
+                      href="/dashboard/dept"
+                      className="text-blue text-xs font-normal underline-offset-2 hover:underline"
+                    >
+                      Appoint one in My department
+                    </Link>
+                  )}
+                </span>
+              )
             }
-            warn={!coordinator}
           />
-          <Fact
+          <StatCard
             label="Teachers"
-            value={teachers.length ? String(teachers.length) : "None"}
-            warn={teachers.length === 0}
+            value={teacherCount}
+            tone={teacherCount === 0 ? "attention" : "default"}
+            detail={
+              teacherCount === 0 ? "Nobody teaches this class yet" : undefined
+            }
           />
-          <Fact
+          <StatCard
             label="Students"
-            value={String(roster.length)}
-            hint={unclaimed > 0 ? `${unclaimed} not signed in` : undefined}
+            value={roster.length}
+            detail={unclaimed > 0 ? `${unclaimed} not signed in` : undefined}
           />
-        </div>
+        </StatCardRow>
 
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold">Needs attention</h2>
@@ -125,37 +153,5 @@ export default async function ClassOverviewPage({
         </section>
       </div>
     </>
-  )
-}
-
-function Fact({
-  label,
-  value,
-  hint,
-  mono,
-  warn,
-}: {
-  label: string
-  value: string
-  hint?: string
-  mono?: boolean
-  warn?: boolean
-}) {
-  return (
-    <div className="border-border rounded border p-3">
-      <p className="text-muted-foreground text-xs">{label}</p>
-      <p
-        className={[
-          "mt-0.5 text-sm font-medium",
-          mono ? "identifier" : "",
-          warn ? "text-destructive" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        {value}
-      </p>
-      {hint && <p className="text-muted-foreground mt-0.5 text-xs">{hint}</p>}
-    </div>
   )
 }

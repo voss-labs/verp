@@ -3,6 +3,8 @@ import {
   canAllocate,
   canReopenLock,
   canWriteOffering,
+  classTeacherOptions,
+  countClassTeachers,
   inDeptScope,
   type AllocationActor,
 } from "./allocation"
@@ -226,5 +228,85 @@ describe("inDeptScope", () => {
 
   it("refuses an unplaced account", () => {
     expect(inDeptScope({ tier: null, deptCodes: [] }, "EXCS")).toBe(false)
+  })
+})
+
+describe("classTeacherOptions", () => {
+  const staff = [
+    { facultyId: "f-ac", name: "Asha Rao", role: "academic_coordinator" },
+    { facultyId: "f-tr", name: "Bhavesh Kale", role: "tr" },
+  ]
+
+  it("keeps a holder with no assignment row on the list", () => {
+    const options = classTeacherOptions(staff, [
+      { facultyId: "f-hod", name: "Chitra Nene" },
+    ])
+    expect(options.map((o) => o.facultyId)).toEqual(["f-ac", "f-tr", "f-hod"])
+    expect(options.find((o) => o.facultyId === "f-hod")?.role).toBeNull()
+  })
+
+  it("resolves every allocated id to an option", () => {
+    const allocated = ["f-tr", "f-hod", "f-gone"]
+    const options = classTeacherOptions(
+      staff,
+      allocated.map((facultyId) => ({ facultyId, name: facultyId }))
+    )
+    for (const id of allocated) {
+      expect(options.some((o) => o.facultyId === id)).toBe(true)
+    }
+  })
+
+  it("does not list a teacher twice when they are both staff and allocated", () => {
+    const options = classTeacherOptions(staff, [
+      { facultyId: "f-tr", name: "Bhavesh Kale" },
+    ])
+    expect(options).toHaveLength(2)
+    expect(options.find((o) => o.facultyId === "f-tr")?.role).toBe("tr")
+  })
+
+  it("orders by name so the list does not shuffle between loads", () => {
+    const options = classTeacherOptions(
+      [{ facultyId: "f-z", name: "Zoya Sheikh", role: "tr" }],
+      [{ facultyId: "f-a", name: "Anil Desai" }]
+    )
+    expect(options.map((o) => o.name)).toEqual(["Anil Desai", "Zoya Sheikh"])
+  })
+
+  it("returns nothing for a class with no staff and no allocations", () => {
+    expect(classTeacherOptions([], [])).toEqual([])
+  })
+})
+
+describe("countClassTeachers", () => {
+  const staff = [
+    { facultyId: "f-ac", role: "academic_coordinator" },
+    { facultyId: "f-tr", role: "tr" },
+  ]
+
+  it("counts a holder the class has no tr row for", () => {
+    expect(countClassTeachers([], ["f-hod", null])).toBe(1)
+  })
+
+  it("cannot read None while a subject is allocated", () => {
+    const allocated = [null, "f-hod", null, null]
+    const unallocated = allocated.filter((id) => !id).length
+    expect(unallocated).toBeLessThan(allocated.length)
+    expect(countClassTeachers([], allocated)).toBeGreaterThan(0)
+  })
+
+  it("counts a tr who holds no subject yet", () => {
+    expect(countClassTeachers(staff, [null])).toBe(1)
+  })
+
+  it("counts a coordinator only once they teach something", () => {
+    expect(countClassTeachers(staff, ["f-ac"])).toBe(2)
+  })
+
+  it("does not double-count a tr who holds two subjects", () => {
+    expect(countClassTeachers(staff, ["f-tr", "f-tr"])).toBe(1)
+  })
+
+  it("is None only when nobody teaches and nobody is appointed", () => {
+    expect(countClassTeachers([], [null, undefined])).toBe(0)
   })
 })

@@ -91,23 +91,25 @@ export function DevActorSwitcher({
               <DropdownMenuItem
                 key={p.key}
                 onClick={() => choose(p.key)}
-                className="gap-2"
+                className="gap-2 py-1.5"
               >
-                <div className="grid flex-1 leading-tight">
-                  <span className="text-sm font-medium">
+                <div className="grid min-w-0 flex-1 leading-tight">
+                  <span className="truncate text-sm font-medium">
                     {p.name}
                     <span className="text-muted-foreground ml-1.5 text-xs font-normal">
                       {p.role}
                     </span>
                   </span>
-                  <span className="text-muted-foreground text-xs">
+                  <span className="text-muted-foreground truncate text-xs">
                     {p.scope}
                   </span>
                 </div>
                 {p.key === current && (
-                  <CheckIcon className="size-4 shrink-0" aria-hidden="true" />
+                  <>
+                    <CheckIcon className="size-4 shrink-0" aria-hidden="true" />
+                    <span className="sr-only">selected</span>
+                  </>
                 )}
-                {p.key === current && <span className="sr-only">selected</span>}
               </DropdownMenuItem>
             ))}
 

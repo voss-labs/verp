@@ -6,8 +6,12 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { ConfirmAction } from "@/components/confirm-action"
 import { parseRollNumber, expectedYear } from "@/lib/roll-number"
-import { submitEnrollmentRequestAction } from "../onboarding/actions"
+import {
+  submitEnrollmentRequestAction,
+  withdrawEnrollmentRequestAction,
+} from "../onboarding/actions"
 
 function splitName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -134,5 +138,31 @@ export function RegisterForm({
         </Button>
       </div>
     </div>
+  )
+}
+
+export function WithdrawRequest({ rollNumber }: { rollNumber: string }) {
+  const router = useRouter()
+
+  async function withdraw() {
+    const res = await withdrawEnrollmentRequestAction()
+    if (res.error) {
+      toast.error(res.error)
+      return
+    }
+    toast.success("Request withdrawn")
+    router.refresh()
+  }
+
+  return (
+    <ConfirmAction
+      label="Withdraw request and start over"
+      variant="outline"
+      size="sm"
+      title="Withdraw this request?"
+      description={`Your claim on ${rollNumber} is deleted and your coordinator stops seeing it. You can enter a roll number again straight after.`}
+      confirmLabel="Withdraw"
+      onConfirm={withdraw}
+    />
   )
 }

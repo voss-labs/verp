@@ -29,6 +29,23 @@ export async function createEnrollmentRequest(input: {
   return row
 }
 
+/** Withdraws an open request. Scoped to its owner, so the id alone is not enough. */
+export async function deleteOwnEnrollmentRequest(
+  id: string,
+  authUserId: string
+) {
+  const [row] = await db
+    .delete(enrollmentRequests)
+    .where(
+      and(
+        eq(enrollmentRequests.id, id),
+        eq(enrollmentRequests.authUserId, authUserId)
+      )
+    )
+    .returning()
+  return row
+}
+
 /** The coordinator's queue: pending requests for one class, oldest first. */
 export async function listPendingRequestsForClass(classId: string) {
   return db

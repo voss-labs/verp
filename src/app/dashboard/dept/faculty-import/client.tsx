@@ -27,6 +27,9 @@ export function FacultyImportClient({
   const [pending, start] = useTransition()
   const [deptCode, setDeptCode] = useState(departments[0]?.code ?? "")
   const [rows, setRows] = useState<FacultyRow[] | null>(null)
+  const [source, setSource] = useState<{ name: string; size: number } | null>(
+    null
+  )
   const [assignClassId, setAssignClassId] = useState("")
   const [assignRole, setAssignRole] = useState<Role>("tr")
 
@@ -44,9 +47,11 @@ export function FacultyImportClient({
       if (parsed.length === 0) {
         toast.error("No faculty rows found. Expected name, email, employee ID.")
         setRows(null)
+        setSource(null)
         return
       }
       setRows(parsed)
+      setSource({ name: file.name, size: file.size })
     }
     reader.readAsText(file)
   }
@@ -71,6 +76,7 @@ export function FacultyImportClient({
         })),
         assignClassId: assignClassId || null,
         assignRole: assignClassId ? assignRole : null,
+        file: source,
       })
       if (res.error) {
         toast.error(res.error)

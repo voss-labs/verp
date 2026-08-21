@@ -8,6 +8,7 @@ import { getErrorMessage } from "@/lib/error-utils"
 import { classKey, tryClassKeyFromRoll } from "@/lib/class-key"
 import { BRANCH_CODE_BY_DEPT, divisionsForBranch } from "@/lib/roll-number"
 import { createAuditLog } from "@/db/queries"
+import { createImportBatch } from "@/db/queries/import-batches"
 import {
   getCourseByCode,
   getCourseById,
@@ -35,7 +36,12 @@ import { createFaculty, getFacultyByEmail } from "@/db/queries/faculty"
 
 type Result = { error: string | null }
 
+type ImportFile = { name: string; size?: number }
+
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
+const importFileName = (file?: ImportFile | null) =>
+  file?.name ?? "(file name not sent)"
 
 // An HOD adds a teaching faculty to their own department. Role is always the plain
 // faculty tier — an HOD cannot mint another HOD or an admin (that stays super_admin).
@@ -94,6 +100,7 @@ export async function bulkImportFacultyAction(input: {
   }[]
   assignClassId?: string | null
   assignRole?: "academic_coordinator" | "tr" | null
+  file?: ImportFile | null
 }): Promise<{
   error: string | null
   created?: number
@@ -104,6 +111,26 @@ export async function bulkImportFacultyAction(input: {
   try {
     const user = await getSessionUser()
     authorize(user, "faculty:create")
+
+    const recordBatch = (
+      status: "committed" | "failed",
+      counts: { inserted: number; updated: number; skipped: number },
+      errorSummary: string | null
+    ) =>
+      createImportBatch({
+        kind: "faculty",
+        fileName: importFileName(input.file),
+        fileSize: input.file?.size ?? null,
+        rowCount: input.rows.length,
+        insertedCount: counts.inserted,
+        updatedCount: counts.updated,
+        skippedCount: counts.skipped,
+        status,
+        errorSummary,
+        scopeLabel: input.deptCode,
+        actorUserId: user!.id,
+      })
+
     if (!inDeptScope(user!, input.deptCode))
       return { error: "That department is not in your scope." }
     if (input.rows.length === 0) return { error: "No rows to import." }
@@ -112,8 +139,15 @@ export async function bulkImportFacultyAction(input: {
     let assignClass: Awaited<ReturnType<typeof getClassById>> | null = null
     if (input.assignClassId && input.assignRole) {
       assignClass = await getClassById(input.assignClassId)
-      if (!assignClass || assignClass.departmentCode !== input.deptCode)
-        return { error: "That class is not in your department." }
+      if (!assignClass || assignClass.departmentCode !== input.deptCode) {
+        const message = "That class is not in your department."
+        await recordBatch(
+          "failed",
+          { inserted: 0, updated: 0, skipped: input.rows.length },
+          message
+        )
+        return { error: message }
+      }
     }
 
     let created = 0
@@ -170,6 +204,11 @@ export async function bulkImportFacultyAction(input: {
         role: input.assignRole ?? null,
       },
     })
+    await recordBatch(
+      "committed",
+      { inserted: created, updated: existing, skipped: failed },
+      failed > 0 ? `${failed} row(s) rejected as incomplete` : null
+    )
     revalidatePath("/dashboard/dept")
     return { error: null, created, existing, assigned, failed }
   } catch (err) {
@@ -521,6 +560,7 @@ export async function bulkCreateCoursesAction(input: {
   departmentCode: string
   /** Which year of the programme this syllabus covers. */
   year?: string | null
+  file?: ImportFile | null
   courses: {
     courseCode: string
     courseName: string
@@ -535,6 +575,25 @@ export async function bulkCreateCoursesAction(input: {
   try {
     const user = await getSessionUser()
     authorize(user, "course:create")
+
+    const recordBatch = (
+      status: "committed" | "failed",
+      counts: { inserted: number; skipped: number },
+      errorSummary: string | null
+    ) =>
+      createImportBatch({
+        kind: "courses",
+        fileName: importFileName(input.file),
+        fileSize: input.file?.size ?? null,
+        rowCount: input.courses.length,
+        insertedCount: counts.inserted,
+        skippedCount: counts.skipped,
+        status,
+        errorSummary,
+        scopeLabel: input.departmentCode,
+        actorUserId: user!.id,
+      })
+
     const inScope =
       user!.tier === "super_admin" ||
       user!.deptCodes.includes(input.departmentCode)
@@ -581,6 +640,11 @@ export async function bulkCreateCoursesAction(input: {
       targetId: input.departmentCode,
       details: { created, skipped, rejected: problems.length },
     })
+    await recordBatch(
+      "committed",
+      { inserted: created, skipped: skipped + problems.length },
+      problems.length > 0 ? problems.slice(0, 5).join("; ") : null
+    )
     revalidatePath("/dashboard/dept/courses")
 
     // A partial import is still a success: the rows that were fine are in, and

@@ -3,6 +3,14 @@
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -11,8 +19,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { SearchIcon, DownloadIcon, Loader2Icon } from "lucide-react"
+import {
+  SearchIcon,
+  DownloadIcon,
+  Loader2Icon,
+  ScrollTextIcon,
+} from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
+import { EmptyState } from "@/components/empty-state"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,6 +65,11 @@ export function AuditLogClient({
   const [search, setSearch] = useState("")
   const [filterAction, setFilterAction] = useState("all")
   const [isExporting, setIsExporting] = useState(false)
+
+  const actionItems = [
+    { value: "all", label: "All actions" },
+    ...actionTypes.map((action) => ({ value: action, label: action })),
+  ]
 
   const filtered = logs.filter((log) => {
     if (filterAction !== "all" && log.action !== filterAction) return false
@@ -114,36 +133,35 @@ export function AuditLogClient({
           <div className="relative max-w-xs flex-1">
             <SearchIcon className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
-              placeholder="Search logs..."
+              placeholder="Search entries…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
             />
           </div>
-          <div className="flex flex-wrap gap-1">
-            <button
-              onClick={() => setFilterAction("all")}
-              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                filterAction === "all"
-                  ? "bg-blue text-blue-foreground shadow-sm"
-                  : "bg-muted hover:bg-muted/80 text-muted-foreground"
-              }`}
+          <div className="flex items-center gap-2">
+            <Label
+              htmlFor="audit-action"
+              className="text-muted-foreground text-xs"
             >
-              All
-            </button>
-            {actionTypes.map((action) => (
-              <button
-                key={action}
-                onClick={() => setFilterAction(action)}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                  filterAction === action
-                    ? "bg-blue text-blue-foreground shadow-sm"
-                    : "bg-muted hover:bg-muted/80 text-muted-foreground"
-                }`}
-              >
-                {action}
-              </button>
-            ))}
+              Action
+            </Label>
+            <Select
+              value={filterAction}
+              items={actionItems}
+              onValueChange={(v) => v && setFilterAction(v)}
+            >
+              <SelectTrigger id="audit-action" className="h-9 w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {actionItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <DropdownMenu>
@@ -187,12 +205,21 @@ export function AuditLogClient({
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="text-muted-foreground h-24 text-center"
-                >
-                  No audit logs found.
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={5} className="p-0">
+                  {logs.length === 0 ? (
+                    <EmptyState
+                      icon={ScrollTextIcon}
+                      title="No audit entries yet"
+                      description="Administrative actions appear here as they happen."
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={SearchIcon}
+                      title="No entries match this filter"
+                      description="Clear the search or choose a different action."
+                    />
+                  )}
                 </TableCell>
               </TableRow>
             ) : (

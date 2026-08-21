@@ -15,9 +15,9 @@ import type { CourseInfo, MarksInput } from "@/lib/sgpi"
 export type MarkRow = MarksInput & { studentId: string }
 
 /** The component a value belongs to, and the maximum it may reach. */
-type Bound = { field: keyof MarksInput; label: string; max: number }
+export type Bound = { field: keyof MarksInput; label: string; max: number }
 
-function bounds(course: CourseInfo): Bound[] {
+export function markBounds(course: CourseInfo): Bound[] {
   const b: Bound[] = [{ field: "isa", label: "ISA", max: course.maxIsa }]
   if (course.maxMse > 0) {
     b.push({ field: "mse1", label: "MSE 1", max: course.maxMse })
@@ -43,7 +43,7 @@ export function invalidReason(
   if (!hasMse && (row.mse1 != null || row.mse2 != null)) {
     return "This subject has no MSE component."
   }
-  for (const b of bounds(course)) {
+  for (const b of markBounds(course)) {
     const v = row[b.field]
     if (v == null) continue
     if (!Number.isInteger(v)) return `${b.label} must be a whole number.`

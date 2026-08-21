@@ -22,9 +22,10 @@ export default async function FacultyPage() {
   return (
     <>
       <PageHeader
-        title="All Faculty"
+        title="All faculty"
         parent="Faculty"
         parentHref="/dashboard/faculty"
+        description="Everyone teaching in your scope, and what each of them runs"
       />
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <FacultyClient data={data} />

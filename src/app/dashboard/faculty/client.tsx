@@ -78,6 +78,7 @@ export function FacultyClient({ data }: { data: FacultyRow[] }) {
           filename: "Faculty",
           onExport: handleExport,
         }}
+        rowId={(f) => f.id}
         onRowClick={setOpen}
         mobileRow={(f) => ({
           title: `${f.firstName} ${f.lastName}`.trim(),

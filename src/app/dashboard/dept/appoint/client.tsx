@@ -6,6 +6,9 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ConfirmAction } from "@/components/confirm-action"
+import { EmptyState } from "@/components/empty-state"
+import { UsersIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   assignClassRoleAction,
@@ -99,11 +102,17 @@ export function AppointClient({
     : []
 
   function run(fn: () => Promise<{ error: string | null }>, ok: string) {
-    start(async () => {
-      const res = await fn()
-      if (res.error) return void toast.error(res.error)
-      toast.success(ok)
-      router.refresh()
+    return new Promise<void>((resolve) => {
+      start(async () => {
+        try {
+          const res = await fn()
+          if (res.error) return void toast.error(res.error)
+          toast.success(ok)
+          router.refresh()
+        } finally {
+          resolve()
+        }
+      })
     })
   }
 
@@ -134,7 +143,7 @@ export function AppointClient({
                   {f.tier}
                 </Badge>
                 {!f.claimed && (
-                  <span className="text-destructive text-xs">not claimed</span>
+                  <span className="text-attention text-xs">Not claimed</span>
                 )}
               </span>
             </button>
@@ -148,10 +157,12 @@ export function AppointClient({
       </div>
 
       {!selected ? (
-        <p className="text-muted-foreground text-sm">
-          No faculty in this department yet. Add them from the department page
-          first.
-        </p>
+        <EmptyState
+          icon={UsersIcon}
+          variant="dashed"
+          title="No faculty in this department"
+          description="Add them from My department, or run a faculty import, then come back to appoint them."
+        />
       ) : (
         <div className="flex flex-col gap-6">
           <div>
@@ -179,12 +190,21 @@ export function AppointClient({
                         {r === "academic_coordinator" ? "Coordinator" : "TR"}
                       </Badge>
                     ))}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="ml-auto h-7 px-2 text-xs"
+                    <ConfirmAction
                       disabled={pending}
-                      onClick={() =>
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive ml-auto h-7 px-2 text-xs"
+                        >
+                          Remove
+                        </Button>
+                      }
+                      title={`Remove ${selected.name} from ${h.klass.label}?`}
+                      description="They lose the class role and stop being offered for its subjects. Marks they already entered stay on record."
+                      confirmLabel="Remove"
+                      onConfirm={() =>
                         run(
                           () =>
                             removeClassRoleAction({
@@ -197,9 +217,7 @@ export function AppointClient({
                           "Removed from the class"
                         )
                       }
-                    >
-                      Remove
-                    </Button>
+                    />
                   </div>
 
                   <div className="divide-border divide-y">
@@ -213,10 +231,7 @@ export function AppointClient({
                           key={s.id}
                           className="flex items-center gap-2 px-3 py-1.5 text-sm"
                         >
-                          <Badge
-                            variant="outline"
-                            className="font-mono text-xs"
-                          >
+                          <Badge variant="outline" className="identifier">
                             {s.code}
                           </Badge>
                           <span className="truncate">{s.name}</span>
@@ -305,7 +320,7 @@ export function AppointClient({
                     key={c.id}
                     className="flex items-center gap-2 px-3 py-2 text-sm"
                   >
-                    <Badge variant="outline" className="font-mono text-xs">
+                    <Badge variant="outline" className="identifier">
                       {c.code}
                     </Badge>
                     <span className="truncate">{c.name}</span>

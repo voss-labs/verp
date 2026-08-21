@@ -15,6 +15,7 @@ import { canAllocate, canReopenLock, canWriteOffering } from "@/lib/allocation"
 import { getErrorMessage } from "@/lib/error-utils"
 import { parseRollNumber, expectedYear } from "@/lib/roll-number"
 import { createAuditLog } from "@/db/queries"
+import { createImportBatch } from "@/db/queries/import-batches"
 import { getClassById } from "@/db/queries/classes"
 import { listClassStaff } from "@/db/queries/class-staff"
 import {
@@ -333,6 +334,7 @@ export async function saveMarksAction(input: {
     mse2: number | null
     ese: number | null
   }[]
+  importFile?: { name: string; size?: number; totalRows?: number } | null
 }): Promise<Result> {
   try {
     const user = await getSessionUser()
@@ -341,6 +343,37 @@ export async function saveMarksAction(input: {
     if (!offering) return { error: "No such subject." }
     const { ok, cls } = await classInScope(user!, offering.classId)
     if (!ok || !cls) return { error: "That class is not in your scope." }
+
+    const parsedRows = Math.max(
+      input.importFile?.totalRows ?? input.rows.length,
+      input.rows.length
+    )
+    const recordImport = (
+      status: "committed" | "failed",
+      counts: { inserted: number; updated: number },
+      errorSummary: string | null
+    ) =>
+      input.importFile
+        ? createImportBatch({
+            kind: "marks",
+            fileName: input.importFile.name,
+            fileSize: input.importFile.size ?? null,
+            rowCount: parsedRows,
+            insertedCount: counts.inserted,
+            updatedCount: counts.updated,
+            skippedCount: parsedRows - counts.inserted - counts.updated,
+            status,
+            errorSummary,
+            scopeLabel: cls.classKey,
+            actorUserId: user!.id,
+          })
+        : Promise.resolve(null)
+
+    const refuse = async (reason: string): Promise<Result> => {
+      await recordImport("failed", { inserted: 0, updated: 0 }, reason)
+      return { error: reason }
+    }
+
     if (
       !canWriteOffering(
         user!,
@@ -349,7 +382,7 @@ export async function saveMarksAction(input: {
         cls.departmentCode
       )
     ) {
-      return { error: "That subject is allocated to another teacher." }
+      return refuse("That subject is allocated to another teacher.")
     }
 
     // A locked component is frozen for everyone, including whoever locked it.
@@ -367,14 +400,14 @@ export async function saveMarksAction(input: {
       roster,
       input.rows.map((r) => r.studentId)
     )
-    if (!scope.ok) return { error: scope.reason }
+    if (!scope.ok) return refuse(scope.reason)
 
     // The number inputs carry min/max, but that is a courtesy to whoever is
     // typing. This is the guarantee: a crafted request previously stored a
     // negative mark, or one above the component maximum, and every average
     // computed from it downstream was silently wrong.
     const valid = validateMarks(input.rows, offering.course)
-    if (!valid.ok) return { error: valid.reason }
+    if (!valid.ok) return refuse(valid.reason)
 
     const lockRows = await getLockedComponents(input.offeringId)
     const locked = lockRows.map((l) => l.component)
@@ -387,11 +420,18 @@ export async function saveMarksAction(input: {
       ese: r.ese,
       recordedByFacultyId: user!.facultyId,
     }))
-    if (locked.length > 0) {
-      const existing = await getMarksForOffering(input.offeringId)
-      const prev = new Map(existing.map((m) => [m.studentId, m]))
+    const previous =
+      locked.length > 0 || input.importFile
+        ? new Map(
+            (await getMarksForOffering(input.offeringId)).map((m) => [
+              m.studentId,
+              m,
+            ])
+          )
+        : null
+    if (locked.length > 0 && previous) {
       for (const r of rows) {
-        const before = prev.get(r.studentId)
+        const before = previous.get(r.studentId)
         // Carry the stored value forward for every locked component, so an edit
         // to an open one cannot drag a frozen figure along with it.
         if (locked.includes("isa")) r.isa = before?.isa ?? null
@@ -411,6 +451,14 @@ export async function saveMarksAction(input: {
       targetId: input.offeringId,
       details: { count: input.rows.length },
     })
+    const updatedCount = previous
+      ? rows.filter((r) => previous.has(r.studentId)).length
+      : 0
+    await recordImport(
+      "committed",
+      { inserted: rows.length - updatedCount, updated: updatedCount },
+      null
+    )
     revalidatePath(`/dashboard/class/${offering.classId}/marks`)
     return { error: null }
   } catch (err) {

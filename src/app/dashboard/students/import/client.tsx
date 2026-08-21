@@ -148,6 +148,9 @@ export function ImportClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          file: file.current
+            ? { name: file.current.name, size: file.current.size }
+            : undefined,
           rows: rows.map((r) => ({
             rollNumber: r.rollNumber,
             firstName: r.firstName,
@@ -396,6 +399,7 @@ export function ImportClient() {
                       size="icon"
                       className="text-muted-foreground hover:text-destructive size-7"
                       title="Remove this row"
+                      aria-label={`Remove row ${i + 1}`}
                       onClick={() => removeRow(i)}
                     >
                       <XIcon className="size-3.5" />

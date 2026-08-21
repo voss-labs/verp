@@ -22,13 +22,36 @@ import type { ClassWork, DeptHealth } from "@/db/queries/overview"
  */
 export type Urgency = "blocking" | "overdue" | "open"
 
+export type AttentionKind =
+  | "enrolment"
+  | "class-subjects"
+  | "register"
+  | "marks"
+  | "coordinator"
+  | "dept-subjects"
+  | "unclaimed"
+
+export type AttentionScope = { label: string; href: string }
+
 export type AttentionItem = {
   id: string
+  kind: AttentionKind
   urgency: Urgency
   title: string
   detail: string
   href: string
   count: number
+  scope: string
+}
+
+export type AttentionSummary = {
+  kind: AttentionKind
+  urgency: Urgency
+  title: string
+  detail: string
+  href?: string
+  count: number
+  scopes: AttentionScope[]
 }
 
 const RANK: Record<Urgency, number> = { blocking: 0, overdue: 1, open: 2 }
@@ -45,16 +68,16 @@ export function buildAttention(input: {
   const items: AttentionItem[] = []
 
   for (const c of input.classWork) {
-    const label = `${c.classKey} · ${c.departmentCode} ${c.division}`
-
     if (c.pendingRequests > 0) {
       items.push({
         id: `enrol:${c.classId}`,
+        kind: "enrolment",
         urgency: "blocking",
         title: `${c.pendingRequests} enrolment ${plural(c.pendingRequests, "request")}`,
-        detail: `${label} — a student cannot see their record until this is decided.`,
+        detail: "A student cannot see their record until this is decided.",
         href: `/dashboard/class/${c.classId}`,
         count: c.pendingRequests,
+        scope: c.classKey,
       })
     }
 
@@ -63,11 +86,13 @@ export function buildAttention(input: {
     if (c.unallocatedSubjects > 0) {
       items.push({
         id: `unallocated:${c.classId}`,
+        kind: "class-subjects",
         urgency: "blocking",
         title: `${c.unallocatedSubjects} ${plural(c.unallocatedSubjects, "subject")} with no teacher`,
-        detail: `${label} — nobody can enter marks or take the register for these.`,
+        detail: "Nobody can enter marks or take the register for these.",
         href: `/dashboard/class/${c.classId}/subjects`,
         count: c.unallocatedSubjects,
+        scope: c.classKey,
       })
     }
 
@@ -75,11 +100,13 @@ export function buildAttention(input: {
     if (c.students > 0 && c.markedToday === 0) {
       items.push({
         id: `attendance:${c.classId}`,
+        kind: "register",
         urgency: "overdue",
         title: "Register not taken today",
-        detail: `${label} — ${c.students} ${plural(c.students, "student")}, nothing recorded for ${input.today}.`,
+        detail: `Nothing recorded for ${input.today}.`,
         href: `/dashboard/class/${c.classId}/attendance`,
         count: c.students,
+        scope: c.classKey,
       })
     }
 
@@ -88,11 +115,13 @@ export function buildAttention(input: {
       const missing = c.students - s.entered
       items.push({
         id: `marks:${s.id}`,
+        kind: "marks",
         urgency: "open",
         title: `${s.code} — ${missing} ${plural(missing, "student")} unmarked`,
-        detail: `${label} — ${s.entered} of ${c.students} entered for ${s.name}.`,
+        detail: "Marks are not complete for every student.",
         href: `/dashboard/class/${c.classId}/marks?offering=${s.id}`,
         count: missing,
+        scope: `${c.classKey} · ${s.code}`,
       })
     }
   }
@@ -101,22 +130,26 @@ export function buildAttention(input: {
     if (d.classesWithoutCoordinator > 0) {
       items.push({
         id: `coordinator:${d.code}`,
+        kind: "coordinator",
         urgency: "blocking",
         title: `${d.classesWithoutCoordinator} ${plural(d.classesWithoutCoordinator, "class", "classes")} without a coordinator`,
-        detail: `${d.code} — nobody can approve enrolments or allocate subjects for these.`,
+        detail: "Nobody can approve enrolments or allocate subjects for these.",
         href: `/dashboard/dept/${d.code}`,
         count: d.classesWithoutCoordinator,
+        scope: d.code,
       })
     }
 
     if (d.unallocatedSubjects > 0) {
       items.push({
         id: `dept-unallocated:${d.code}`,
+        kind: "dept-subjects",
         urgency: "overdue",
         title: `${d.unallocatedSubjects} unallocated ${plural(d.unallocatedSubjects, "subject")}`,
-        detail: `${d.code} — waiting on a teacher to be appointed.`,
+        detail: "Waiting on a teacher to be appointed.",
         href: "/dashboard/dept/appoint",
         count: d.unallocatedSubjects,
+        scope: d.code,
       })
     }
 
@@ -125,11 +158,13 @@ export function buildAttention(input: {
     if (d.unclaimedStudents > 0) {
       items.push({
         id: `unclaimed:${d.code}`,
+        kind: "unclaimed",
         urgency: "open",
         title: `${d.unclaimedStudents} ${plural(d.unclaimedStudents, "student")} ${plural(d.unclaimedStudents, "has", "have")} never signed in`,
-        detail: `${d.code} — check the email on the roster row if this looks wrong.`,
+        detail: "Check the email on the roster row if this looks wrong.",
         href: `/dashboard/students?department=${d.code}`,
         count: d.unclaimedStudents,
+        scope: d.code,
       })
     }
   }
@@ -137,4 +172,52 @@ export function buildAttention(input: {
   return items.sort(
     (a, b) => RANK[a.urgency] - RANK[b.urgency] || b.count - a.count
   )
+}
+
+const GROUP_TITLE: Record<
+  AttentionKind,
+  (count: number, scopes: number) => string
+> = {
+  enrolment: (n) => `${n} enrolment ${plural(n, "request")}`,
+  "class-subjects": (n) => `${n} ${plural(n, "subject")} with no teacher`,
+  register: (_, s) =>
+    `Register not taken today in ${s} ${plural(s, "class", "classes")}`,
+  marks: (n) => `${n} ${plural(n, "mark")} still to enter`,
+  coordinator: (n) =>
+    `${n} ${plural(n, "class", "classes")} without a coordinator`,
+  "dept-subjects": (n) => `${n} unallocated ${plural(n, "subject")}`,
+  unclaimed: (n) =>
+    `${n} ${plural(n, "student")} ${plural(n, "has", "have")} never signed in`,
+}
+
+export function groupAttention(items: AttentionItem[]): AttentionSummary[] {
+  const groups = new Map<AttentionKind, AttentionSummary>()
+
+  for (const item of items) {
+    const group = groups.get(item.kind)
+    if (!group) {
+      groups.set(item.kind, {
+        kind: item.kind,
+        urgency: item.urgency,
+        title: item.title,
+        detail: item.detail,
+        href: item.href,
+        count: item.count,
+        scopes: [{ label: item.scope, href: item.href }],
+      })
+      continue
+    }
+    group.count += item.count
+    group.href = undefined
+    if (!group.scopes.some((s) => s.label === item.scope)) {
+      group.scopes.push({ label: item.scope, href: item.href })
+    }
+  }
+
+  return [...groups.values()]
+    .map((g) => ({
+      ...g,
+      title: GROUP_TITLE[g.kind](g.count, g.scopes.length),
+    }))
+    .sort((a, b) => RANK[a.urgency] - RANK[b.urgency] || b.count - a.count)
 }

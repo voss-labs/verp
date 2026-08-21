@@ -3,39 +3,27 @@
 import { useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { SearchIcon } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { CAPABILITY_CATALOG, ROLE_DEFAULTS, type Capability } from "@/lib/rbac"
 import { Input } from "@/components/ui/input"
-import { SearchIcon } from "lucide-react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { ConfirmAction } from "@/components/confirm-action"
+import { EmptyState } from "@/components/empty-state"
 import { setRoleCapabilityAction } from "../actions"
 
 type ToggleTier = "hod" | "faculty" | "student"
 type Override = { tier: string; capability: string; effect: "grant" | "deny" }
 
-const TIERS: { key: ToggleTier; label: string }[] = [
-  { key: "hod", label: "HOD" },
-  { key: "faculty", label: "Faculty" },
-  { key: "student", label: "Student" },
+const TIERS: { key: ToggleTier; label: string; one: string; many: string }[] = [
+  { key: "hod", label: "HOD", one: "HOD", many: "HODs" },
+  {
+    key: "faculty",
+    label: "Faculty",
+    one: "faculty member",
+    many: "faculty members",
+  },
+  { key: "student", label: "Student", one: "student", many: "students" },
 ]
-
-type PendingChange = {
-  tier: ToggleTier
-  tierLabel: string
-  capability: Capability
-  capLabel: string
-  enabled: boolean
-  affected: number
-}
 
 export function RolesClient({
   overrides,
@@ -47,7 +35,6 @@ export function RolesClient({
   const router = useRouter()
   const [pending, start] = useTransition()
   const [query, setQuery] = useState("")
-  const [confirming, setConfirming] = useState<PendingChange | null>(null)
 
   // (tier, capability) -> effect, for quick lookup.
   const overrideMap = useMemo(() => {
@@ -67,35 +54,22 @@ export function RolesClient({
   const overridden = (tier: ToggleTier, cap: Capability) =>
     overrideMap.has(`${tier}:${cap}`)
 
-  function apply(tier: ToggleTier, capability: Capability, enabled: boolean) {
-    start(async () => {
-      const res = await setRoleCapabilityAction({ tier, capability, enabled })
-      if (res.error) {
-        toast.error(res.error)
-        return
-      }
-      setConfirming(null)
-      router.refresh()
-    })
-  }
-
-  // Taking a capability away is the direction that breaks someone's day
-  // mid-semester, so it stops to say whose. Granting is additive and goes
-  // straight through: nobody loses work because a switch turned on.
-  function toggle(tier: ToggleTier, capability: Capability, enabled: boolean) {
-    if (enabled) {
-      apply(tier, capability, true)
+  async function apply(
+    tier: ToggleTier,
+    capability: Capability,
+    enabled: boolean
+  ) {
+    const res = await setRoleCapabilityAction({ tier, capability, enabled })
+    if (res.error) {
+      toast.error(res.error)
       return
     }
-    setConfirming({
-      tier,
-      tierLabel: TIERS.find((t) => t.key === tier)!.label,
-      capability,
-      capLabel:
-        CAPABILITY_CATALOG.find((c) => c.capability === capability)?.label ??
-        capability,
-      enabled: false,
-      affected: headcount[tier] ?? 0,
+    start(() => router.refresh())
+  }
+
+  function grant(tier: ToggleTier, capability: Capability) {
+    start(async () => {
+      await apply(tier, capability, true)
     })
   }
 
@@ -128,11 +102,17 @@ export function RolesClient({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-muted-foreground text-sm leading-relaxed">
-        Capabilities default per tier (in code). Toggle to grant or revoke over
-        the default — a dot marks a cell that differs from its baseline.
-        Super-admin always has everything and is never listed.
-      </p>
+      <div className="flex flex-col gap-1.5">
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          Capabilities default per tier (in code). Toggle to grant or revoke
+          over the default. Super-admin always has everything and is never
+          listed.
+        </p>
+        <p className="text-muted-foreground flex items-center gap-2 text-xs">
+          <span className="bg-blue size-1.5 shrink-0 rounded-full" />A dot marks
+          a cell that differs from its coded default.
+        </p>
+      </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative w-full max-w-sm">
@@ -156,30 +136,37 @@ export function RolesClient({
           {/* The table is taller than the screen and the header carries the
               only thing that says which column is which tier — scrolling it
               away turns every switch into a guess. */}
-          <thead className="bg-muted/60 sticky top-0 z-10">
+          <thead className="sticky top-0 z-20">
             <tr>
-              <th className="p-3 text-left text-xs font-medium">Capability</th>
-              {TIERS.map((t) => (
-                <th
-                  key={t.key}
-                  className="w-24 p-3 text-center text-xs font-medium"
-                >
-                  <span className="block">{t.label}</span>
-                  <span className="text-muted-foreground font-normal tabular-nums">
-                    {headcount[t.key] ?? 0}
-                  </span>
-                </th>
-              ))}
+              <th className="bg-muted border-border sticky left-0 z-30 border-r p-3 text-left text-xs font-medium">
+                Capability
+              </th>
+              {TIERS.map((t) => {
+                const n = headcount[t.key] ?? 0
+                return (
+                  <th
+                    key={t.key}
+                    title={`${n} active ${n === 1 ? t.one : t.many} hold${n === 1 ? "s" : ""} this tier`}
+                    className="bg-muted w-24 p-3 text-center text-xs font-medium"
+                  >
+                    <span className="block">{t.label}</span>
+                    <span className="text-muted-foreground font-normal tabular-nums">
+                      {n}
+                    </span>
+                  </th>
+                )
+              })}
             </tr>
           </thead>
           <tbody className="divide-border divide-y">
             {groups.length === 0 ? (
               <tr>
-                <td
-                  colSpan={1 + TIERS.length}
-                  className="text-muted-foreground p-6 text-center text-sm"
-                >
-                  No capability matches “{query}”.
+                <td colSpan={1 + TIERS.length} className="p-0">
+                  <EmptyState
+                    icon={SearchIcon}
+                    title={`No capability matches “${query}”`}
+                    description="The search reads the label, the group, and the capability string."
+                  />
                 </td>
               </tr>
             ) : (
@@ -188,59 +175,18 @@ export function RolesClient({
                   key={g.group}
                   group={g.group}
                   caps={g.caps}
+                  headcount={headcount}
                   effective={effective}
                   overridden={overridden}
                   pending={pending}
-                  onToggle={toggle}
+                  onGrant={grant}
+                  onRevoke={(t, c) => apply(t, c, false)}
                 />
               ))
             )}
           </tbody>
         </table>
       </div>
-
-      <AlertDialog
-        open={confirming !== null}
-        onOpenChange={(o) => !o && setConfirming(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Revoke {confirming?.capLabel} from {confirming?.tierLabel}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              <span className="text-foreground font-medium tabular-nums">
-                {confirming?.affected}
-              </span>{" "}
-              active {confirming?.tierLabel.toLowerCase()} account
-              {confirming?.affected === 1 ? "" : "s"} lose{" "}
-              <span className="identifier">{confirming?.capability}</span> the
-              moment this is saved. Anyone mid-task is refused on their next
-              action.
-            </AlertDialogDescription>
-            {/* Outside the description, which renders a paragraph of its own —
-                a nested <p> is invalid and hydrates as a mismatch. */}
-            <p className="text-muted-foreground text-xs">
-              Scope still applies on top of this: revoking here removes the
-              action everywhere, not only where you were thinking of. The change
-              is recorded in the audit log against your account.
-            </p>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={pending}>Keep it</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              disabled={pending}
-              onClick={() =>
-                confirming &&
-                apply(confirming.tier, confirming.capability, false)
-              }
-            >
-              {pending ? "Revoking…" : "Revoke"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }
@@ -248,50 +194,90 @@ export function RolesClient({
 function GroupRows({
   group,
   caps,
+  headcount,
   effective,
   overridden,
   pending,
-  onToggle,
+  onGrant,
+  onRevoke,
 }: {
   group: string
   caps: typeof CAPABILITY_CATALOG
+  headcount: Record<string, number>
   effective: (t: ToggleTier, c: Capability) => boolean
   overridden: (t: ToggleTier, c: Capability) => boolean
   pending: boolean
-  onToggle: (t: ToggleTier, c: Capability, v: boolean) => void
+  onGrant: (t: ToggleTier, c: Capability) => void
+  onRevoke: (t: ToggleTier, c: Capability) => Promise<void>
 }) {
   return (
     <>
       <tr className="bg-muted/30">
-        <td
-          colSpan={1 + TIERS.length}
-          className="text-muted-foreground px-3 py-1.5 text-xs font-medium"
-        >
-          {group}
+        <td colSpan={1 + TIERS.length} className="px-3 py-1.5">
+          <span className="text-muted-foreground sticky left-3 inline-block text-xs font-medium">
+            {group}
+          </span>
         </td>
       </tr>
       {caps.map((c) => (
-        <tr key={c.capability} className="hover:bg-muted/20">
-          <td className="p-3">
+        <tr key={c.capability} className="group/row hover:bg-muted/20">
+          <td className="bg-background group-hover/row:bg-muted/20 border-border sticky left-0 z-10 border-r p-3 transition-colors">
             <span>{c.label}</span>
             <span className="text-muted-foreground/60 ml-2 font-mono text-[10px]">
               {c.capability}
             </span>
           </td>
-          {TIERS.map((t) => (
-            <td key={t.key} className="p-3 text-center">
-              <div className="relative inline-flex items-center">
-                <Switch
-                  checked={effective(t.key, c.capability)}
-                  disabled={pending}
-                  onCheckedChange={(v) => onToggle(t.key, c.capability, v)}
-                />
-                {overridden(t.key, c.capability) && (
-                  <span className="bg-blue absolute -top-1 -right-1 size-1.5 rounded-full" />
-                )}
-              </div>
-            </td>
-          ))}
+          {TIERS.map((t) => {
+            const n = headcount[t.key] ?? 0
+            const name = `${c.label} — ${t.label}`
+            return (
+              <td key={t.key} className="p-3 text-center">
+                <div className="relative inline-flex items-center">
+                  {effective(t.key, c.capability) ? (
+                    <ConfirmAction
+                      trigger={
+                        <Switch checked disabled={pending} aria-label={name} />
+                      }
+                      disabled={pending}
+                      title={`Revoke ${c.label} from ${t.label}?`}
+                      description={
+                        <>
+                          <span className="text-foreground font-medium tabular-nums">
+                            {n}
+                          </span>{" "}
+                          active {n === 1 ? t.one : t.many}{" "}
+                          {n === 1 ? "loses" : "lose"}{" "}
+                          <span className="identifier">{c.capability}</span> the
+                          moment this is saved — everywhere, not only where you
+                          were thinking of. The change is recorded in the audit
+                          log against your account.
+                        </>
+                      }
+                      confirmLabel="Revoke"
+                      cancelLabel="Keep it"
+                      onConfirm={() => onRevoke(t.key, c.capability)}
+                    />
+                  ) : (
+                    <Switch
+                      checked={false}
+                      disabled={pending}
+                      aria-label={name}
+                      onCheckedChange={() => onGrant(t.key, c.capability)}
+                    />
+                  )}
+                  {overridden(t.key, c.capability) && (
+                    <>
+                      <span
+                        aria-hidden
+                        className="bg-blue absolute -top-1 -right-1 size-1.5 rounded-full"
+                      />
+                      <span className="sr-only">Differs from the default</span>
+                    </>
+                  )}
+                </div>
+              </td>
+            )
+          })}
         </tr>
       ))}
     </>

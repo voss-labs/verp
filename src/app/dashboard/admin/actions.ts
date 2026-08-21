@@ -24,7 +24,11 @@ import {
   getFacultyByEmail,
   getFacultyById,
 } from "@/db/queries/faculty"
-import { appointHod, appointCoordinator } from "@/db/queries/appointments"
+import {
+  appointHod,
+  appointCoordinator,
+  getActiveHod,
+} from "@/db/queries/appointments"
 
 type Result = { error: string | null }
 
@@ -186,21 +190,58 @@ export async function deactivateFacultyAction(input: {
   }
 }
 
-export async function appointAction(input: {
+export async function appointHodAction(input: {
   deptCode: string
   facultyId: string
-  appointment: "hod" | "coordinator"
 }): Promise<Result> {
   try {
     const user = await getSessionUser()
     authorize(user, "hod:appoint")
-    if (input.appointment === "hod") {
-      await appointHod(input.deptCode, input.facultyId, user!.facultyId)
-    } else {
-      await appointCoordinator(input.deptCode, input.facultyId, user!.facultyId)
-    }
+
+    const dept = await getDepartment(input.deptCode)
+    if (!dept) return { error: "No such department." }
+    if (!dept.isActive)
+      return { error: `${dept.code} is inactive. Reactivate it first.` }
+
+    const target = await getFacultyById(input.facultyId)
+    if (!target) return { error: "No such active faculty member." }
+    if (target.role === "super_admin")
+      return { error: "A super-admin cannot be appointed HOD." }
+
+    const current = await getActiveHod(dept.code)
+    if (current?.facultyId === target.id)
+      return { error: `${target.firstName} already heads ${dept.code}.` }
+
+    await appointHod(dept.code, target.id, user!.facultyId)
     await createAuditLog({
-      action: `dept.${input.appointment}_appointed`,
+      action: "dept.hod_appointed",
+      actorId: user!.id,
+      targetType: "department",
+      targetId: dept.code,
+      details: {
+        facultyId: target.id,
+        employeeId: target.employeeId,
+        replacedFacultyId: current?.facultyId ?? null,
+      },
+    })
+    revalidatePath("/dashboard/admin/departments")
+    revalidatePath("/dashboard/dept")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not appoint an HOD") }
+  }
+}
+
+export async function appointCoordinatorAction(input: {
+  deptCode: string
+  facultyId: string
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "hod:appoint")
+    await appointCoordinator(input.deptCode, input.facultyId, user!.facultyId)
+    await createAuditLog({
+      action: "dept.coordinator_appointed",
       actorId: user!.id,
       targetType: "department",
       targetId: input.deptCode,

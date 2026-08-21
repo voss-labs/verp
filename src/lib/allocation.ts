@@ -66,6 +66,41 @@ export function canReopenLock(
   return lockedByFacultyId != null && lockedByFacultyId === user.facultyId
 }
 
+export type ClassTeacher = {
+  facultyId: string
+  name: string
+  role: string | null
+}
+
+export function classTeacherOptions(
+  staff: { facultyId: string; name: string; role: string }[],
+  allocated: { facultyId: string; name: string }[]
+): ClassTeacher[] {
+  const byId = new Map<string, ClassTeacher>()
+  for (const s of staff) {
+    byId.set(s.facultyId, {
+      facultyId: s.facultyId,
+      name: s.name,
+      role: s.role,
+    })
+  }
+  for (const a of allocated) {
+    if (byId.has(a.facultyId)) continue
+    byId.set(a.facultyId, { facultyId: a.facultyId, name: a.name, role: null })
+  }
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export function countClassTeachers(
+  staff: { facultyId: string; role: string }[],
+  allocatedFacultyIds: (string | null | undefined)[]
+): number {
+  const ids = new Set<string>()
+  for (const s of staff) if (s.role === "tr") ids.add(s.facultyId)
+  for (const id of allocatedFacultyIds) if (id) ids.add(id)
+  return ids.size
+}
+
 /**
  * Whether a department is the caller's to act in.
  *

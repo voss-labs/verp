@@ -28,7 +28,7 @@ export async function requireClassContext(classId: string) {
     (user.tier === "hod" && user.deptCodes.includes(cls.departmentCode)) ||
     user.coordinatorClassIds.includes(classId)
   const inScope = canAllocate || user.classIds.includes(classId)
-  if (!inScope) redirect("/dashboard/class")
+  if (!inScope) redirect("/dashboard/class?denied=class")
 
   const year = expectedYear(cls.admissionYear, new Date()) ?? cls.admissionYear
   const label = `${year} · ${cls.departmentCode} · ${cls.division}`

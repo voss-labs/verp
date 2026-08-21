@@ -3,9 +3,11 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { UsersIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Field, FieldLabel } from "@/components/ui/field"
 import {
   Select,
   SelectContent,
@@ -13,11 +15,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { ConfirmAction } from "@/components/confirm-action"
+import { EmptyState } from "@/components/empty-state"
 import {
   createFacultyAction,
   setFacultyRoleAction,
   deactivateFacultyAction,
-  appointAction,
+  appointHodAction,
+  appointCoordinatorAction,
 } from "../actions"
 
 type Faculty = {
@@ -67,6 +72,16 @@ export function FacultyAdminClient({
       router.refresh()
     })
 
+  async function remove(f: Faculty) {
+    const res = await deactivateFacultyAction({ facultyId: f.id })
+    if (res.error) {
+      toast.error(res.error)
+      return
+    }
+    toast.success(`${f.name} removed`)
+    start(() => router.refresh())
+  }
+
   const apptFor = (deptCode: string, kind: "hod" | "coordinator") =>
     appointments.find((a) => a.deptCode === deptCode && a.appointment === kind)
 
@@ -83,9 +98,11 @@ export function FacultyAdminClient({
         <h3 className="text-sm font-medium">Faculty ({faculty.length})</h3>
         <div className="border-border mt-3 overflow-hidden rounded-lg border">
           {faculty.length === 0 ? (
-            <p className="text-muted-foreground p-6 text-sm">
-              No faculty yet. Add one above.
-            </p>
+            <EmptyState
+              icon={UsersIcon}
+              title="No faculty yet"
+              description="Add the first one with the form above."
+            />
           ) : (
             <ul className="divide-border divide-y">
               {faculty.map((f) => (
@@ -128,17 +145,22 @@ export function FacultyAdminClient({
                         </SelectContent>
                       </Select>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={pending || f.role === "super_admin"}
-                      className="text-muted-foreground hover:text-destructive text-xs"
-                      onClick={() =>
-                        run(() => deactivateFacultyAction({ facultyId: f.id }))
+                    <ConfirmAction
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-destructive text-xs"
+                        >
+                          Remove
+                        </Button>
                       }
-                    >
-                      Remove
-                    </Button>
+                      disabled={pending || f.role === "super_admin"}
+                      title={`Remove ${f.name} from faculty?`}
+                      description="Their sign-in stays but all VERP access ends."
+                      confirmLabel="Remove"
+                      onConfirm={() => remove(f)}
+                    />
                   </div>
                 </li>
               ))}
@@ -190,11 +212,15 @@ export function FacultyAdminClient({
                           v &&
                           run(
                             () =>
-                              appointAction({
-                                deptCode: d.code,
-                                facultyId: v,
-                                appointment: kind,
-                              }),
+                              kind === "hod"
+                                ? appointHodAction({
+                                    deptCode: d.code,
+                                    facultyId: v,
+                                  })
+                                : appointCoordinatorAction({
+                                    deptCode: d.code,
+                                    facultyId: v,
+                                  }),
                             `${kind} appointed`
                           )
                         }
@@ -271,54 +297,107 @@ function AddFaculty({
     <section className="border-border bg-muted/30 rounded-xl border p-4">
       <h3 className="text-sm font-medium">Add faculty</h3>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Input
-          placeholder="First name"
-          value={f.firstName}
-          onChange={(e) => set("firstName", e.target.value)}
-          className="h-9"
-        />
-        <Input
-          placeholder="Last name"
-          value={f.lastName}
-          onChange={(e) => set("lastName", e.target.value)}
-          className="h-9"
-        />
-        <Input
-          placeholder="Employee ID"
-          value={f.employeeId}
-          onChange={(e) => set("employeeId", e.target.value)}
-          className="h-9"
-        />
-        <Input
-          placeholder="name@vit.edu.in"
-          value={f.email}
-          onChange={(e) => set("email", e.target.value)}
-          className="h-9"
-        />
-        <Select
-          value={f.department}
-          onValueChange={(v) => v && set("department", v)}
-        >
-          <SelectTrigger size="sm" className="h-9">
-            <SelectValue placeholder="Department" />
-          </SelectTrigger>
-          <SelectContent>
-            {departments.map((d) => (
-              <SelectItem key={d.code} value={d.code}>
-                {d.code} — {d.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={f.role} onValueChange={(v) => v && set("role", v)}>
-          <SelectTrigger size="sm" className="h-9">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="faculty">Faculty</SelectItem>
-            <SelectItem value="hod">HOD</SelectItem>
-          </SelectContent>
-        </Select>
+        <Field className="gap-1.5">
+          <FieldLabel
+            htmlFor="faculty-first-name"
+            className="text-muted-foreground text-xs"
+          >
+            First name
+          </FieldLabel>
+          <Input
+            id="faculty-first-name"
+            value={f.firstName}
+            onChange={(e) => set("firstName", e.target.value)}
+            className="h-9"
+          />
+        </Field>
+        <Field className="gap-1.5">
+          <FieldLabel
+            htmlFor="faculty-last-name"
+            className="text-muted-foreground text-xs"
+          >
+            Last name
+          </FieldLabel>
+          <Input
+            id="faculty-last-name"
+            value={f.lastName}
+            onChange={(e) => set("lastName", e.target.value)}
+            className="h-9"
+          />
+        </Field>
+        <Field className="gap-1.5">
+          <FieldLabel
+            htmlFor="faculty-employee-id"
+            className="text-muted-foreground text-xs"
+          >
+            Employee ID
+          </FieldLabel>
+          <Input
+            id="faculty-employee-id"
+            value={f.employeeId}
+            onChange={(e) => set("employeeId", e.target.value)}
+            className="h-9"
+          />
+        </Field>
+        <Field className="gap-1.5">
+          <FieldLabel
+            htmlFor="faculty-email"
+            className="text-muted-foreground text-xs"
+          >
+            Email
+          </FieldLabel>
+          <Input
+            id="faculty-email"
+            placeholder="name@vit.edu.in"
+            value={f.email}
+            onChange={(e) => set("email", e.target.value)}
+            className="h-9"
+          />
+        </Field>
+        <Field className="gap-1.5">
+          <FieldLabel
+            htmlFor="faculty-department"
+            className="text-muted-foreground text-xs"
+          >
+            Department
+          </FieldLabel>
+          <Select
+            value={f.department}
+            onValueChange={(v) => v && set("department", v)}
+          >
+            <SelectTrigger
+              id="faculty-department"
+              size="sm"
+              className="h-9 w-full"
+            >
+              <SelectValue placeholder="Choose department" />
+            </SelectTrigger>
+            <SelectContent>
+              {departments.map((d) => (
+                <SelectItem key={d.code} value={d.code}>
+                  {d.code} — {d.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field className="gap-1.5">
+          <FieldLabel
+            htmlFor="faculty-tier"
+            className="text-muted-foreground text-xs"
+          >
+            Tier
+          </FieldLabel>
+          <Select value={f.role} onValueChange={(v) => v && set("role", v)}>
+            <SelectTrigger id="faculty-tier" size="sm" className="h-9 w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="faculty">Faculty</SelectItem>
+              <SelectItem value="hod">HOD</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
       </div>
       <Button
         className="mt-3 h-9"
