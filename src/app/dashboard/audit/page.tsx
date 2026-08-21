@@ -13,7 +13,7 @@ export default async function AuditPage() {
   if (!can(user, "audit:read")) {
     return (
       <>
-        <PageHeader title="Activity Log" />
+        <PageHeader title="Activity log" />
         <div className="p-4 lg:p-6">
           <p className="text-muted-foreground text-sm">
             You do not have access to the activity log.
@@ -30,7 +30,12 @@ export default async function AuditPage() {
 
   return (
     <>
-      <PageHeader title="Activity Log" parent="Admin" parentHref="/dashboard" />
+      <PageHeader
+        title="Activity log"
+        parent="Admin"
+        parentHref="/dashboard"
+        description="The last 100 recorded actions — who did what, to which record, and when"
+      />
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <AuditLogClient
           logs={logs.map((l) => ({

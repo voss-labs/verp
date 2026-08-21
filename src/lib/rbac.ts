@@ -198,6 +198,8 @@ export const ROLE_DEFAULTS: Record<
     "assignment:read",
     "course:read",
     "offering:read",
+    "offering:create",
+    "offering:update",
     "student:read",
     "onboarding:read",
     "onboarding:approve",

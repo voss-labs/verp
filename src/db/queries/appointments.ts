@@ -42,6 +42,28 @@ export async function appointHod(
     .where(eq(departments.code, deptCode))
 }
 
+/** The department's sitting HOD, or null — the authoritative row, not the pointer. */
+export async function getActiveHod(deptCode: string) {
+  const [row] = await db
+    .select({
+      facultyId: faculty.id,
+      firstName: faculty.firstName,
+      lastName: faculty.lastName,
+      employeeId: faculty.employeeId,
+    })
+    .from(deptAppointments)
+    .innerJoin(faculty, eq(deptAppointments.facultyId, faculty.id))
+    .where(
+      and(
+        eq(deptAppointments.deptCode, deptCode),
+        eq(deptAppointments.appointment, "hod"),
+        eq(deptAppointments.isActive, true)
+      )
+    )
+    .limit(1)
+  return row ?? null
+}
+
 /** Appoint a department coordinator. Coordinator is a scope, not a tier. */
 export async function appointCoordinator(
   deptCode: string,

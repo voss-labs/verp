@@ -22,6 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { EmptyState } from "@/components/empty-state"
+import { MarksSplitBar } from "@/components/marks-split-bar"
+import { BookOpenIcon } from "lucide-react"
 import {
   createCourseAction,
   updateCourseAction,
@@ -59,10 +62,23 @@ type Course = {
 
 const YEARS = ["FE", "SE", "TE", "BE"] as const
 const YEAR_LABEL: Record<string, string> = {
-  FE: "First Year",
-  SE: "Second Year",
-  TE: "Third Year",
-  BE: "Final Year",
+  FE: "First year",
+  SE: "Second year",
+  TE: "Third year",
+  BE: "Final year",
+}
+const TYPE_LABEL: Record<string, string> = {
+  theory: "Theory",
+  practical: "Practical",
+  project: "Project",
+}
+
+function marksSegments(c: { maxIsa: number; maxMse: number; maxEse: number }) {
+  return [
+    { label: "ISA", value: c.maxIsa },
+    { label: "MSE", value: c.maxMse },
+    { label: "ESE", value: c.maxEse },
+  ].filter((s) => s.value > 0)
 }
 
 export function CoursesClient({
@@ -102,6 +118,18 @@ export function CoursesClient({
     ),
   ].sort()
 
+  const yearItems = [
+    { value: "all", label: "All years" },
+    ...YEARS.map((y) => ({
+      value: y as string,
+      label: `${YEAR_LABEL[y]} (${countFor(y)})`,
+    })),
+  ]
+  const deptItems = [
+    { value: "all", label: "All departments" },
+    ...deptsPresent.map((d) => ({ value: d, label: d })),
+  ]
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -114,16 +142,16 @@ export function CoursesClient({
           />
           <Select
             value={yearFilter}
+            items={yearItems}
             onValueChange={(v) => v && setYearFilter(v)}
           >
-            <SelectTrigger className="h-9 w-40">
+            <SelectTrigger className="h-9 w-44" aria-label="Filter by year">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All years</SelectItem>
-              {YEARS.map((y) => (
-                <SelectItem key={y} value={y}>
-                  {YEAR_LABEL[y]} ({countFor(y)})
+              {yearItems.map((i) => (
+                <SelectItem key={i.value} value={i.value}>
+                  {i.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -131,16 +159,19 @@ export function CoursesClient({
           {deptsPresent.length > 1 && (
             <Select
               value={deptFilter}
+              items={deptItems}
               onValueChange={(v) => v && setDeptFilter(v)}
             >
-              <SelectTrigger className="h-9 w-36">
+              <SelectTrigger
+                className="h-9 w-40"
+                aria-label="Filter by department"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All departments</SelectItem>
-                {deptsPresent.map((d) => (
-                  <SelectItem key={d} value={d}>
-                    {d}
+                {deptItems.map((i) => (
+                  <SelectItem key={i.value} value={i.value}>
+                    {i.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -168,10 +199,12 @@ export function CoursesClient({
       </div>
 
       {courses.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          No courses yet. They are created the first time a subject is added to
-          a class.
-        </p>
+        <EmptyState
+          icon={BookOpenIcon}
+          variant="dashed"
+          title="No courses yet"
+          description="Import a syllabus, or add a course — one is also created the first time a subject is added to a class."
+        />
       ) : (
         <div className="border-border overflow-x-auto rounded border">
           <table className="w-full text-sm">
@@ -183,7 +216,7 @@ export function CoursesClient({
                 {deptsPresent.length > 1 && <th className="w-20">Dept</th>}
                 <th className="w-24">Type</th>
                 <th className="w-16">Credits</th>
-                <th className="w-32">Marks split</th>
+                <th className="w-36">Marks split</th>
                 <th className="w-20">In use</th>
                 <th className="w-20">Status</th>
                 {canEdit && (
@@ -194,55 +227,75 @@ export function CoursesClient({
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
-              {view.map((c) => (
-                <tr key={c.id} className="[&>td]:px-3 [&>td]:py-1.5">
-                  <td className="font-mono text-xs">{c.courseCode}</td>
-                  <td>{c.courseName}</td>
-                  <td>
-                    {c.year ? (
-                      <Badge variant="outline">{c.year}</Badge>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
-                    )}
-                  </td>
-                  {deptsPresent.length > 1 && (
-                    <td className="text-muted-foreground text-xs">
-                      {c.departmentCode ?? "—"}
-                    </td>
-                  )}
-                  <td className="capitalize">{c.courseType}</td>
-                  <td className="tabular-nums">{c.credits}</td>
-                  <td className="text-muted-foreground text-xs tabular-nums">
-                    {c.maxIsa}/{c.maxMse}/{c.maxEse} · {c.maxTotal}
-                  </td>
-                  <td className="tabular-nums">
-                    {c.offerings > 0 ? (
-                      <Badge variant="secondary">{c.offerings}</Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td>
-                    {c.isActive ? (
-                      <Badge variant="outline">Active</Badge>
-                    ) : (
-                      <Badge variant="secondary">Retired</Badge>
-                    )}
-                  </td>
-                  {canEdit && (
+              {view.map((c) => {
+                const usage = `In use on ${c.offerings} class${c.offerings === 1 ? "" : "es"}`
+                return (
+                  <tr key={c.id} className="[&>td]:px-3 [&>td]:py-1.5">
+                    <td className="identifier">{c.courseCode}</td>
+                    <td>{c.courseName}</td>
                     <td>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => setEditing(c)}
-                      >
-                        Edit
-                      </Button>
+                      {c.year ? (
+                        <Badge variant="outline">{c.year}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
                     </td>
-                  )}
-                </tr>
-              ))}
+                    {deptsPresent.length > 1 && (
+                      <td className="text-muted-foreground text-xs">
+                        {c.departmentCode ?? "—"}
+                      </td>
+                    )}
+                    <td>{TYPE_LABEL[c.courseType] ?? c.courseType}</td>
+                    <td className="tabular-nums">{c.credits}</td>
+                    <td>
+                      <MarksSplitBar
+                        compact
+                        segments={marksSegments(c)}
+                        total={c.maxTotal}
+                      />
+                      <span className="identifier text-muted-foreground">
+                        {c.maxIsa}/{c.maxMse}/{c.maxEse} · {c.maxTotal}
+                      </span>
+                    </td>
+                    <td className="tabular-nums">
+                      {c.offerings > 0 ? (
+                        <Badge
+                          variant="secondary"
+                          title={usage}
+                          aria-label={usage}
+                        >
+                          {c.offerings}
+                        </Badge>
+                      ) : (
+                        <span
+                          className="text-muted-foreground"
+                          title="Not on any class yet"
+                        >
+                          —
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {c.isActive ? (
+                        <Badge variant="outline">Active</Badge>
+                      ) : (
+                        <Badge variant="secondary">Retired</Badge>
+                      )}
+                    </td>
+                    {canEdit && (
+                      <td>
+                        <button
+                          type="button"
+                          className="text-blue text-xs underline-offset-2 hover:underline"
+                          onClick={() => setEditing(c)}
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -323,9 +376,9 @@ function EditDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            {form.courseCode}{" "}
+            <span className="identifier">{form.courseCode}</span>{" "}
             <span className="text-muted-foreground text-sm font-normal">
-              {form.departmentCode ?? "college-wide"}
+              {form.departmentCode ?? "College-wide"}
             </span>
           </DialogTitle>
         </DialogHeader>
@@ -341,6 +394,7 @@ function EditDialog({
             <Field label="Type">
               <Select
                 value={form.courseType}
+                items={TYPE_LABEL}
                 // Base UI hands back null when a select is cleared; the course
                 // must always have a type, so a clear is simply ignored.
                 onValueChange={(v) => v && setForm({ ...form, courseType: v })}
@@ -368,6 +422,7 @@ function EditDialog({
             <Field label="Year">
               <Select
                 value={form.year ?? "none"}
+                items={{ none: "Not set", ...YEAR_LABEL }}
                 onValueChange={(v) =>
                   v && setForm({ ...form, year: v === "none" ? null : v })
                 }
@@ -537,7 +592,7 @@ function CreateDialog({
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="ITC501"
-                className="font-mono"
+                className="identifier"
               />
             </Field>
             <div className="col-span-2">
@@ -573,6 +628,7 @@ function CreateDialog({
             <Field label="Type">
               <Select
                 value={type}
+                items={TYPE_LABEL}
                 onValueChange={(v) => v && pickType(v as CourseType)}
               >
                 <SelectTrigger>
@@ -594,7 +650,11 @@ function CreateDialog({
               />
             </Field>
             <Field label="Year">
-              <Select value={year} onValueChange={(v) => v && setYear(v)}>
+              <Select
+                value={year}
+                items={YEAR_LABEL}
+                onValueChange={(v) => v && setYear(v)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

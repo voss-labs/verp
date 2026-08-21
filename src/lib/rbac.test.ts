@@ -97,6 +97,15 @@ describe("tier defaults", () => {
     expect(ROLE_DEFAULTS.faculty).not.toContain("permission:manage")
   })
 
+  // Allocating a subject is a faculty capability so a class coordinator can do
+  // it; scope (canAllocate in allocation.ts) is what keeps a plain TR out, not
+  // the capability. Without these a coordinator saw the controls and every
+  // attempt threw Forbidden.
+  it("lets faculty create and update offerings", () => {
+    expect(ROLE_DEFAULTS.faculty).toContain("offering:create")
+    expect(ROLE_DEFAULTS.faculty).toContain("offering:update")
+  })
+
   // An HOD runs the department rather than teaching it, but holds cover
   // authority: when a teacher is absent mid-term somebody senior must be able
   // to finish the work. Scope still bounds it to their own department, which is

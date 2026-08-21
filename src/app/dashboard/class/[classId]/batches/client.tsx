@@ -3,10 +3,13 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { CheckCircle2Icon, FlaskConicalIcon, UsersIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
+import { ConfirmAction } from "@/components/confirm-action"
+import { EmptyState } from "@/components/empty-state"
 import {
   createBatchAction,
   assignBatchAction,
@@ -38,11 +41,12 @@ export function BatchesClient({
 
   if (offerings.length === 0) {
     return (
-      <p className="text-muted-foreground text-sm">
-        No practical or project subjects in this class yet. Batches only apply
-        to lab sessions — a theory lecture is delivered to the whole division at
-        once.
-      </p>
+      <EmptyState
+        icon={FlaskConicalIcon}
+        variant="dashed"
+        title="No practical or project subjects yet"
+        description="Add one on the Subjects tab — batches only apply to lab sessions, because a theory lecture is delivered to the whole division at once."
+      />
     )
   }
 
@@ -50,6 +54,8 @@ export function BatchesClient({
   // offered again: the list left over IS the work still to do.
   const placed = new Set(batches.flatMap((b) => b.students.map((s) => s.id)))
   const unplaced = roster.filter((s) => !placed.has(s.id))
+  const activeTarget =
+    target && batches.some((b) => b.id === target) ? target : null
 
   function addBatch() {
     if (!selectedId) return
@@ -63,10 +69,10 @@ export function BatchesClient({
   }
 
   function assign() {
-    if (!target || picked.size === 0) return
+    if (!activeTarget || picked.size === 0) return
     start(async () => {
       const res = await assignBatchAction({
-        batchId: target,
+        batchId: activeTarget,
         studentIds: [...picked],
       })
       if (res.error) return void toast.error(res.error)
@@ -77,10 +83,16 @@ export function BatchesClient({
   }
 
   function remove(batchId: string, studentId: string) {
-    start(async () => {
-      const res = await removeFromBatchAction({ batchId, studentId })
-      if (res.error) return void toast.error(res.error)
-      router.refresh()
+    return new Promise<void>((resolve) => {
+      start(async () => {
+        try {
+          const res = await removeFromBatchAction({ batchId, studentId })
+          if (res.error) return void toast.error(res.error)
+          router.refresh()
+        } finally {
+          resolve()
+        }
+      })
     })
   }
 
@@ -98,7 +110,7 @@ export function BatchesClient({
               )
             }
           >
-            <span className="font-mono text-xs">{o.code}</span>
+            <span className="identifier">{o.code}</span>
           </Button>
         ))}
       </div>
@@ -125,9 +137,12 @@ export function BatchesClient({
             <span className="text-muted-foreground">({unplaced.length})</span>
           </h2>
           {unplaced.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              Everyone has a batch for this subject.
-            </p>
+            <EmptyState
+              icon={CheckCircle2Icon}
+              variant="dashed"
+              title="Everyone has a batch"
+              description="Every student on this roster is placed for this subject."
+            />
           ) : (
             <>
               <div className="border-border max-h-80 overflow-y-auto rounded border">
@@ -145,7 +160,7 @@ export function BatchesClient({
                         setPicked(next)
                       }}
                     />
-                    <span className="font-mono text-xs">{s.rollNumber}</span>
+                    <span className="identifier">{s.rollNumber}</span>
                     <span>{s.name}</span>
                   </label>
                 ))}
@@ -158,7 +173,7 @@ export function BatchesClient({
                   <Button
                     key={b.id}
                     size="sm"
-                    variant={target === b.id ? "default" : "outline"}
+                    variant={activeTarget === b.id ? "default" : "outline"}
                     onClick={() => setTarget(b.id)}
                   >
                     {b.name}
@@ -166,7 +181,7 @@ export function BatchesClient({
                 ))}
                 <Button
                   size="sm"
-                  disabled={pending || !target || picked.size === 0}
+                  disabled={pending || !activeTarget || picked.size === 0}
                   onClick={assign}
                 >
                   Assign
@@ -179,9 +194,12 @@ export function BatchesClient({
         <div className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold">Batches</h2>
           {batches.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              No batches yet. Add one above.
-            </p>
+            <EmptyState
+              icon={UsersIcon}
+              variant="dashed"
+              title="No batches yet"
+              description="Create one above to split practicals into lab groups."
+            />
           ) : (
             batches.map((b) => (
               <div key={b.id} className="border-border rounded border">
@@ -201,20 +219,25 @@ export function BatchesClient({
                         className="flex items-center justify-between px-3 py-1.5 text-sm"
                       >
                         <span className="flex items-center gap-2">
-                          <span className="font-mono text-xs">
-                            {s.rollNumber}
-                          </span>
+                          <span className="identifier">{s.rollNumber}</span>
                           <span>{s.name}</span>
                         </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2 text-xs"
+                        <ConfirmAction
                           disabled={pending}
-                          onClick={() => remove(b.id, s.id)}
-                        >
-                          Remove
-                        </Button>
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:bg-destructive/10 hover:text-destructive h-6 px-2 text-xs"
+                            >
+                              Remove
+                            </Button>
+                          }
+                          title={`Remove ${s.name} from ${b.name}?`}
+                          description={`${s.rollNumber} goes back to the unassigned list for this subject and can be put in another batch.`}
+                          confirmLabel="Remove"
+                          onConfirm={() => remove(b.id, s.id)}
+                        />
                       </div>
                     ))}
                   </div>

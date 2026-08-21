@@ -4,9 +4,12 @@ import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
+import { BookOpenIcon, TriangleAlertIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { EmptyState } from "@/components/empty-state"
+import { MarksSplitBar } from "@/components/marks-split-bar"
 import { createSubjectAction, assignOfferingFacultyAction } from "../../actions"
 
 type Offering = {
@@ -15,10 +18,14 @@ type Offering = {
   name: string
   semester: number
   credits: number
-  marks: string
+  maxIsa: number
+  maxMse: number
+  maxEse: number
+  maxTotal: number
   facultyId: string | null
+  facultyName: string | null
 }
-type Staff = { facultyId: string; name: string; role: string }
+type Teacher = { facultyId: string; name: string; role: string | null }
 type CatalogueCourse = {
   code: string
   name: string
@@ -33,13 +40,27 @@ type CatalogueCourse = {
 
 const UNALLOCATED = "__none__"
 
+function marksSegments(o: { maxIsa: number; maxMse: number; maxEse: number }) {
+  return [
+    { label: "ISA", value: o.maxIsa },
+    { label: "MSE", value: o.maxMse },
+    { label: "ESE", value: o.maxEse },
+  ].filter((s) => s.value > 0)
+}
+
+function teacherLabel(t: Teacher) {
+  if (t.role === "academic_coordinator") return `${t.name} (AC)`
+  if (t.role === null) return `${t.name} (not on this class)`
+  return t.name
+}
+
 export function SubjectsClient({
   classId,
   canAllocate,
   classYear,
   semesters,
   offerings,
-  staff,
+  teachers,
   catalogue,
 }: {
   classId: string
@@ -48,7 +69,7 @@ export function SubjectsClient({
   /** The two semesters this cohort can actually be sitting. */
   semesters: [number, number]
   offerings: Offering[]
-  staff: Staff[]
+  teachers: Teacher[]
   catalogue: CatalogueCourse[]
 }) {
   const router = useRouter()
@@ -115,19 +136,27 @@ export function SubjectsClient({
             Subjects on this class ({offerings.length})
           </h2>
           {unallocated > 0 && (
-            <span className="text-destructive text-xs">
+            <Badge
+              variant="secondary"
+              className="bg-attention/10 text-attention"
+            >
+              <TriangleAlertIcon data-icon="inline-start" />
               {unallocated} not allocated
-            </span>
+            </Badge>
           )}
         </div>
 
         {offerings.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No subjects yet.{" "}
-            {canAllocate
-              ? "Add one from the catalogue on the right."
-              : "The class coordinator or HOD adds them."}
-          </p>
+          <EmptyState
+            icon={BookOpenIcon}
+            variant="dashed"
+            title="No subjects yet"
+            description={
+              canAllocate
+                ? "Add one from the catalogue on the right to start allocating teachers."
+                : "The class coordinator or HOD adds them."
+            }
+          />
         ) : (
           <div className="border-border overflow-x-auto rounded border">
             <table className="w-full text-sm">
@@ -137,19 +166,26 @@ export function SubjectsClient({
                   <th>Subject</th>
                   <th className="w-14">Sem</th>
                   <th className="w-14">Cr</th>
-                  <th className="w-28">ISA/MSE/ESE</th>
-                  <th className="w-56">Teacher</th>
+                  <th className="w-36">ISA/MSE/ESE</th>
+                  <th className="w-80">Teacher</th>
                 </tr>
               </thead>
               <tbody className="divide-border divide-y">
                 {offerings.map((o) => (
                   <tr key={o.id} className="[&>td]:px-3 [&>td]:py-2">
-                    <td className="font-mono text-xs">{o.code}</td>
+                    <td className="identifier">{o.code}</td>
                     <td>{o.name}</td>
                     <td className="tabular-nums">{o.semester}</td>
                     <td className="tabular-nums">{o.credits}</td>
-                    <td className="text-muted-foreground text-xs tabular-nums">
-                      {o.marks}
+                    <td>
+                      <MarksSplitBar
+                        compact
+                        segments={marksSegments(o)}
+                        total={o.maxTotal}
+                      />
+                      <span className="identifier text-muted-foreground">
+                        {o.maxIsa}/{o.maxMse}/{o.maxEse}
+                      </span>
                     </td>
                     <td>
                       {canAllocate ? (
@@ -157,21 +193,24 @@ export function SubjectsClient({
                           value={o.facultyId ?? UNALLOCATED}
                           disabled={pending}
                           onChange={(e) => allocate(o.id, e.target.value)}
+                          aria-label={`Teacher for ${o.code}`}
                           className="border-input bg-background h-8 w-full rounded border px-2 text-sm"
                         >
                           <option value={UNALLOCATED}>Unallocated</option>
-                          {staff.map((s) => (
-                            <option key={s.facultyId} value={s.facultyId}>
-                              {s.name}
-                              {s.role === "academic_coordinator" ? " (AC)" : ""}
+                          {teachers.map((t) => (
+                            <option
+                              key={t.facultyId}
+                              value={t.facultyId}
+                              disabled={t.role === null}
+                            >
+                              {teacherLabel(t)}
                             </option>
                           ))}
                         </select>
                       ) : (
                         <span className="text-sm">
-                          {staff.find((s) => s.facultyId === o.facultyId)
-                            ?.name ?? (
-                            <span className="text-destructive text-xs">
+                          {o.facultyName ?? (
+                            <span className="text-attention text-xs">
                               Unallocated
                             </span>
                           )}
@@ -190,7 +229,7 @@ export function SubjectsClient({
             A teacher enters marks for the subjects allocated to them, from{" "}
             <Link
               href={`/dashboard/class/${classId}/marks`}
-              className="underline"
+              className="text-blue underline underline-offset-2"
             >
               Enter marks
             </Link>
@@ -207,7 +246,10 @@ export function SubjectsClient({
             <p className="text-muted-foreground text-sm">
               Every catalogued subject for this department is already on the
               class. Import a syllabus or add a course to the{" "}
-              <Link href="/dashboard/dept/courses" className="underline">
+              <Link
+                href="/dashboard/dept/courses"
+                className="text-blue underline underline-offset-2"
+              >
                 catalogue
               </Link>{" "}
               first.
@@ -250,7 +292,7 @@ export function SubjectsClient({
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="font-mono text-xs">
+                        <Badge variant="outline" className="identifier">
                           {c.code}
                         </Badge>
                         {c.year && (

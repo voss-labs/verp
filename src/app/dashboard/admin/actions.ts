@@ -3,12 +3,8 @@
 import { revalidatePath } from "next/cache"
 import { getSessionUser } from "@/lib/session"
 import { inDeptScope } from "@/lib/allocation"
-import {
-  authorize,
-  ROLE_DEFAULTS,
-  type Capability,
-  type Tier,
-} from "@/lib/rbac"
+import { authorize, can, ROLE_DEFAULTS } from "@/lib/rbac"
+import { isCapability, isFacultyRole, isManageableTier } from "@/lib/validate"
 import { getErrorMessage } from "@/lib/error-utils"
 import { createAuditLog } from "@/db/queries"
 import { setRoleOverride } from "@/db/queries/permissions"
@@ -24,7 +20,11 @@ import {
   getFacultyByEmail,
   getFacultyById,
 } from "@/db/queries/faculty"
-import { appointHod, appointCoordinator } from "@/db/queries/appointments"
+import {
+  appointHod,
+  appointCoordinator,
+  getActiveHod,
+} from "@/db/queries/appointments"
 
 type Result = { error: string | null }
 
@@ -92,7 +92,7 @@ export async function createFacultyAction(input: {
   employeeId: string
   email: string
   department: string
-  role: "faculty" | "hod"
+  role: string
 }): Promise<Result> {
   try {
     const user = await getSessionUser()
@@ -103,6 +103,10 @@ export async function createFacultyAction(input: {
     if (!input.employeeId.trim()) return { error: "Employee ID is required." }
     if (!EMAIL_RE.test(email)) return { error: "A valid email is required." }
     if (!input.department) return { error: "Department is required." }
+    if (!isFacultyRole(input.role) || input.role === "super_admin")
+      return { error: "Choose a valid role." }
+    if (input.role !== "faculty" && !can(user, "faculty:setRole"))
+      return { error: "You cannot create faculty above the faculty tier." }
     // faculty:create is an HOD default and the department comes from the
     // payload, so without this an HOD could add staff to a department that is
     // not theirs. The department workspace already checked; the console did not.
@@ -136,11 +140,21 @@ export async function createFacultyAction(input: {
 
 export async function setFacultyRoleAction(input: {
   facultyId: string
-  role: "faculty" | "hod"
+  role: string
 }): Promise<Result> {
   try {
     const user = await getSessionUser()
     authorize(user, "faculty:setRole")
+    if (!isFacultyRole(input.role) || input.role === "super_admin")
+      return { error: "Choose a valid role." }
+
+    const target = await getFacultyById(input.facultyId)
+    if (!target) return { error: "No such faculty." }
+    if (!inDeptScope(user!, target.department))
+      return { error: "That faculty member is in another department." }
+    if (target.id === user!.facultyId)
+      return { error: "You cannot change your own tier." }
+
     const row = await updateFaculty(input.facultyId, { role: input.role })
     if (!row) return { error: "No such faculty." }
     await createAuditLog({
@@ -186,21 +200,69 @@ export async function deactivateFacultyAction(input: {
   }
 }
 
-export async function appointAction(input: {
+export async function appointHodAction(input: {
   deptCode: string
   facultyId: string
-  appointment: "hod" | "coordinator"
 }): Promise<Result> {
   try {
     const user = await getSessionUser()
     authorize(user, "hod:appoint")
-    if (input.appointment === "hod") {
-      await appointHod(input.deptCode, input.facultyId, user!.facultyId)
-    } else {
-      await appointCoordinator(input.deptCode, input.facultyId, user!.facultyId)
-    }
+
+    const dept = await getDepartment(input.deptCode)
+    if (!dept) return { error: "No such department." }
+    if (!inDeptScope(user!, dept.code))
+      return { error: "That department is not yours to appoint in." }
+    if (!dept.isActive)
+      return { error: `${dept.code} is inactive. Reactivate it first.` }
+
+    const target = await getFacultyById(input.facultyId)
+    if (!target) return { error: "No such active faculty member." }
+    if (target.role === "super_admin")
+      return { error: "A super-admin cannot be appointed HOD." }
+
+    const current = await getActiveHod(dept.code)
+    if (current?.facultyId === target.id)
+      return { error: `${target.firstName} already heads ${dept.code}.` }
+
+    await appointHod(dept.code, target.id, user!.facultyId)
     await createAuditLog({
-      action: `dept.${input.appointment}_appointed`,
+      action: "dept.hod_appointed",
+      actorId: user!.id,
+      targetType: "department",
+      targetId: dept.code,
+      details: {
+        facultyId: target.id,
+        employeeId: target.employeeId,
+        replacedFacultyId: current?.facultyId ?? null,
+      },
+    })
+    revalidatePath("/dashboard/admin/departments")
+    revalidatePath("/dashboard/dept")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not appoint an HOD") }
+  }
+}
+
+export async function appointCoordinatorAction(input: {
+  deptCode: string
+  facultyId: string
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "hod:appoint")
+
+    if (!inDeptScope(user!, input.deptCode))
+      return { error: "That department is not yours to appoint in." }
+
+    const target = await getFacultyById(input.facultyId)
+    if (!target) return { error: "No such active faculty member." }
+    if (target.department !== input.deptCode)
+      return { error: "That faculty member is in another department." }
+
+    await appointCoordinator(input.deptCode, input.facultyId, user!.facultyId)
+    await createAuditLog({
+      action: "dept.coordinator_appointed",
       actorId: user!.id,
       targetType: "department",
       targetId: input.deptCode,
@@ -215,16 +277,16 @@ export async function appointAction(input: {
 
 // ── Roles & permissions ─────────────────────────────────────────────────
 
-type ToggleTier = Exclude<Tier, "super_admin">
-
 export async function setRoleCapabilityAction(input: {
-  tier: ToggleTier
-  capability: Capability
+  tier: string
+  capability: string
   enabled: boolean
 }): Promise<Result> {
   try {
     const user = await getSessionUser()
     authorize(user, "permission:manage")
+    if (!isManageableTier(input.tier) || !isCapability(input.capability))
+      return { error: "Unknown role or capability." }
 
     // Store an override only when the wish diverges from the code default;
     // matching the default clears any override (back to baseline).

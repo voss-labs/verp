@@ -39,7 +39,7 @@ export default async function AttendancePage({
     user.tier === "super_admin" ||
     user.classIds.includes(classId) ||
     (user.tier === "hod" && user.deptCodes.includes(cls.departmentCode))
-  if (!inScope) redirect("/dashboard/class")
+  if (!inScope) redirect("/dashboard/class?denied=class")
 
   // The college's date, not UTC. toISOString() rolls over at 05:30 IST and
   // would open tomorrow's register during an early-morning lecture.
@@ -81,6 +81,7 @@ export default async function AttendancePage({
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <ClassTabs tabs={classTabs(classId, user, { canAllocate })} />
         <AttendanceClient
+          key={`${date}|${slot}|${offeringId ?? ""}`}
           classId={classId}
           date={date}
           slot={slot}

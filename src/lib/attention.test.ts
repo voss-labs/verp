@@ -81,6 +81,16 @@ describe("buildAttention", () => {
     expect(items.find((i) => i.id.startsWith("attendance:"))).toBeUndefined()
   })
 
+  it("still flags a partly-taken register until every student is marked", () => {
+    const items = build([cls({ students: 60, markedToday: 20 })])
+    const register = items.find((i) => i.id.startsWith("attendance:"))
+    expect(register).toBeDefined()
+    expect(register?.urgency).toBe("overdue")
+    expect(register?.count).toBe(40)
+    expect(register?.title).toBe("Register only partly taken")
+    expect(register?.detail).toContain("20 of 60 students marked")
+  })
+
   it("counts what is missing, not what is entered", () => {
     const items = build([
       cls({

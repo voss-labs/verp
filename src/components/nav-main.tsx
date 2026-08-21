@@ -1,70 +1,70 @@
 "use client"
 
+import { Fragment } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
 import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
+  SidebarSeparator,
 } from "@/components/ui/sidebar"
-import { ChevronRightIcon } from "lucide-react"
 
-export function NavMain({
-  items,
-}: {
-  items: {
-    title: string
-    url: string
-    icon?: React.ReactNode
-    isActive?: boolean
-    items?: {
-      title: string
-      url: string
-    }[]
-  }[]
-}) {
+export type NavMainItem = {
+  title: string
+  url: string
+  icon?: React.ReactNode
+}
+
+export type NavMainSection = {
+  label?: string
+  trailing?: boolean
+  items: NavMainItem[]
+}
+
+const matches = (pathname: string, url: string) =>
+  url === "/dashboard"
+    ? pathname === url
+    : pathname === url || pathname.startsWith(`${url}/`)
+
+export function NavMain({ sections }: { sections: NavMainSection[] }) {
+  const pathname = usePathname()
+  const active = sections
+    .flatMap((s) => s.items.map((i) => i.url))
+    .filter((url) => matches(pathname, url))
+    .sort((a, b) => b.length - a.length)[0]
+
   return (
-    <SidebarGroup>
-      <SidebarGroupLabel>Navigation</SidebarGroupLabel>
-      <SidebarMenu>
-        {items.map((item) => (
-          <Collapsible
-            key={item.title}
-            defaultOpen={item.isActive}
-            className="group/collapsible"
-            render={<SidebarMenuItem />}
-          >
-            <CollapsibleTrigger
-              render={<SidebarMenuButton tooltip={item.title} />}
-            >
-              {item.icon}
-              <span>{item.title}</span>
-              <ChevronRightIcon className="ml-auto transition-transform duration-200 group-data-open/collapsible:rotate-90" />
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <SidebarMenuSub>
-                {item.items?.map((subItem) => (
-                  <SidebarMenuSubItem key={subItem.title}>
-                    <SidebarMenuSubButton render={<Link href={subItem.url} />}>
-                      <span>{subItem.title}</span>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                ))}
-              </SidebarMenuSub>
-            </CollapsibleContent>
-          </Collapsible>
-        ))}
-      </SidebarMenu>
-    </SidebarGroup>
+    <>
+      {sections.map((section, index) => (
+        <Fragment key={section.label ?? index}>
+          {section.trailing && <SidebarSeparator className="my-1" />}
+          <SidebarGroup>
+            {section.label && (
+              <SidebarGroupLabel className="text-[10px] tracking-wider uppercase">
+                {section.label}
+              </SidebarGroupLabel>
+            )}
+            <SidebarMenu>
+              {section.items.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    isActive={item.url === active}
+                    render={<Link href={item.url} />}
+                  >
+                    {item.icon}
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        </Fragment>
+      ))}
+    </>
   )
 }

@@ -2,31 +2,21 @@
 
 import { Badge } from "@/components/ui/badge"
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
-/**
- * The shared record drawer (spec 5.2).
- *
- * Inspecting a person or a course used to mean leaving the table, losing the
- * filters and the scroll position, and navigating back. A drawer keeps the list
- * behind it, so comparing two records is two clicks rather than four page loads.
- *
- * Deliberately presentational: it takes facts, badges and actions rather than
- * fetching. A drawer that queried on open would make every table page depend on
- * a client data path, which is what the server-scoped queries exist to avoid.
- */
-
-export type DrawerFact = {
+export type DialogFact = {
   label: string
   value: React.ReactNode
   mono?: boolean
 }
 
-export function RecordDrawer({
+/** Inspect one roster record over the table it was opened from, without losing the filters behind it. */
+export function RecordDialog({
   open,
   onClose,
   title,
@@ -41,17 +31,19 @@ export function RecordDrawer({
   title: string
   subtitle?: string
   badges?: { label: string; tone?: "default" | "warn" | "critical" }[]
-  facts?: DrawerFact[]
+  facts?: DialogFact[]
   children?: React.ReactNode
   footer?: React.ReactNode
 }) {
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="flex w-full flex-col gap-0 overflow-y-auto sm:max-w-md">
-        <SheetHeader className="gap-1">
-          <SheetTitle className="text-base">{title}</SheetTitle>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="flex max-h-[85svh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
+        <DialogHeader className="shrink-0 gap-1 px-4 pt-4 pr-12">
+          <DialogTitle className="text-base">{title}</DialogTitle>
           {subtitle && (
-            <p className="text-muted-foreground text-xs">{subtitle}</p>
+            <DialogDescription className="text-xs">
+              {subtitle}
+            </DialogDescription>
           )}
           {badges && badges.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1.5">
@@ -66,9 +58,9 @@ export function RecordDrawer({
               ))}
             </div>
           )}
-        </SheetHeader>
+        </DialogHeader>
 
-        <div className="flex flex-col gap-5 px-4 pb-4">
+        <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-4 py-4">
           {facts && facts.length > 0 && (
             <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
               {facts.map((f) => (
@@ -91,17 +83,17 @@ export function RecordDrawer({
         </div>
 
         {footer && (
-          <div className="border-border mt-auto border-t px-4 py-3">
+          <div className="border-border shrink-0 border-t px-4 py-3">
             {footer}
           </div>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   )
 }
 
-/** A titled block inside a drawer — assignments, activity, related records. */
-export function DrawerSection({
+/** A titled block inside the record dialog — assignments, activity, related records. */
+export function DialogSection({
   title,
   empty,
   children,

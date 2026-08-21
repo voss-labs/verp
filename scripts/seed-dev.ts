@@ -219,6 +219,7 @@ async function main() {
     "classes",
     "faculty",
     "departments",
+    "import_batches",
     "session",
     "account",
     '"user"',

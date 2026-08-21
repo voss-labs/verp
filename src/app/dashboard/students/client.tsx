@@ -12,8 +12,8 @@ import { exportTableCsv, exportTableXlsx } from "@/lib/xlsx-export"
 import { downloadBase64File } from "@/lib/utils"
 import Link from "next/link"
 import { Button, buttonVariants } from "@/components/ui/button"
-import { Trash2Icon, UploadIcon } from "lucide-react"
-import { RecordDrawer } from "@/components/record-drawer"
+import { Trash2Icon } from "lucide-react"
+import { RecordDialog } from "@/components/record-dialog"
 import { RecordHistory } from "@/components/record-history"
 import { bulkDeactivateStudentsAction } from "./actions"
 
@@ -21,10 +21,12 @@ export function StudentsClient({
   data,
   canDeactivate,
   department,
+  lastImport,
 }: {
   data: StudentRow[]
   canDeactivate: boolean
   department?: string
+  lastImport?: { when: string; by: string } | null
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -88,15 +90,11 @@ export function StudentsClient({
 
   return (
     <>
-      <div className="flex justify-end pb-2">
-        <Link
-          href="/dashboard/students/import"
-          className={buttonVariants({ variant: "outline" })}
-        >
-          <UploadIcon className="mr-2 h-4 w-4" />
-          Import roster
-        </Link>
-      </div>
+      {lastImport && (
+        <p className="text-muted-foreground pb-2 text-xs">
+          Last import: {lastImport.when} by {lastImport.by}
+        </p>
+      )}
 
       <DataTableView
         columns={studentsColumns}
@@ -145,7 +143,7 @@ export function StudentsClient({
         }
       />
 
-      <RecordDrawer
+      <RecordDialog
         open={open !== null}
         onClose={() => setOpen(null)}
         title={open ? `${open.firstName} ${open.lastName}`.trim() : ""}
@@ -188,7 +186,7 @@ export function StudentsClient({
         }
       >
         <RecordHistory targetType="student" targetId={open?.id ?? null} />
-      </RecordDrawer>
+      </RecordDialog>
     </>
   )
 }

@@ -32,7 +32,7 @@ export default async function MarksPage({
     user.tier === "super_admin" ||
     user.classIds.includes(classId) ||
     (user.tier === "hod" && user.deptCodes.includes(cls.departmentCode))
-  if (!inScope) redirect("/dashboard/class")
+  if (!inScope) redirect("/dashboard/class?denied=class")
 
   // Allocation rights decide what you see. A coordinator or HOD runs the whole
   // timetable, so they get every subject; a TR gets the ones handed to them,

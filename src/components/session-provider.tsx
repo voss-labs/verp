@@ -3,6 +3,9 @@
 import { createContext, useContext } from "react"
 import type { Capability } from "@/lib/rbac"
 
+export type ScopeDept = { code: string; name: string }
+export type ScopeClass = { id: string; classKey: string; label: string }
+
 /**
  * The signed-in identity, resolved once on the server and handed down.
  *
@@ -26,6 +29,9 @@ export type ClientSession = {
   classIds: string[]
   coordinatorClassIds: string[]
   capabilities: Capability[]
+  scopeDepts: ScopeDept[]
+  scopeClasses: ScopeClass[]
+  rollNumber: string | null
 }
 
 type Ctx = ClientSession & { capabilitySet: ReadonlySet<Capability> }

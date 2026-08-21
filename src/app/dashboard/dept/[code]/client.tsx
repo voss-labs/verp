@@ -16,6 +16,9 @@ import {
 import { assignSubjectToTeacherAction } from "../actions"
 import { DeptTabs } from "./dept-tabs"
 import { Badge } from "@/components/ui/badge"
+import { EmptyState } from "@/components/empty-state"
+import { StatCard, StatCardRow } from "@/components/stat-card"
+import { LayersIcon, UsersIcon } from "lucide-react"
 
 type Person = { name: string; email: string }
 type ClassRow = {
@@ -100,29 +103,29 @@ export function DeptDashboardClient({
       )}
 
       {show("overview") && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat
+        <StatCardRow>
+          <StatCard
             label="Students"
             value={totals.students}
-            hint={`${placed} in a class`}
+            detail={`${placed} in a class`}
           />
-          <Stat
+          <StatCard
             label="Faculty"
             value={faculty.length}
-            hint={`${faculty.filter((f) => f.claimed).length} signed in`}
+            detail={`${faculty.filter((f) => f.claimed).length} signed in`}
           />
-          <Stat
+          <StatCard
             label="Classes"
             value={classes.length}
-            hint={`${classes.filter((c) => c.graduated).length} graduated`}
+            detail={`${classes.filter((c) => c.graduated).length} graduated`}
           />
-          <Stat
+          <StatCard
             label="Not signed in"
             value={totals.unclaimedStudents}
-            hint="students yet to claim"
-            warn={totals.unclaimedStudents > 0}
+            detail="students yet to claim"
+            tone={totals.unclaimedStudents > 0 ? "attention" : "default"}
           />
-        </div>
+        </StatCardRow>
       )}
 
       {show("overview") && (
@@ -137,18 +140,30 @@ export function DeptDashboardClient({
       {(show("overview") || show("classes")) && (
         <Section title={`Classes (${classes.length})`}>
           {classes.length === 0 ? (
-            <Empty>No classes yet in this department.</Empty>
+            <EmptyState
+              icon={LayersIcon}
+              variant="dashed"
+              title="No classes yet"
+              description="Cohorts appear here once they are created in My department."
+            />
           ) : (
             <Table
-              head={["Class", "Coordinator", "TR", "Students", "Status", ""]}
+              head={[
+                "Class",
+                "Coordinator",
+                "Teacher (TR)",
+                "Students",
+                "Status",
+                "",
+              ]}
               rows={classes.map((c) => [
                 <Link
                   key="k"
                   href={`/dashboard/class/${c.id}`}
-                  className="hover:underline"
+                  className="text-blue underline-offset-2 hover:underline"
                 >
                   <span className="font-medium">{c.label}</span>{" "}
-                  <span className="text-muted-foreground font-mono text-xs">
+                  <span className="text-muted-foreground identifier">
                     {c.classKey}
                   </span>
                 </Link>,
@@ -189,7 +204,12 @@ export function DeptDashboardClient({
       {(show("overview") || show("faculty")) && (
         <Section title={`Faculty (${faculty.length})`}>
           {faculty.length === 0 ? (
-            <Empty>No faculty on record for this department.</Empty>
+            <EmptyState
+              icon={UsersIcon}
+              variant="dashed"
+              title="No faculty on record"
+              description="Add them from My department, or run a faculty import."
+            />
           ) : (
             <Table
               head={[
@@ -211,7 +231,9 @@ export function DeptDashboardClient({
                 f.classRoles.length > 0 ? (
                   f.classRoles.join(" · ")
                 ) : (
-                  <Unset key="r">—</Unset>
+                  <span key="r" className="text-muted-foreground text-xs">
+                    —
+                  </span>
                 ),
                 f.claimed ? (
                   <span key="a" className="text-muted-foreground text-xs">
@@ -247,13 +269,13 @@ export function DeptDashboardClient({
           <Table
             head={["Roll", "Name", "Year", "Cohort key"]}
             rows={unplaced.map((s) => [
-              <span key="r" className="font-mono text-xs">
+              <span key="r" className="identifier">
                 {s.rollNumber}
               </span>,
               s.name,
               s.year,
               s.classKey ? (
-                <span key="k" className="font-mono text-xs">
+                <span key="k" className="identifier">
                   {s.classKey}
                 </span>
               ) : (
@@ -268,32 +290,6 @@ export function DeptDashboardClient({
           )}
         </Section>
       )}
-    </div>
-  )
-}
-
-function Stat({
-  label,
-  value,
-  hint,
-  warn,
-}: {
-  label: string
-  value: number
-  hint: string
-  warn?: boolean
-}) {
-  return (
-    <div className="border-border rounded border p-4">
-      <p className="text-muted-foreground text-sm">{label}</p>
-      <p className="text-2xl font-semibold tabular-nums">{value}</p>
-      <p
-        className={
-          warn ? "text-destructive text-xs" : "text-muted-foreground text-xs"
-        }
-      >
-        {hint}
-      </p>
     </div>
   )
 }
@@ -323,18 +319,14 @@ function Lead({ role, person }: { role: string; person: Person | null }) {
           <p className="text-muted-foreground text-xs">{person.email}</p>
         </>
       ) : (
-        <p className="text-destructive text-sm">Not appointed</p>
+        <p className="text-attention text-sm">Not appointed</p>
       )}
     </div>
   )
 }
 
 function Unset({ children }: { children: React.ReactNode }) {
-  return <span className="text-destructive text-xs">{children}</span>
-}
-
-function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="text-muted-foreground text-sm">{children}</p>
+  return <span className="text-attention text-xs">{children}</span>
 }
 
 function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
@@ -464,7 +456,7 @@ function AssignSubjectDialog({
                     (courseId === c.id ? "bg-muted" : "")
                   }
                 >
-                  <Badge variant="outline" className="font-mono text-xs">
+                  <Badge variant="outline" className="identifier">
                     {c.code}
                   </Badge>
                   <span className="truncate">{c.name}</span>

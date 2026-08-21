@@ -36,7 +36,7 @@ export default async function DepartmentDashboard({
   // never offers it, which is exactly why the check cannot live in the nav.
   const allowed =
     user.tier === "super_admin" || user.deptCodes.includes(deptCode)
-  if (!allowed) redirect("/dashboard/dept")
+  if (!allowed) redirect("/dashboard/dept?denied=dept")
 
   const dept = await getDepartment(deptCode)
   if (!dept) return notFound()

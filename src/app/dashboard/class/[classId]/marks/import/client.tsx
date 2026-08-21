@@ -109,7 +109,13 @@ export function ImportClient({
       return
     }
     start(async () => {
-      const res = await saveMarksAction({ offeringId, rows })
+      const res = await saveMarksAction({
+        offeringId,
+        rows,
+        importFile: file
+          ? { name: file.name, size: file.size, totalRows: preview.totalRows }
+          : null,
+      })
       if (res.error) {
         toast.error(res.error)
         return
@@ -120,6 +126,12 @@ export function ImportClient({
   }
 
   const unmatched = preview ? preview.totalRows - preview.matchedRows : 0
+  const written = [
+    mapping.some((t) => t === "isa") && "ISA",
+    mapping.some((t) => t === "mse_avg" || t === "mse1" || t === "mse2") &&
+      "MSE",
+    mapping.some((t) => t === "ese") && "ESE",
+  ].filter((c): c is string => Boolean(c))
 
   return (
     <div className="flex flex-col gap-5">
@@ -236,6 +248,12 @@ export function ImportClient({
                 })}
               </div>
             </div>
+
+            <p className="text-muted-foreground text-xs">
+              {written.length > 0
+                ? `This import writes ${written.join(", ")}. Components you do not map keep their current marks.`
+                : "Map at least one column to a mark field — nothing is written yet."}
+            </p>
 
             <div className="flex flex-wrap items-center gap-3">
               <Button size="sm" disabled={committing} onClick={commit}>

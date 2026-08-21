@@ -101,6 +101,12 @@ Required env vars:
 - `BETTER_AUTH_SECRET` -- a random secret (`openssl rand -base64 32`)
 - `BETTER_AUTH_URL` -- `http://localhost:3000` for local dev
 
+Optional:
+
+- `VERP_BUG_REPORT_URL` -- base URL of the bug-report Worker
+  (`infrastructure/bug-report-worker`), which holds the GitHub PAT and files the
+  issue. Unset, the "Report a bug" button does not render.
+
 ## Authentication
 
 VERP holds no credentials. [VOSS](https://accounts.vosslabs.org) is the identity

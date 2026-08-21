@@ -1,17 +1,19 @@
 import { PageHeader } from "@/components/page-header"
 import { getAllFaculty } from "@/db/queries/faculty"
 import { listDepartments } from "@/db/queries/departments"
-import { listActiveAppointments } from "@/db/queries/appointments"
-import { FacultyAdminClient } from "./client"
+import { AddFacultyDialog, FacultyAdminClient } from "./client"
 
 export const dynamic = "force-dynamic"
 
 export default async function AdminFacultyPage() {
-  const [faculty, departments, appointments] = await Promise.all([
+  const [faculty, departments] = await Promise.all([
     getAllFaculty(),
     listDepartments(),
-    listActiveAppointments(),
   ])
+
+  const active = departments
+    .filter((d) => d.isActive)
+    .map((d) => ({ code: d.code, name: d.name }))
 
   return (
     <>
@@ -19,6 +21,8 @@ export default async function AdminFacultyPage() {
         title="Faculty"
         parent="Administration"
         parentHref="/dashboard/admin"
+        description="Everyone on staff and the tier each one holds."
+        actions={<AddFacultyDialog departments={active} />}
       />
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <FacultyAdminClient
@@ -30,10 +34,6 @@ export default async function AdminFacultyPage() {
             department: f.department,
             role: f.role,
           }))}
-          departments={departments
-            .filter((d) => d.isActive)
-            .map((d) => ({ code: d.code, name: d.name }))}
-          appointments={appointments}
         />
       </div>
     </>

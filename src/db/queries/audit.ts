@@ -1,4 +1,4 @@
-import { eq, and, desc, gte } from "drizzle-orm"
+import { eq, and, count, desc, gte } from "drizzle-orm"
 import { db } from "@/db"
 import { auditLogs } from "@/db/schema"
 import { user } from "@/db/schema"
@@ -59,6 +59,42 @@ export async function getAuditLogs(params?: {
     .offset(offset)
 
   return rows
+}
+
+export async function getAuditLogsByActor(actorUserId: string, limit: number) {
+  const rows = await db
+    .select({
+      id: auditLogs.id,
+      action: auditLogs.action,
+      targetType: auditLogs.targetType,
+      targetId: auditLogs.targetId,
+      details: auditLogs.details,
+      createdAt: auditLogs.createdAt,
+    })
+    .from(auditLogs)
+    .where(eq(auditLogs.actorId, actorUserId))
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(limit)
+
+  return rows
+}
+
+export async function countActorActionsSince(
+  actorUserId: string,
+  action: string,
+  since: Date
+): Promise<number> {
+  const [row] = await db
+    .select({ total: count() })
+    .from(auditLogs)
+    .where(
+      and(
+        eq(auditLogs.actorId, actorUserId),
+        eq(auditLogs.action, action),
+        gte(auditLogs.createdAt, since)
+      )
+    )
+  return row?.total ?? 0
 }
 
 export async function getAuditActionTypes() {

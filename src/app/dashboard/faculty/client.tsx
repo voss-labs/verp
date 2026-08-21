@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { DataTableView } from "@/components/data-table-view"
-import { RecordDrawer } from "@/components/record-drawer"
+import { RecordDialog } from "@/components/record-dialog"
 import { RecordHistory } from "@/components/record-history"
 import {
   facultyColumns,
@@ -78,6 +78,7 @@ export function FacultyClient({ data }: { data: FacultyRow[] }) {
           filename: "Faculty",
           onExport: handleExport,
         }}
+        rowId={(f) => f.id}
         onRowClick={setOpen}
         mobileRow={(f) => ({
           title: `${f.firstName} ${f.lastName}`.trim(),
@@ -90,7 +91,7 @@ export function FacultyClient({ data }: { data: FacultyRow[] }) {
         })}
       />
 
-      <RecordDrawer
+      <RecordDialog
         open={open !== null}
         onClose={() => setOpen(null)}
         title={open ? `${open.firstName} ${open.lastName}`.trim() : ""}
@@ -120,7 +121,7 @@ export function FacultyClient({ data }: { data: FacultyRow[] }) {
         }
       >
         <RecordHistory targetType="faculty" targetId={open?.id ?? null} />
-      </RecordDrawer>
+      </RecordDialog>
     </>
   )
 }

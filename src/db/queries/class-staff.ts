@@ -1,27 +1,10 @@
-import { and, eq, inArray } from "drizzle-orm"
+import { and, eq, ne, inArray } from "drizzle-orm"
 import { db } from "@/db"
 import { facultyClassAssignments, faculty } from "@/db/schema"
 
 type ClassRole = "academic_coordinator" | "tr"
 
-/**
- * Assign a class role. Both roles are one-per-class — coordinator and TR alike —
- * so the current holder of that role is retired before the new one is written.
- * Ordered statements — no transaction on neon-http, fine for an admin/HOD action.
- */
-/**
- * Put a faculty member on a class.
- *
- * The coordinator is one per class and replacing them retires the incumbent —
- * the database enforces that with a partial unique index, so the retirement has
- * to happen first or the insert fails.
- *
- * TRs accumulate. A class is taught by as many teachers as it has subjects, and
- * each subject carries its own teacher, so retiring the previous TR on every
- * appointment silently unstaffed whoever was already there. That rule was
- * written before subjects were allocated per teacher; the schema never asked
- * for it, and only the coordinator index does.
- */
+/** Put a faculty member on a class; for the one-per-class coordinator the newcomer is installed before the incumbent is retired so a failure can never leave the class unstaffed. */
 export async function assignClassRole(
   classId: string,
   facultyId: string,
@@ -29,21 +12,42 @@ export async function assignClassRole(
   assignedBy: string | null
 ) {
   if (role === "academic_coordinator") {
+    const now = new Date()
+    await db
+      .insert(facultyClassAssignments)
+      .values({ classId, facultyId, role, assignedBy, isActive: false })
+      .onConflictDoUpdate({
+        target: [
+          facultyClassAssignments.classId,
+          facultyClassAssignments.facultyId,
+          facultyClassAssignments.role,
+        ],
+        set: { assignedBy, updatedAt: now },
+      })
     await db
       .update(facultyClassAssignments)
-      .set({ isActive: false, updatedAt: new Date() })
+      .set({ isActive: false, updatedAt: now })
       .where(
         and(
           eq(facultyClassAssignments.classId, classId),
           eq(facultyClassAssignments.role, role),
-          eq(facultyClassAssignments.isActive, true)
+          eq(facultyClassAssignments.isActive, true),
+          ne(facultyClassAssignments.facultyId, facultyId)
         )
       )
+    await db
+      .update(facultyClassAssignments)
+      .set({ isActive: true, assignedBy, updatedAt: now })
+      .where(
+        and(
+          eq(facultyClassAssignments.classId, classId),
+          eq(facultyClassAssignments.facultyId, facultyId),
+          eq(facultyClassAssignments.role, role)
+        )
+      )
+    return
   }
 
-  // Re-appointing someone already on the class reactivates their row rather
-  // than adding a second: the pair is unique, and a duplicate would show them
-  // twice on every roster.
   await db
     .insert(facultyClassAssignments)
     .values({ classId, facultyId, role, assignedBy })

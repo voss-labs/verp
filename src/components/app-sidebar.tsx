@@ -22,31 +22,35 @@ import {
   Building2Icon,
   UploadIcon,
   GraduationCapIcon,
+  ScrollTextIcon,
+  LibraryIcon,
+  LayersIcon,
+  UserPlusIcon,
+  ClipboardListIcon,
+  SearchIcon,
 } from "lucide-react"
-
-// One icon per domain, so a new page inherits the right one by naming its
-// domain rather than by editing a list.
-const DOMAIN_ICON: Record<string, React.ReactNode> = {
-  Overview: <LayoutDashboardIcon />,
-  Academics: <BookOpenIcon />,
-  Organization: <Building2Icon />,
-  People: <UsersIcon />,
-  Import: <UploadIcon />,
-  Administration: <ShieldIcon />,
-  "My academics": <GraduationCapIcon />,
-}
 import { useSessionUser, useCan } from "@/components/session-provider"
-import { buildNavigation } from "@/lib/navigation"
+import { buildNavigation, type NavIcon } from "@/lib/navigation"
 import { openCommandPalette } from "@/components/command-palette"
-import { SearchIcon } from "lucide-react"
-import { VossMark } from "@/components/voss-logo"
+import { ScopeSwitcher } from "@/components/scope-switcher"
 import { DevActorSwitcher } from "@/components/dev-actor-switcher"
 import type { DevPersona } from "@/lib/dev-personas"
 
-// MVP surface only: roster and identity. Marks / attendance / courses come back
-// with the features that own them, each adding its own nav.
-// Super-admin also gets the console — the door to every CRUD.
-// Coordinators/TRs own their classes: approve enrolments, manage the roster.
+const NAV_ICON: Record<NavIcon, React.ReactNode> = {
+  overview: <LayoutDashboardIcon />,
+  students: <UsersIcon />,
+  faculty: <GraduationCapIcon />,
+  departments: <Building2Icon />,
+  roles: <ShieldIcon />,
+  audit: <ScrollTextIcon />,
+  imports: <UploadIcon />,
+  classes: <BookOpenIcon />,
+  courses: <LibraryIcon />,
+  dept: <LayersIcon />,
+  appoint: <UserPlusIcon />,
+  marks: <ClipboardListIcon />,
+}
+
 export function AppSidebar({
   devAuth,
   ...props
@@ -65,40 +69,26 @@ export function AppSidebar({
     email: session.email,
     avatar: session.image ?? "",
   }
-  const navItems = buildNavigation({
+  const sections = buildNavigation({
     tier: session.tier,
     can,
     isCoordinator: session.coordinatorClassIds.length > 0,
     hasClasses: session.classIds.length > 0,
-  }).map((d) => ({
-    title: d.domain,
-    url: d.url,
-    icon: DOMAIN_ICON[d.domain] ?? <LayoutDashboardIcon />,
-    isActive: d.domain === "Overview",
-    items: d.items,
+    classIds: session.classIds,
+  }).map((section) => ({
+    label: section.label,
+    trailing: section.trailing,
+    items: section.items.map((item) => ({
+      title: item.title,
+      url: item.url,
+      icon: NAV_ICON[item.icon],
+    })),
   }))
 
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              size="lg"
-              className="pointer-events-none data-[slot=sidebar-menu-button]:!p-1.5"
-            >
-              <div className="bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-md">
-                <VossMark className="text-base" />
-              </div>
-              <div className="grid flex-1 text-left leading-tight">
-                <span className="truncate font-semibold">VOSS</span>
-                <span className="text-muted-foreground truncate text-xs">
-                  VERP · Vidyalankar ERP
-                </span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <ScopeSwitcher />
         {devAuth && (
           <DevActorSwitcher
             personas={devAuth.personas}
@@ -121,7 +111,7 @@ export function AppSidebar({
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <NavMain items={navItems} />
+        <NavMain sections={sections} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />

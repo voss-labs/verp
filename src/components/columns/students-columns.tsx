@@ -17,10 +17,17 @@ export type StudentRow = {
   isActive: boolean
 }
 
+const QUIET_SUCCESS = "bg-success/10 text-success"
+const QUIET_MUTED = "bg-muted text-muted-foreground"
+const QUIET_ATTENTION = "bg-attention/10 text-attention"
+
 export const studentsColumns: ColumnDef<StudentRow>[] = [
   {
     accessorKey: "rollNumber",
     header: "Roll No.",
+    cell: ({ row }) => (
+      <span className="identifier">{row.getValue("rollNumber")}</span>
+    ),
   },
   {
     id: "name",
@@ -58,19 +65,31 @@ export const studentsColumns: ColumnDef<StudentRow>[] = [
   {
     accessorKey: "authUserId",
     header: "Claimed",
-    cell: ({ row }) => (
-      <Badge variant={row.getValue("authUserId") ? "default" : "secondary"}>
-        {row.getValue("authUserId") ? "Claimed" : "Pending"}
-      </Badge>
-    ),
+    cell: ({ row }) => {
+      const claimed = Boolean(row.getValue("authUserId"))
+      return (
+        <Badge
+          variant="secondary"
+          className={claimed ? QUIET_SUCCESS : QUIET_MUTED}
+        >
+          {claimed ? "Claimed" : "Pending"}
+        </Badge>
+      )
+    },
   },
   {
     accessorKey: "isActive",
     header: "Status",
-    cell: ({ row }) => (
-      <Badge variant={row.getValue("isActive") ? "default" : "secondary"}>
-        {row.getValue("isActive") ? "Active" : "Inactive"}
-      </Badge>
-    ),
+    cell: ({ row }) => {
+      const active = Boolean(row.getValue("isActive"))
+      return (
+        <Badge
+          variant="secondary"
+          className={active ? QUIET_SUCCESS : QUIET_ATTENTION}
+        >
+          {active ? "Active" : "Inactive"}
+        </Badge>
+      )
+    },
   },
 ]

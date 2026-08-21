@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -25,17 +26,23 @@ import { contextualRole } from "@/lib/navigation"
  */
 export type TrailSegment = { label: string; href?: string }
 
+export type PageHeaderProps = {
+  title: string
+  parent?: string
+  parentHref?: string
+  trail?: TrailSegment[]
+  description?: string
+  actions?: ReactNode
+}
+
 export function PageHeader({
   title,
   parent,
   parentHref,
   trail,
-}: {
-  title: string
-  parent?: string
-  parentHref?: string
-  trail?: TrailSegment[]
-}) {
+  description,
+  actions,
+}: PageHeaderProps) {
   const session = useSessionUser()
   // The responsibility, not the database tier: a faculty member coordinating a
   // class is a coordinator here, and "Faculty" told them nothing they did not
@@ -45,50 +52,83 @@ export function PageHeader({
     can: () => false,
     isCoordinator: session.coordinatorClassIds.length > 0,
     hasClasses: session.classIds.length > 0,
+    isTeacher: session.classIds.length > session.coordinatorClassIds.length,
   })
+  const coordinated = session.scopeClasses
+    .filter((c) => session.coordinatorClassIds.includes(c.id))
+    .map((c) => c.classKey)
   return (
-    <header className="bg-card flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
-      <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
-        <SidebarTrigger className="-ml-1" />
-        <Separator
-          orientation="vertical"
-          className="mx-2 h-4 data-vertical:self-auto"
-        />
-        <Breadcrumb>
-          <BreadcrumbList>
-            {trail?.map((seg) => (
-              <span key={seg.label} className="contents">
-                <BreadcrumbItem className="hidden md:block">
-                  {seg.href ? (
-                    <BreadcrumbLink href={seg.href}>{seg.label}</BreadcrumbLink>
-                  ) : (
-                    <span className="text-muted-foreground">{seg.label}</span>
-                  )}
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-              </span>
-            ))}
-            {parent && (
-              <>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href={parentHref ?? "/dashboard"}>
-                    {parent}
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-              </>
+    <>
+      <header className="bg-card flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
+        <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
+          <SidebarTrigger className="-ml-1" />
+          <Separator
+            orientation="vertical"
+            className="mx-2 h-4 data-vertical:self-auto"
+          />
+          <Breadcrumb>
+            <BreadcrumbList>
+              {trail?.map((seg) => (
+                <span key={seg.label} className="contents">
+                  <BreadcrumbItem className="hidden md:block">
+                    {seg.href ? (
+                      <BreadcrumbLink href={seg.href}>
+                        {seg.label}
+                      </BreadcrumbLink>
+                    ) : (
+                      <span className="text-muted-foreground">{seg.label}</span>
+                    )}
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator className="hidden md:block" />
+                </span>
+              ))}
+              {parent && (
+                <>
+                  <BreadcrumbItem className="hidden md:block">
+                    <BreadcrumbLink href={parentHref ?? "/dashboard"}>
+                      {parent}
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator className="hidden md:block" />
+                </>
+              )}
+              <BreadcrumbItem>
+                <BreadcrumbPage className="font-semibold">
+                  {title}
+                </BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+          {session.tier && (
+            <Badge
+              variant="outline"
+              className="ml-auto font-medium"
+              title={
+                coordinated.length > 0
+                  ? `Coordinates ${coordinated.join(", ")}`
+                  : undefined
+              }
+            >
+              {role}
+            </Badge>
+          )}
+        </div>
+      </header>
+      {(description || actions) && (
+        <div className="flex flex-wrap items-start justify-between gap-3 px-4 pt-4 lg:px-6 lg:pt-6">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            {description && (
+              <p className="text-muted-foreground mt-1 text-sm">
+                {description}
+              </p>
             )}
-            <BreadcrumbItem>
-              <BreadcrumbPage className="font-semibold">{title}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-        {session.tier && (
-          <Badge variant="outline" className="ml-auto font-medium">
-            {role}
-          </Badge>
-        )}
-      </div>
-    </header>
+          </div>
+          {actions && (
+            <div className="flex shrink-0 items-center gap-2">{actions}</div>
+          )}
+        </div>
+      )}
+    </>
   )
 }

@@ -3,6 +3,7 @@ import {
   completeCount,
   incompleteStudents,
   invalidReason,
+  mergeMarks,
   requiredComponents,
   validateMarks,
 } from "./marks-integrity"
@@ -141,6 +142,57 @@ describe("incompleteStudents", () => {
   // An empty class cannot block its own publication.
   it("says nothing about an empty roster", () => {
     expect(incompleteStudents([], new Map(), ["isa"])).toEqual([])
+  })
+})
+
+describe("mergeMarks", () => {
+  const stored: MarksInput = { isa: 18, mse1: 25, mse2: 27, ese: 40 }
+
+  // The bug this exists to stop: an ESE-only import nulled every unmapped column
+  // and erased a stored ISA that no history could recover.
+  it("keeps the stored value where the incoming column is null", () => {
+    const incoming = { ...blank, ese: 45 }
+    expect(mergeMarks(stored, incoming, [])).toEqual({
+      isa: 18,
+      mse1: 25,
+      mse2: 27,
+      ese: 45,
+    })
+  })
+
+  // Zero is a mark somebody earned, not an absence — it must overwrite.
+  it("writes an incoming zero over a stored value", () => {
+    expect(mergeMarks(stored, { ...blank, isa: 0 }, []).isa).toBe(0)
+  })
+
+  it("leaves a locked component at its stored value even when the file carries one", () => {
+    const incoming = { ...blank, isa: 5, ese: 50 }
+    expect(mergeMarks(stored, incoming, ["isa"])).toEqual({
+      isa: 18,
+      mse1: 25,
+      mse2: 27,
+      ese: 50,
+    })
+  })
+
+  it("carries both MSE halves forward when MSE is locked", () => {
+    const incoming = { ...blank, mse1: 1, mse2: 2 }
+    const merged = mergeMarks(stored, incoming, ["mse"])
+    expect([merged.mse1, merged.mse2]).toEqual([25, 27])
+  })
+
+  it("writes an incoming value when the column is mapped and unlocked", () => {
+    expect(mergeMarks(stored, { ...blank, isa: 12 }, []).isa).toBe(12)
+  })
+
+  // A student with no prior row: a null incoming has nothing to keep, so it stays null.
+  it("yields null when neither stored nor incoming has a value", () => {
+    expect(mergeMarks(undefined, { ...blank, ese: 30 }, [])).toEqual({
+      isa: null,
+      mse1: null,
+      mse2: null,
+      ese: 30,
+    })
   })
 })
 

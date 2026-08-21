@@ -6,7 +6,9 @@ import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
 import { rollsInScope } from "@/lib/scope"
 import { tryClassKeyFromRoll } from "@/lib/class-key"
+import { parseRollNumber } from "@/lib/roll-number"
 import { createStudent, createAuditLog } from "@/db/queries"
+import { createImportBatch } from "@/db/queries/import-batches"
 import { db } from "@/db"
 import { students } from "@/db/schema"
 import { inArray } from "drizzle-orm"
@@ -27,7 +29,27 @@ const importRowSchema = z.object({
 
 const importBodySchema = z.object({
   rows: z.array(importRowSchema).min(1, "No rows provided"),
+  file: z
+    .object({
+      name: z.string().min(1).max(255),
+      size: z.number().int().nonnegative().optional(),
+    })
+    .optional(),
 })
+
+function rosterScopeLabel(rollNumbers: string[]): string {
+  const depts = new Set<string>()
+  for (const roll of rollNumbers) {
+    try {
+      const dept = parseRollNumber(roll).department
+      if (dept) depts.add(dept)
+    } catch {
+      continue
+    }
+  }
+  const list = [...depts]
+  return list.length === 1 ? list[0] : "institution"
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -82,20 +104,21 @@ export async function POST(req: NextRequest) {
       new Map(existingInDb.map((s) => [s.rollNumber.toUpperCase(), s.classKey]))
     )
     if (!scope.ok) {
-      // The batch fails whole rather than importing the in-scope part: a
-      // half-applied roster is harder to reason about than a refused one, and a
-      // forged batch should leave a refusal rather than a partial success.
-      return apiError(
-        `${scope.reason}${scope.offending.length ? " " + scope.offending.join(", ") : ""}`,
-        403
-      )
+      // A scope refusal writes nothing: no ledger row, and never one labelled
+      // with a payload-chosen department. The batch also fails whole rather than
+      // importing the in-scope part, so a forged batch leaves no partial write.
+      const message = `${scope.reason}${scope.offending.length ? " " + scope.offending.join(", ") : ""}`
+      return apiError(message, 403)
     }
 
     // ── 3. Classify rows into valid / errored ─────────────────────────────
     type RowError = { row: number; field: string; message: string }
     const errors: RowError[] = []
-    const validRows: ((typeof parsed.data.rows)[number] & { _idx: number })[] =
-      []
+    const validRows: ((typeof parsed.data.rows)[number] & {
+      _idx: number
+      _department: string
+      _division: string | null
+    })[] = []
 
     rows.forEach((row, idx) => {
       const rowNum = idx + 1 // 1-based for display
@@ -121,7 +144,50 @@ export async function POST(req: NextRequest) {
         return
       }
 
-      validRows.push({ ...row, _idx: idx })
+      // Department and division are the roll's to state, not the payload's: a
+      // caller in scope for the roll must not be able to file the student under
+      // another department. Derive them and refuse a row whose payload disagrees
+      // rather than writing the spoofed label. An unknown branch leaves the
+      // roll's department null, so the payload value stands as the only source.
+      let department = row.department
+      let division: string | null = row.division ?? null
+      try {
+        const p = parseRollNumber(row.rollNumber)
+        if (p.department) {
+          if (row.department.trim().toUpperCase() !== p.department) {
+            errors.push({
+              row: rowNum,
+              field: "department",
+              message: `Department "${row.department}" does not match roll number (roll says ${p.department})`,
+            })
+            return
+          }
+          department = p.department
+        }
+        if (row.division && row.division !== p.division) {
+          errors.push({
+            row: rowNum,
+            field: "division",
+            message: `Division "${row.division}" does not match roll number (roll says ${p.division})`,
+          })
+          return
+        }
+        division = p.division
+      } catch (e) {
+        errors.push({
+          row: rowNum,
+          field: "rollNumber",
+          message: e instanceof Error ? e.message : "Invalid roll number",
+        })
+        return
+      }
+
+      validRows.push({
+        ...row,
+        _idx: idx,
+        _department: department,
+        _division: division,
+      })
     })
 
     // ── 4. Batch-insert valid rows ────────────────────────────────────────
@@ -133,8 +199,8 @@ export async function POST(req: NextRequest) {
           lastName: r.lastName ?? "",
           rollNumber: r.rollNumber,
           email: r.email,
-          department: r.department,
-          division: r.division ?? null,
+          department: r._department,
+          division: r._division,
           year: r.year,
           // Cohort membership is derived from the roll, so a bulk-imported
           // student lands in their class with no separate linking step.
@@ -174,6 +240,25 @@ export async function POST(req: NextRequest) {
         },
       })
     }
+
+    await createImportBatch({
+      kind: "roster",
+      fileName: parsed.data.file?.name ?? "(file name not sent)",
+      fileSize: parsed.data.file?.size ?? null,
+      rowCount: rows.length,
+      insertedCount,
+      skippedCount: errors.length,
+      status: "committed",
+      errorSummary:
+        errors.length > 0
+          ? errors
+              .slice(0, 5)
+              .map((e) => `Row ${e.row}: ${e.message}`)
+              .join("; ")
+          : null,
+      scopeLabel: rosterScopeLabel(allRollNumbers),
+      actorUserId: user.id,
+    })
 
     return apiSuccess({
       inserted: insertedCount,

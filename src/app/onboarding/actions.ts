@@ -11,6 +11,7 @@ import { getClassByKey } from "@/db/queries/classes"
 import {
   getLatestRequestForUser,
   createEnrollmentRequest,
+  deleteOwnEnrollmentRequest,
 } from "@/db/queries/onboarding"
 
 type Result = { error: string | null }
@@ -68,5 +69,36 @@ export async function submitEnrollmentRequestAction(input: {
     return { error: null }
   } catch (err) {
     return { error: getErrorMessage(err, "Could not submit your request") }
+  }
+}
+
+export async function withdrawEnrollmentRequestAction(): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    if (!user) return { error: "Please sign in again." }
+    if (user.tier !== null) return { error: "Your account is already set up." }
+
+    const req = await getLatestRequestForUser(user.id)
+    if (!req || (req.status !== "pending" && req.status !== "unrouted"))
+      return { error: "There is no request to withdraw." }
+
+    const removed = await deleteOwnEnrollmentRequest(req.id, user.id)
+    if (!removed) return { error: "That request is not yours to withdraw." }
+
+    await createAuditLog({
+      action: "enrollment.withdrawn",
+      actorId: user.id,
+      targetType: "enrollment_request",
+      targetId: req.id,
+      details: {
+        rollNumber: req.rollNumber,
+        classId: req.classId,
+        status: req.status,
+      },
+    })
+    revalidatePath("/unclaimed")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not withdraw your request") }
   }
 }
