@@ -84,6 +84,16 @@ Appointment ease: admin Departments rows gain an HOD column with an appoint/chan
 8. TrendLine becomes an area chart: gradient fill, dots, fixed 0-100 domain for percents, denser ticks.
 9. Coordinator and Teacher dashboards diverge: coordination panels (enrolment queue, allocation status, publish state) for coordinators, teaching panels only when offerings exist; pure teachers see teaching only.
 
+## Phase 7 - Backend remediation (from research/backend-audit-2026-08-21.md)
+
+Criticals: (1) marks import erases unmapped components - merge against previous in saveMarksAction import branch; (2) createFacultyAction writes role with no validation - an HOD can mint super_admin - validate at boundary, gate hod behind faculty:setRole; (3) bulkImportFacultyAction passes user.id into a uuid FK and retires the sitting coordinator before the failing insert - user.id to user.facultyId, and reorder retire-after-insert in class-staff.ts.
+Reachable highs: coordinator allocation (add offering:create/update to ROLE_DEFAULTS.faculty, bounded by canAllocate - verify the scope gate exists first, add coordinator-success and TR-denial tests); scope checks on appointHodAction/appointCoordinatorAction/setFacultyRoleAction; stale-session key on attendance and batches clients; roster import derives department from the roll and moves the 403 before the ledger write.
+Deferred: 23 mediums + 15 lows batched afterward.
+
+## Phase 8 - Color: retune the attention/warning token
+
+The yellowish-golden --attention/--warning (used on Not taken, Overdue, unsigned counts, N open) clashes with the red/blue/green system. Retune both tokens in globals.css (light and dark) to a refined amber-orange - richer, slightly darker, less pale-gold - keeping it distinct from destructive red and success green, and re-validate 4.5:1 contrast as text on card and as background with its foreground. Runs after Phase 7.
+
 ## Execution
 
 Wave A (Phase 1): one workflow, six parallel Opus fix agents + verify agent running npm run check.

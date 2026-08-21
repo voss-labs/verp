@@ -107,6 +107,7 @@ export async function bulkImportFacultyAction(input: {
   existing?: number
   assigned?: number
   failed?: number
+  notes?: string | null
 }> {
   try {
     const user = await getSessionUser()
@@ -154,16 +155,19 @@ export async function bulkImportFacultyAction(input: {
     let existing = 0
     let assigned = 0
     let failed = 0
+    const problems: string[] = []
     for (const r of input.rows) {
       const email = r.email.trim().toLowerCase()
       const firstName = r.firstName.trim()
       const employeeId = r.employeeId.trim()
       if (!firstName || !employeeId || !EMAIL_RE.test(email)) {
         failed++
+        problems.push(`${email || "(no email)"}: incomplete row`)
         continue
       }
+      let fac: Awaited<ReturnType<typeof getFacultyByEmail>> | null = null
       try {
-        let fac = await getFacultyByEmail(email)
+        fac = await getFacultyByEmail(email)
         if (fac) existing++
         else {
           fac = await createFaculty({
@@ -176,17 +180,25 @@ export async function bulkImportFacultyAction(input: {
           })
           created++
         }
-        if (assignClass && fac && input.assignRole) {
+      } catch (err) {
+        failed++
+        problems.push(`${email}: ${getErrorMessage(err, "could not be added")}`)
+        continue
+      }
+      if (assignClass && fac && input.assignRole) {
+        try {
           await assignClassRole(
             assignClass.id,
             fac.id,
             input.assignRole,
-            user!.id
+            user!.facultyId
           )
           assigned++
+        } catch (err) {
+          problems.push(
+            `${email}: role not assigned — ${getErrorMessage(err, "assignment failed")}`
+          )
         }
-      } catch {
-        failed++
       }
     }
 
@@ -204,13 +216,18 @@ export async function bulkImportFacultyAction(input: {
         role: input.assignRole ?? null,
       },
     })
+    const summary =
+      problems.length > 0
+        ? problems.slice(0, 20).join("; ") +
+          (problems.length > 20 ? `; +${problems.length - 20} more` : "")
+        : null
     await recordBatch(
       "committed",
       { inserted: created, updated: existing, skipped: failed },
-      failed > 0 ? `${failed} row(s) rejected as incomplete` : null
+      summary
     )
     revalidatePath("/dashboard/dept")
-    return { error: null, created, existing, assigned, failed }
+    return { error: null, created, existing, assigned, failed, notes: summary }
   } catch (err) {
     return { error: getErrorMessage(err, "Could not import faculty") }
   }

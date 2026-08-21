@@ -126,9 +126,11 @@ export async function TeacherDashboard({
 
   const rosterTotal = scoped.reduce((n, r) => n + r.roster, 0)
   const markedTotal = scoped.reduce((n, r) => n + r.marked, 0)
-  const takenCount = scoped.filter((r) => r.marked > 0).length
+  const takenCount = scoped.filter(
+    (r) => r.roster > 0 && r.marked >= r.roster
+  ).length
   const allTaken = scoped.length > 0 && takenCount === scoped.length
-  const nextRegister = scoped.find((r) => r.marked === 0) ?? scoped.at(0)
+  const nextRegister = scoped.find((r) => r.marked < r.roster) ?? scoped.at(0)
 
   const enteredTotal = mine.reduce((n, o) => n + enteredOf(o), 0)
   const capacityTotal = mine.reduce((n, o) => n + capacityOf(o), 0)

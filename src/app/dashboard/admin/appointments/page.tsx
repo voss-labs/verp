@@ -31,6 +31,7 @@ export default async function AdminAppointmentsPage() {
             .map((f) => ({
               id: f.id,
               name: `${f.firstName} ${f.lastName}`.trim(),
+              department: f.department,
             }))}
           appointments={appointments}
         />

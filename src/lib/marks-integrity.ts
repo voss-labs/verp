@@ -77,6 +77,24 @@ export function validateMarks(
 
 export type Component = "isa" | "mse" | "ese"
 
+/** Resolve one import row against stored marks: a column absent from the file keeps its stored value, a locked component never moves, and a real zero is written. */
+export function mergeMarks(
+  previous: MarksInput | undefined,
+  incoming: MarksInput,
+  locked: Component[]
+): MarksInput {
+  const resolve = (field: keyof MarksInput, component: Component) => {
+    if (locked.includes(component)) return previous?.[field] ?? null
+    return incoming[field] ?? previous?.[field] ?? null
+  }
+  return {
+    isa: resolve("isa", "isa"),
+    mse1: resolve("mse1", "mse"),
+    mse2: resolve("mse2", "mse"),
+    ese: resolve("ese", "ese"),
+  }
+}
+
 /** Whether one student's entry for a component is finished. */
 function hasComponent(row: MarksInput | undefined, c: Component): boolean {
   if (!row) return false

@@ -17,7 +17,7 @@ import {
 import { EmptyState } from "@/components/empty-state"
 import { appointHodAction, appointCoordinatorAction } from "../actions"
 
-type Person = { id: string; name: string }
+type Person = { id: string; name: string; department: string }
 type Dept = { code: string; name: string }
 type Appt = {
   deptCode: string
@@ -101,73 +101,76 @@ export function AppointmentsClient({
         </p>
       )}
       <div className="grid gap-3 lg:grid-cols-2">
-        {departments.map((d) => (
-          <div
-            key={d.code}
-            className="border-border bg-card rounded-xl border p-4"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <Badge variant="outline" className="identifier">
-                  {d.code}
-                </Badge>
-                <span className="truncate text-sm">{d.name}</span>
+        {departments.map((d) => {
+          const deptFaculty = faculty.filter((f) => f.department === d.code)
+          return (
+            <div
+              key={d.code}
+              className="border-border bg-card rounded-xl border p-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Badge variant="outline" className="identifier">
+                    {d.code}
+                  </Badge>
+                  <span className="truncate text-sm">{d.name}</span>
+                </div>
+                <Link
+                  href="/dashboard/admin/departments"
+                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex shrink-0 items-center gap-1 rounded text-xs outline-none focus-visible:ring-2"
+                >
+                  Department
+                  <ArrowRightIcon className="size-3" />
+                </Link>
               </div>
-              <Link
-                href="/dashboard/admin/departments"
-                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex shrink-0 items-center gap-1 rounded text-xs outline-none focus-visible:ring-2"
-              >
-                Department
-                <ArrowRightIcon className="size-3" />
-              </Link>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {KINDS.map((kind) => {
+                  const current = appointmentFor(d.code, kind)
+                  const id = `${d.code}-${kind}`
+                  return (
+                    <div key={kind} className="grid gap-1.5">
+                      <label
+                        htmlFor={id}
+                        className="text-muted-foreground text-xs"
+                      >
+                        {KIND_LABEL[kind]}
+                      </label>
+                      <Select
+                        value={current?.facultyId ?? ""}
+                        items={deptFaculty.map((f) => ({
+                          value: f.id,
+                          label: f.name,
+                        }))}
+                        disabled={pending || deptFaculty.length === 0}
+                        onValueChange={(v) =>
+                          appoint(
+                            d,
+                            kind,
+                            deptFaculty.find((f) => f.id === v)
+                          )
+                        }
+                      >
+                        <SelectTrigger id={id} size="sm" className="w-full">
+                          <SelectValue placeholder="Appoint…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {deptFaculty.map((f) => (
+                            <SelectItem key={f.id} value={f.id}>
+                              {f.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-muted-foreground truncate text-xs">
+                        {current ? current.email : "Nobody appointed"}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {KINDS.map((kind) => {
-                const current = appointmentFor(d.code, kind)
-                const id = `${d.code}-${kind}`
-                return (
-                  <div key={kind} className="grid gap-1.5">
-                    <label
-                      htmlFor={id}
-                      className="text-muted-foreground text-xs"
-                    >
-                      {KIND_LABEL[kind]}
-                    </label>
-                    <Select
-                      value={current?.facultyId ?? ""}
-                      items={faculty.map((f) => ({
-                        value: f.id,
-                        label: f.name,
-                      }))}
-                      disabled={pending || faculty.length === 0}
-                      onValueChange={(v) =>
-                        appoint(
-                          d,
-                          kind,
-                          faculty.find((f) => f.id === v)
-                        )
-                      }
-                    >
-                      <SelectTrigger id={id} size="sm" className="w-full">
-                        <SelectValue placeholder="Appoint…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {faculty.map((f) => (
-                          <SelectItem key={f.id} value={f.id}>
-                            {f.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-muted-foreground truncate text-xs">
-                      {current ? current.email : "Nobody appointed"}
-                    </p>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

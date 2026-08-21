@@ -54,6 +54,8 @@ export function BatchesClient({
   // offered again: the list left over IS the work still to do.
   const placed = new Set(batches.flatMap((b) => b.students.map((s) => s.id)))
   const unplaced = roster.filter((s) => !placed.has(s.id))
+  const activeTarget =
+    target && batches.some((b) => b.id === target) ? target : null
 
   function addBatch() {
     if (!selectedId) return
@@ -67,10 +69,10 @@ export function BatchesClient({
   }
 
   function assign() {
-    if (!target || picked.size === 0) return
+    if (!activeTarget || picked.size === 0) return
     start(async () => {
       const res = await assignBatchAction({
-        batchId: target,
+        batchId: activeTarget,
         studentIds: [...picked],
       })
       if (res.error) return void toast.error(res.error)
@@ -171,7 +173,7 @@ export function BatchesClient({
                   <Button
                     key={b.id}
                     size="sm"
-                    variant={target === b.id ? "default" : "outline"}
+                    variant={activeTarget === b.id ? "default" : "outline"}
                     onClick={() => setTarget(b.id)}
                   >
                     {b.name}
@@ -179,7 +181,7 @@ export function BatchesClient({
                 ))}
                 <Button
                   size="sm"
-                  disabled={pending || !target || picked.size === 0}
+                  disabled={pending || !activeTarget || picked.size === 0}
                   onClick={assign}
                 >
                   Assign

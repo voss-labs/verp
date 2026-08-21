@@ -54,6 +54,22 @@ describe("canAllocate", () => {
   it("keeps a coordinator to the class they coordinate", () => {
     expect(canAllocate(coordinator, "other-class", DEPT)).toBe(false)
   })
+
+  // Faculty now hold offering:create/offering:update, so the capability check no
+  // longer separates who may allocate from who may not — this scope gate is the
+  // only thing that does. A plain TR on the class must still be refused.
+  it("decides allocation by scope now that the capability is shared", () => {
+    const otherClassTeacher: AllocationActor = { ...tr, facultyId: "f-other" }
+    const cases: [string, AllocationActor, string, boolean][] = [
+      ["coordinator of the class", coordinator, CLASS, true],
+      ["plain TR on the same class", tr, CLASS, false],
+      ["teacher on another class", otherClassTeacher, "other-class", false],
+      ["HOD of the department", hod, CLASS, true],
+    ]
+    for (const [, actor, classId, expected] of cases) {
+      expect(canAllocate(actor, classId, DEPT)).toBe(expected)
+    }
+  })
 })
 
 describe("canWriteOffering", () => {

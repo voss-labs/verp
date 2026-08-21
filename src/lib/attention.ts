@@ -96,16 +96,23 @@ export function buildAttention(input: {
       })
     }
 
-    // Only meaningful once there is a roster to take a register against.
-    if (c.students > 0 && c.markedToday === 0) {
+    // Only meaningful once there is a roster to take a register against, and
+    // unfinished until every student on it has a class-level mark.
+    if (c.students > 0 && c.markedToday < c.students) {
+      const missing = c.students - c.markedToday
+      const started = c.markedToday > 0
       items.push({
         id: `attendance:${c.classId}`,
         kind: "register",
         urgency: "overdue",
-        title: "Register not taken today",
-        detail: `Nothing recorded for ${input.today}.`,
+        title: started
+          ? "Register only partly taken"
+          : "Register not taken today",
+        detail: started
+          ? `${c.markedToday} of ${c.students} students marked for ${input.today}.`
+          : `Nothing recorded for ${input.today}.`,
         href: `/dashboard/class/${c.classId}/attendance`,
-        count: c.students,
+        count: missing,
         scope: c.classKey,
       })
     }

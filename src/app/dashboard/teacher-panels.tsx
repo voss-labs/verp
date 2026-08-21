@@ -133,7 +133,7 @@ function AttendanceRow({
   entry: TodayClass
   canAttendance: boolean
 }) {
-  const taken = entry.marked > 0
+  const taken = entry.roster > 0 && entry.marked >= entry.roster
   return (
     <QueueRow
       head={

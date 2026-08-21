@@ -81,6 +81,7 @@ export default async function AttendancePage({
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <ClassTabs tabs={classTabs(classId, user, { canAllocate })} />
         <AttendanceClient
+          key={`${date}|${slot}|${offeringId ?? ""}`}
           classId={classId}
           date={date}
           slot={slot}

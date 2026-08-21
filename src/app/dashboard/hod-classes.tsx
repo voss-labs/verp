@@ -40,6 +40,14 @@ function RegisterChip({ marked, roster }: { marked: number; roster: number }) {
       </Badge>
     )
   }
+  if (marked < roster) {
+    return (
+      <Badge variant="secondary" className="bg-attention/10 text-attention">
+        <CircleIcon data-icon="inline-start" />
+        Part done · {marked}/{roster}
+      </Badge>
+    )
+  }
   return (
     <Badge variant="secondary" className="bg-success/10 text-success">
       <CircleCheckIcon data-icon="inline-start" />

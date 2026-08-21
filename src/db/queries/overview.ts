@@ -212,13 +212,14 @@ export async function getClassWork(
     db
       .select({
         classId: attendanceTable.classId,
-        n: sql<number>`count(*)::int`,
+        n: sql<number>`count(distinct ${attendanceTable.studentId})::int`,
       })
       .from(attendanceTable)
       .where(
         and(
           inArray(attendanceTable.classId, classIds),
-          eq(attendanceTable.sessionDate, today)
+          eq(attendanceTable.sessionDate, today),
+          isNull(attendanceTable.courseOfferingId)
         )
       )
       .groupBy(attendanceTable.classId),

@@ -8,6 +8,7 @@ import {
   type Component,
   incompleteMessage,
   incompleteStudents,
+  mergeMarks,
   requiredComponents,
   validateMarks,
 } from "@/lib/marks-integrity"
@@ -429,7 +430,19 @@ export async function saveMarksAction(input: {
             ])
           )
         : null
-    if (locked.length > 0 && previous) {
+    if (input.importFile && previous) {
+      // An import maps only the columns the file carries, so a null here means
+      // "not in this file" — keep what is stored rather than erasing it. The
+      // grid always sends all four read back from the server, so its null is a
+      // deliberate clear and keeps the replace path below.
+      for (const r of rows) {
+        const merged = mergeMarks(previous.get(r.studentId), r, locked)
+        r.isa = merged.isa
+        r.mse1 = merged.mse1
+        r.mse2 = merged.mse2
+        r.ese = merged.ese
+      }
+    } else if (locked.length > 0 && previous) {
       for (const r of rows) {
         const before = previous.get(r.studentId)
         // Carry the stored value forward for every locked component, so an edit

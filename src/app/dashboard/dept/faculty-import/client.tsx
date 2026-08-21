@@ -86,6 +86,7 @@ export function FacultyImportClient({
         `${res.created} created, ${res.existing} already present` +
           (res.assigned ? `, ${res.assigned} assigned` : "")
       )
+      if (res.notes) toast.warning(res.notes)
       router.push("/dashboard/dept")
     })
   }
