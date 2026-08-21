@@ -1,20 +1,22 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
+import { LayersIcon } from "lucide-react"
 import { DeniedToast } from "@/components/denied-toast"
+import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
-import { Badge } from "@/components/ui/badge"
+import { buttonVariants } from "@/components/ui/button-variants"
 import { getSessionUser } from "@/lib/session"
+import { buildNavigation } from "@/lib/navigation"
+import { can } from "@/lib/rbac"
 import { expectedYear } from "@/lib/roll-number"
-import { cn } from "@/lib/utils"
 import { getClassesByIds } from "@/db/queries/onboarding"
 import { listClassesForDepts } from "@/db/queries/classes"
 import { listClassStaff } from "@/db/queries/class-staff"
 import { listDepartments } from "@/db/queries/departments"
 import { getClassWork } from "@/db/queries/overview"
+import { ClassIndexClient, type ClassCard } from "./client"
 
 export const dynamic = "force-dynamic"
-
-const YEAR_ORDER = ["FE", "SE", "TE", "BE"]
 
 const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`
@@ -31,14 +33,14 @@ export default async function ClassIndexPage({
   // An HOD holds no class assignments — their scope is the department — so this
   // listed nothing and told them to ask their HOD, which is themselves. A
   // super-admin holds neither, and saw the same empty page.
+  const scoped = user.tier === "hod" || user.tier === "super_admin"
   const deptScope =
     user.tier === "super_admin"
       ? (await listDepartments()).filter((d) => d.isActive).map((d) => d.code)
       : user.deptCodes
-  const classes =
-    user.tier === "hod" || user.tier === "super_admin"
-      ? await listClassesForDepts(deptScope)
-      : await getClassesByIds(user.classIds)
+  const classes = scoped
+    ? await listClassesForDepts(deptScope)
+    : await getClassesByIds(user.classIds)
   const now = new Date()
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
@@ -51,7 +53,7 @@ export default async function ClassIndexPage({
   ])
   const workById = new Map(work.map((w) => [w.classId, w]))
 
-  const cards = classes.map((c) => {
+  const cards: ClassCard[] = classes.map((c) => {
     const coord = staff.find(
       (s) => s.classId === c.id && s.role === "academic_coordinator"
     )
@@ -68,7 +70,8 @@ export default async function ClassIndexPage({
       id: c.id,
       classKey: c.classKey,
       group: String(expectedYear(c.admissionYear, now) ?? c.admissionYear),
-      label: `${c.departmentCode} · ${c.division}`,
+      deptCode: c.departmentCode,
+      division: c.division,
       coordinator: coord ? `${coord.firstName} ${coord.lastName}`.trim() : null,
       students: w?.students ?? 0,
       attention,
@@ -76,87 +79,71 @@ export default async function ClassIndexPage({
     }
   })
 
-  const groups = new Map<string, typeof cards>()
-  for (const card of cards) {
-    const list = groups.get(card.group) ?? []
-    list.push(card)
-    groups.set(card.group, list)
-  }
-  const ordered = [...groups.keys()].sort((a, b) => {
-    const ai = YEAR_ORDER.indexOf(a)
-    const bi = YEAR_ORDER.indexOf(b)
-    if (ai !== -1 && bi !== -1) return ai - bi
-    if (ai !== -1) return -1
-    if (bi !== -1) return 1
-    return b.localeCompare(a)
-  })
+  const navUrls = buildNavigation({
+    tier: user.tier,
+    can: (c) => can(user, c),
+    isCoordinator: user.coordinatorClassIds.length > 0,
+    hasClasses: user.classIds.length > 0,
+    classIds: user.classIds,
+  }).flatMap((s) => s.items.map((i) => i.url))
+  const assignHref = navUrls.includes("/dashboard/dept")
+    ? "/dashboard/dept"
+    : null
+
+  const title = scoped ? "All classes" : "My classes"
+  const description =
+    user.tier === "super_admin"
+      ? `Every class across ${plural(deptScope.length, "active department", "active departments")}.`
+      : user.tier === "hod"
+        ? deptScope.length > 0
+          ? `Every class in ${deptScope.join(", ")}, not only the ones you teach.`
+          : "You are not appointed to a department yet."
+        : "The classes you coordinate or teach."
+
+  const empty = !scoped
+    ? {
+        title: "No classes assigned",
+        description:
+          "You are not assigned to any class yet. Your HOD assigns coordinators.",
+      }
+    : deptScope.length === 0
+      ? {
+          title: "No department scope",
+          description:
+            user.tier === "hod"
+              ? "Ask a super-admin to appoint you to a department."
+              : "No active department exists yet.",
+        }
+      : {
+          title: "No classes yet",
+          description:
+            "A cohort has to be created on the department console before it shows up here.",
+        }
 
   return (
     <>
-      <PageHeader title="My classes" />
+      <PageHeader title={title} description={description} />
       {denied && <DeniedToast scope={denied} />}
       <div className="@container/main flex flex-1 flex-col gap-6 p-4 lg:p-6">
-        {classes.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            You are not assigned to any class yet. Your HOD assigns
-            coordinators.
-          </p>
+        {cards.length === 0 ? (
+          <EmptyState
+            icon={LayersIcon}
+            variant="dashed"
+            title={empty.title}
+            description={empty.description}
+            action={
+              scoped && deptScope.length > 0 && assignHref ? (
+                <Link
+                  href={assignHref}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Department console
+                </Link>
+              ) : undefined
+            }
+          />
         ) : (
-          ordered.map((group) => (
-            <section key={group} className="flex flex-col gap-3">
-              <div className="flex items-baseline gap-2 border-b pb-2">
-                <h2 className="text-sm font-semibold">
-                  {YEAR_ORDER.includes(group) ? group : `${group} intake`}
-                </h2>
-                <span className="text-muted-foreground text-xs tabular-nums">
-                  {plural(groups.get(group)!.length, "class", "classes")}
-                </span>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {groups.get(group)!.map((c) => (
-                  <Link
-                    key={c.id}
-                    href={`/dashboard/class/${c.id}`}
-                    className="border-border bg-card hover:border-blue/50 flex flex-col gap-2 rounded-xl border p-5 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-medium">{c.label}</p>
-                      <Badge variant="outline" className="identifier shrink-0">
-                        {c.classKey}
-                      </Badge>
-                    </div>
-                    <p
-                      className={cn(
-                        "text-sm",
-                        c.coordinator
-                          ? "text-muted-foreground"
-                          : "text-attention"
-                      )}
-                    >
-                      {c.coordinator ?? "No coordinator"}
-                    </p>
-                    <p className="text-muted-foreground text-xs tabular-nums">
-                      {plural(c.students, "student", "students")}
-                    </p>
-                    {c.attention.length > 0 && (
-                      <p className="text-attention flex items-center gap-1.5 text-xs">
-                        <span
-                          aria-hidden
-                          className="bg-attention size-1.5 shrink-0 rounded-full"
-                        />
-                        {c.attention.join(" · ")}
-                      </p>
-                    )}
-                    {!c.isActive && (
-                      <Badge variant="secondary" className="w-fit">
-                        inactive
-                      </Badge>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ))
+          <ClassIndexClient cards={cards} assignHref={assignHref} />
         )}
       </div>
     </>

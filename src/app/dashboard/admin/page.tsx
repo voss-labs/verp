@@ -2,6 +2,7 @@ import Link from "next/link"
 import {
   BuildingIcon,
   UsersIcon,
+  UserPlusIcon,
   GraduationCapIcon,
   ShieldIcon,
   ScrollTextIcon,
@@ -21,7 +22,13 @@ const SECTIONS = [
     href: "/dashboard/admin/faculty",
     icon: UsersIcon,
     title: "Faculty",
-    desc: "Add staff, set their tier, and appoint HODs and coordinators.",
+    desc: "Add staff, set their tier, and remove the ones who have left.",
+  },
+  {
+    href: "/dashboard/admin/appointments",
+    icon: UserPlusIcon,
+    title: "Appointments",
+    desc: "Appoint the HOD and coordinator of each department.",
   },
   {
     href: "/dashboard/students",

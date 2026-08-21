@@ -592,9 +592,24 @@ export type OfferingCompletion = {
   courseCode: string
   courseName: string
   facultyId: string | null
+  facultyName: string | null
   roster: number
   components: { component: Component; entered: number }[]
   publishedAt: Date | null
+}
+
+async function facultyNamesByIds(ids: string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(ids)]
+  if (unique.length === 0) return new Map()
+  const rows = await db
+    .select({
+      id: faculty.id,
+      first: faculty.firstName,
+      last: faculty.lastName,
+    })
+    .from(faculty)
+    .where(inArray(faculty.id, unique))
+  return new Map(rows.map((r) => [r.id, `${r.first} ${r.last}`.trim()]))
 }
 
 /** Per-subject marks progress for the given classes, component by component. */
@@ -608,9 +623,12 @@ export async function marksCompletionByOffering(
     .from(classes)
     .where(inArray(classes.id, classIds))
   const offerings = await activeOfferings(cls.map((c) => c.id))
-  const [roster, marks] = await Promise.all([
+  const [roster, marks, teachers] = await Promise.all([
     rosterIdsByClassKey(cls.map((c) => c.classKey)),
     marksByOfferingId(offerings.map((o) => o.id)),
+    facultyNamesByIds(
+      offerings.flatMap((o) => (o.facultyId === null ? [] : [o.facultyId]))
+    ),
   ])
 
   const keyOf = new Map(cls.map((c) => [c.id, c.classKey]))
@@ -623,6 +641,8 @@ export async function marksCompletionByOffering(
       courseCode: o.code,
       courseName: o.name,
       facultyId: o.facultyId,
+      facultyName:
+        o.facultyId === null ? null : (teachers.get(o.facultyId) ?? null),
       roster: ids.length,
       components: requiredComponents(courseCaps(o)).map((component) => ({
         component,
@@ -632,6 +652,46 @@ export async function marksCompletionByOffering(
       publishedAt: o.publishedAt,
     }
   })
+}
+
+export type PendingEnrolment = {
+  requestId: string
+  classId: string
+  rollNumber: string
+  name: string
+}
+
+/** The coordinator's queue across every class they run, oldest request first. */
+export async function pendingEnrolmentsForClasses(
+  classIds: string[],
+  limit: number
+): Promise<PendingEnrolment[]> {
+  if (classIds.length === 0 || limit <= 0) return []
+
+  const rows = await db
+    .select({
+      id: enrollmentRequests.id,
+      classId: enrollmentRequests.classId,
+      rollNumber: enrollmentRequests.rollNumber,
+      first: enrollmentRequests.firstName,
+      last: enrollmentRequests.lastName,
+    })
+    .from(enrollmentRequests)
+    .where(
+      and(
+        inArray(enrollmentRequests.classId, classIds),
+        eq(enrollmentRequests.status, "pending")
+      )
+    )
+    .orderBy(enrollmentRequests.createdAt)
+    .limit(limit)
+
+  return rows.map((r) => ({
+    requestId: r.id,
+    classId: r.classId ?? "",
+    rollNumber: r.rollNumber,
+    name: `${r.first} ${r.last}`.trim(),
+  }))
 }
 
 export type AttendanceScope = {

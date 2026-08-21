@@ -5,7 +5,11 @@ import Link from "next/link"
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ChevronRightIcon, LayersIcon } from "lucide-react"
+import {
+  ChevronRightIcon,
+  EllipsisVerticalIcon,
+  LayersIcon,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -15,14 +19,29 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { ConfirmAction } from "@/components/confirm-action"
 import { EmptyState } from "@/components/empty-state"
+import { cn } from "@/lib/utils"
 import { BRANCH_CODE_BY_DEPT, divisionsForBranch } from "@/lib/roll-number"
 import {
   createClassAction,
@@ -38,6 +57,7 @@ type Klass = {
   classKey: string
   graduated: boolean
   label: string
+  yearDivision: string
   departmentCode: string
   admissionYear: number
   division: string
@@ -56,6 +76,9 @@ type Faculty = {
   department: string
   role: "super_admin" | "hod" | "faculty"
 }
+
+const HEAD =
+  "bg-surface sticky top-0 z-10 shadow-[inset_0_-1px_0_var(--border)]"
 
 export function DeptClient({
   departments,
@@ -127,7 +150,7 @@ export function DeptClient({
               </Link>
             </div>
 
-            <div className="border-border overflow-hidden rounded-lg border">
+            <div className="border-border overflow-hidden rounded-lg border [&>[data-slot=table-container]]:max-h-[65svh]">
               {deptClasses.length === 0 ? (
                 <EmptyState
                   icon={LayersIcon}
@@ -135,162 +158,31 @@ export function DeptClient({
                   description="Create the first cohort from Add class below."
                 />
               ) : (
-                <ul className="divide-border divide-y">
-                  {deptClasses.map((c) => {
-                    const facultyItems = deptFaculty.map((f) => ({
-                      value: f.id,
-                      label: f.name,
-                    }))
-                    const rolePicker = (
-                      role: "academic_coordinator" | "tr",
-                      current: string | undefined,
-                      placeholder: string
-                    ) => (
-                      <Select
-                        value={current ?? ""}
-                        items={facultyItems}
-                        disabled={pending || deptFaculty.length === 0}
-                        onValueChange={(v) =>
-                          v &&
-                          run(
-                            () =>
-                              assignClassRoleAction({
-                                classId: c.id,
-                                facultyId: v,
-                                role,
-                              }),
-                            "Assigned"
-                          )
-                        }
-                      >
-                        <SelectTrigger
-                          className="w-52"
-                          aria-label={`${placeholder} for ${c.label}`}
-                        >
-                          <SelectValue placeholder={placeholder} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {deptFaculty.map((f) => (
-                            <SelectItem key={f.id} value={f.id}>
-                              {f.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )
-                    return (
-                      <li
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className={HEAD}>Class</TableHead>
+                      <TableHead className={HEAD}>Coordinator</TableHead>
+                      <TableHead className={HEAD}>Teacher (TR)</TableHead>
+                      <TableHead className={cn(HEAD, "w-10 text-right")}>
+                        <span className="sr-only">Actions</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {deptClasses.map((c) => (
+                      <ClassRow
                         key={c.id}
-                        className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-                      >
-                        <div>
-                          <p className="text-sm font-medium">{c.label}</p>
-                          <p className="text-muted-foreground identifier">
-                            {c.classKey}
-                            {!c.isActive && " · inactive"}
-                            {c.graduated && " · graduated"}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {rolePicker(
-                            "academic_coordinator",
-                            coordinatorOf(c.id)?.facultyId,
-                            "Coordinator"
-                          )}
-                          {rolePicker(
-                            "tr",
-                            trOf(c.id)?.facultyId,
-                            "Teacher (TR)"
-                          )}
-                          {c.isActive ? (
-                            <ConfirmAction
-                              disabled={pending}
-                              trigger={
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive hover:bg-destructive/10 hover:text-destructive text-xs"
-                                >
-                                  Deactivate
-                                </Button>
-                              }
-                              title={`Deactivate ${c.label}?`}
-                              description={`${c.classKey} drops out of the active class lists. Its roster, marks and attendance stay on record.`}
-                              confirmLabel="Deactivate"
-                              onConfirm={() =>
-                                run(() =>
-                                  setClassActiveAction({
-                                    classId: c.id,
-                                    isActive: false,
-                                  })
-                                )
-                              }
-                            />
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={pending}
-                              className="text-xs"
-                              onClick={() =>
-                                run(() =>
-                                  setClassActiveAction({
-                                    classId: c.id,
-                                    isActive: true,
-                                  })
-                                )
-                              }
-                            >
-                              Reactivate
-                            </Button>
-                          )}
-                          {c.graduated ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={pending}
-                              className="text-xs"
-                              onClick={() =>
-                                run(() =>
-                                  graduateClassAction({
-                                    classId: c.id,
-                                    graduated: false,
-                                  })
-                                )
-                              }
-                            >
-                              Undo graduation
-                            </Button>
-                          ) : (
-                            <ConfirmAction
-                              disabled={pending}
-                              trigger={
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive hover:bg-destructive/10 hover:text-destructive text-xs"
-                                >
-                                  Graduate
-                                </Button>
-                              }
-                              title={`Graduate ${c.label}?`}
-                              description="Students move out of the active roster. The class stays on record and the change can be undone."
-                              confirmLabel="Graduate"
-                              onConfirm={() =>
-                                run(() =>
-                                  graduateClassAction({
-                                    classId: c.id,
-                                    graduated: true,
-                                  })
-                                )
-                              }
-                            />
-                          )}
-                        </div>
-                      </li>
-                    )
-                  })}
-                </ul>
+                        klass={c}
+                        faculty={deptFaculty}
+                        coordinatorId={coordinatorOf(c.id)?.facultyId}
+                        trId={trOf(c.id)?.facultyId}
+                        pending={pending}
+                        run={run}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </div>
 
@@ -314,6 +206,175 @@ export function DeptClient({
         )
       })}
     </div>
+  )
+}
+
+type Run = (
+  fn: () => Promise<{ error: string | null }>,
+  ok?: string
+) => Promise<void>
+
+function ClassRow({
+  klass: c,
+  faculty,
+  coordinatorId,
+  trId,
+  pending,
+  run,
+}: {
+  klass: Klass
+  faculty: Faculty[]
+  coordinatorId: string | undefined
+  trId: string | undefined
+  pending: boolean
+  run: Run
+}) {
+  const items = faculty.map((f) => ({ value: f.id, label: f.name }))
+
+  const picker = (
+    role: "academic_coordinator" | "tr",
+    current: string | undefined,
+    aria: string,
+    placeholder: string,
+    attention?: boolean
+  ) => (
+    <Select
+      value={current ?? ""}
+      items={items}
+      disabled={pending || faculty.length === 0}
+      onValueChange={(v) =>
+        v &&
+        run(
+          () => assignClassRoleAction({ classId: c.id, facultyId: v, role }),
+          "Assigned"
+        )
+      }
+    >
+      <SelectTrigger
+        className={cn(
+          "w-52",
+          attention && !current && "data-placeholder:text-attention"
+        )}
+        aria-label={`${aria} for ${c.label}`}
+      >
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {faculty.map((f) => (
+          <SelectItem key={f.id} value={f.id}>
+            {f.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+
+  return (
+    <TableRow>
+      <TableCell>
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-1.5">
+            <span className="identifier font-medium">{c.classKey}</span>
+            {!c.isActive && <Badge variant="secondary">Inactive</Badge>}
+            {c.graduated && (
+              <Badge variant="secondary" className="bg-blue/10 text-blue">
+                Graduated
+              </Badge>
+            )}
+          </div>
+          <span className="text-muted-foreground text-xs">
+            {c.yearDivision}
+          </span>
+        </div>
+      </TableCell>
+      <TableCell>
+        {picker(
+          "academic_coordinator",
+          coordinatorId,
+          "Coordinator",
+          "Assign coordinator",
+          true
+        )}
+      </TableCell>
+      <TableCell>{picker("tr", trId, "Teacher (TR)", "Unassigned")}</TableCell>
+      <TableCell className="text-right">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled={pending}
+                className="text-muted-foreground data-open:bg-muted"
+                aria-label={`Actions for ${c.label}`}
+              />
+            }
+          >
+            <EllipsisVerticalIcon />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            {c.isActive ? (
+              <ConfirmAction
+                disabled={pending}
+                trigger={
+                  <DropdownMenuItem closeOnClick={false} variant="destructive">
+                    Deactivate
+                  </DropdownMenuItem>
+                }
+                title={`Deactivate ${c.label}?`}
+                description={`${c.classKey} drops out of the active class lists. Its roster, marks and attendance stay on record.`}
+                confirmLabel="Deactivate"
+                onConfirm={() =>
+                  run(() =>
+                    setClassActiveAction({ classId: c.id, isActive: false })
+                  )
+                }
+              />
+            ) : (
+              <DropdownMenuItem
+                disabled={pending}
+                onClick={() =>
+                  run(() =>
+                    setClassActiveAction({ classId: c.id, isActive: true })
+                  )
+                }
+              >
+                Reactivate
+              </DropdownMenuItem>
+            )}
+            {c.graduated ? (
+              <DropdownMenuItem
+                disabled={pending}
+                onClick={() =>
+                  run(() =>
+                    graduateClassAction({ classId: c.id, graduated: false })
+                  )
+                }
+              >
+                Undo graduation
+              </DropdownMenuItem>
+            ) : (
+              <ConfirmAction
+                disabled={pending}
+                trigger={
+                  <DropdownMenuItem closeOnClick={false} variant="destructive">
+                    Graduate
+                  </DropdownMenuItem>
+                }
+                title={`Graduate ${c.label}?`}
+                description="Students move out of the active roster. The class stays on record and the change can be undone."
+                confirmLabel="Graduate"
+                onConfirm={() =>
+                  run(() =>
+                    graduateClassAction({ classId: c.id, graduated: true })
+                  )
+                }
+              />
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
   )
 }
 

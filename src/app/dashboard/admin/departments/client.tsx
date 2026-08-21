@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -11,8 +12,17 @@ import {
   UsersIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button-variants"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Field, FieldLabel } from "@/components/ui/field"
 import {
   Dialog,
@@ -40,7 +50,18 @@ import {
 } from "../actions"
 
 type Hod = { id: string; name: string }
-type Dept = { code: string; name: string; isActive: boolean; hod: Hod | null }
+type Dept = {
+  code: string
+  name: string
+  isActive: boolean
+  hod: Hod | null
+  coordinators: string[]
+  students: number
+  faculty: number
+  classes: number
+  classesWithoutCoordinator: number
+  unallocatedSubjects: number
+}
 type Person = {
   id: string
   name: string
@@ -172,50 +193,90 @@ export function DepartmentsClient({
         </Button>
       </div>
 
-      <div className="border-border overflow-hidden rounded-lg border">
-        {departments.length === 0 ? (
-          <EmptyState
-            icon={BuildingIcon}
-            title="No departments yet"
-            description="Add the five branches above."
-          />
-        ) : (
-          <>
-            <div className="text-muted-foreground border-border bg-muted/30 hidden items-center gap-4 border-b px-4 py-2 text-xs sm:flex">
-              <span className="min-w-0 flex-1">Department</span>
-              <span className="w-44 shrink-0">Head of department</span>
-              <span className="w-44 shrink-0" aria-hidden />
-            </div>
-            <ul className="divide-border divide-y">
-              {departments.map((d) => (
-                <li
-                  key={d.code}
-                  className="flex flex-wrap items-center gap-4 px-4 py-3"
-                >
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <Badge variant="outline" className="identifier">
-                      {d.code}
-                    </Badge>
-                    <span className="truncate text-sm">{d.name}</span>
-                    {!d.isActive && (
-                      <span className="text-muted-foreground text-xs">
-                        Inactive
-                      </span>
-                    )}
-                  </div>
-                  <div className="w-44 shrink-0">
-                    {d.hod ? (
-                      <span className="block truncate text-sm">
-                        {d.hod.name}
-                      </span>
-                    ) : (
-                      <Badge variant="outline" className="text-attention">
+      {departments.length === 0 ? (
+        <EmptyState
+          icon={BuildingIcon}
+          variant="dashed"
+          title="No departments yet"
+          description="Add the five branches above."
+        />
+      ) : (
+        <div className="grid gap-4 @3xl/main:grid-cols-2">
+          {departments.map((d) => (
+            <Card key={d.code} className="h-full">
+              <CardHeader>
+                <CardTitle className="flex min-w-0 items-center gap-2">
+                  <Badge variant="outline" className="identifier">
+                    {d.code}
+                  </Badge>
+                  <span className="truncate">{d.name}</span>
+                </CardTitle>
+                {!d.isActive && (
+                  <CardAction>
+                    <Badge variant="secondary">Inactive</Badge>
+                  </CardAction>
+                )}
+              </CardHeader>
+
+              <CardContent className="flex flex-1 flex-col gap-4">
+                <div className="border-border divide-border grid grid-cols-3 divide-x rounded-lg border">
+                  <DeptStat label="Students" value={d.students} />
+                  <DeptStat label="Faculty" value={d.faculty} />
+                  <DeptStat label="Classes" value={d.classes} />
+                </div>
+
+                {(d.classesWithoutCoordinator > 0 ||
+                  d.unallocatedSubjects > 0) && (
+                  <div className="flex flex-wrap gap-2">
+                    {d.classesWithoutCoordinator > 0 && (
+                      <Badge
+                        variant="outline"
+                        className="text-attention"
+                        render={
+                          <Link
+                            href={`/dashboard/dept/${d.code}?tab=classes`}
+                          />
+                        }
+                      >
                         <CircleAlertIcon data-icon="inline-start" />
-                        No HOD
+                        {d.classesWithoutCoordinator} without coordinator
+                      </Badge>
+                    )}
+                    {d.unallocatedSubjects > 0 && (
+                      <Badge
+                        variant="outline"
+                        className="text-attention"
+                        render={
+                          <Link
+                            href={`/dashboard/dept/${d.code}?tab=classes`}
+                          />
+                        }
+                      >
+                        <CircleAlertIcon data-icon="inline-start" />
+                        {d.unallocatedSubjects} unallocated subjects
                       </Badge>
                     )}
                   </div>
-                  <div className="flex w-44 shrink-0 items-center justify-end gap-1">
+                )}
+
+                <div className="border-border mt-auto flex flex-col gap-3 border-t pt-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-muted-foreground text-xs">
+                        Head of department
+                      </p>
+                      {d.hod ? (
+                        <p className="mt-1 truncate text-sm">{d.hod.name}</p>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="text-attention mt-1"
+                        >
+                          <CircleAlertIcon data-icon="inline-start" />
+                          No HOD
+                        </Badge>
+                      )}
+                    </div>
                     {d.isActive && (
                       <AppointHod
                         dept={d}
@@ -224,41 +285,77 @@ export function DepartmentsClient({
                         onDone={() => start(() => router.refresh())}
                       />
                     )}
-                    {d.isActive ? (
-                      <ConfirmAction
-                        trigger={
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-muted-foreground hover:text-destructive text-xs"
-                          >
-                            Deactivate
-                          </Button>
-                        }
-                        disabled={pending}
-                        title={`Deactivate ${d.name}?`}
-                        description={`It stops appearing wherever a department is chosen. Existing records keep their ${d.code} tag, and you can reactivate it here.`}
-                        confirmLabel="Deactivate"
-                        onConfirm={() => setActive(d, false)}
-                      />
-                    ) : (
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-muted-foreground text-xs">
+                      {d.coordinators.length > 1
+                        ? "Department coordinators"
+                        : "Department coordinator"}
+                    </p>
+                    <p className="mt-1 truncate text-sm">
+                      {d.coordinators.length > 0 ? (
+                        d.coordinators.join(", ")
+                      ) : (
+                        <span className="text-muted-foreground">
+                          Not appointed
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+
+              <CardFooter className="justify-between gap-2">
+                <Link
+                  href={`/dashboard/dept/${d.code}`}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Open
+                </Link>
+                {d.isActive ? (
+                  <ConfirmAction
+                    trigger={
                       <Button
                         variant="ghost"
                         size="sm"
-                        disabled={pending}
-                        onClick={() => reactivate(d)}
-                        className="text-xs"
+                        className="text-muted-foreground hover:text-destructive text-xs"
                       >
-                        Reactivate
+                        Deactivate
                       </Button>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </div>
+                    }
+                    disabled={pending}
+                    title={`Deactivate ${d.name}?`}
+                    description={`It stops appearing wherever a department is chosen. Existing records keep their ${d.code} tag, and you can reactivate it here.`}
+                    confirmLabel="Deactivate"
+                    onConfirm={() => setActive(d, false)}
+                  />
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={pending}
+                    onClick={() => reactivate(d)}
+                    className="text-xs"
+                  >
+                    Reactivate
+                  </Button>
+                )}
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DeptStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="px-3 py-2.5">
+      <p className="text-muted-foreground text-xs font-medium">{label}</p>
+      <p className="mt-1.5 text-2xl leading-none font-semibold tracking-tight tabular-nums">
+        {value}
+      </p>
     </div>
   )
 }
@@ -309,7 +406,9 @@ function AppointHod({
     <Dialog open={open} onOpenChange={close}>
       <DialogTrigger
         disabled={disabled}
-        render={<Button variant="ghost" size="sm" className="text-xs" />}
+        render={
+          <Button variant="outline" size="sm" className="shrink-0 text-xs" />
+        }
       >
         {dept.hod ? "Change" : "Appoint"}
       </DialogTrigger>

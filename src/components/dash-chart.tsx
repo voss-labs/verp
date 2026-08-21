@@ -1,12 +1,13 @@
 "use client"
 
+import { useId } from "react"
 import { ChartColumnIcon, ChartLineIcon } from "lucide-react"
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
-  Line,
-  LineChart,
   XAxis,
   YAxis,
 } from "recharts"
@@ -24,12 +25,17 @@ import {
 const SHELL = "aspect-auto h-40 w-full"
 const MARGIN = { top: 8, right: 8, bottom: 0, left: 0 }
 
+const PERCENT_DOMAIN: [number, number] = [0, 100]
+const PERCENT_TICKS = [0, 25, 50, 75, 100]
+const ALL_TICKS_UP_TO = 14
+
 export type TrendPoint = { date: string; value: number }
 
 export type TrendLineProps = {
   data: TrendPoint[]
   yLabel: string
   emptyLabel?: string
+  percent?: boolean
 }
 
 export type ComparePoint = { label: string; value: number; total?: number }
@@ -66,7 +72,10 @@ export function TrendLine({
   data,
   yLabel,
   emptyLabel = "Nothing recorded yet",
+  percent = true,
 }: TrendLineProps) {
+  const fillId = `trend-fill-${useId().replace(/[^a-zA-Z0-9]/g, "")}`
+
   if (data.length === 0) {
     return (
       <EmptyState icon={ChartLineIcon} title={emptyLabel} variant="dashed" />
@@ -77,16 +86,33 @@ export function TrendLine({
     value: { label: yLabel, color: "var(--blue)" },
   } satisfies ChartConfig
 
+  const everyTick = data.length <= ALL_TICKS_UP_TO
+
   return (
     <ChartContainer config={config} className={SHELL}>
-      <LineChart accessibilityLayer data={data} margin={MARGIN}>
+      <AreaChart accessibilityLayer data={data} margin={MARGIN}>
+        <defs>
+          <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+            <stop
+              offset="0%"
+              stopColor="var(--color-value)"
+              stopOpacity={0.25}
+            />
+            <stop
+              offset="100%"
+              stopColor="var(--color-value)"
+              stopOpacity={0}
+            />
+          </linearGradient>
+        </defs>
         <CartesianGrid vertical={false} />
         <XAxis
           dataKey="date"
           tickLine={false}
           axisLine={false}
           tickMargin={8}
-          minTickGap={24}
+          interval={everyTick ? 0 : "preserveStartEnd"}
+          minTickGap={everyTick ? 0 : 24}
         />
         <YAxis
           width={32}
@@ -94,6 +120,8 @@ export function TrendLine({
           axisLine={false}
           tickMargin={4}
           allowDecimals={false}
+          domain={percent ? PERCENT_DOMAIN : undefined}
+          ticks={percent ? PERCENT_TICKS : undefined}
         />
         <ChartTooltip
           cursor={false}
@@ -105,16 +133,23 @@ export function TrendLine({
             />
           }
         />
-        <Line
+        <Area
           dataKey="value"
           type="monotone"
           stroke="var(--color-value)"
-          strokeWidth={1.5}
+          strokeWidth={1.75}
           strokeLinecap="round"
-          dot={false}
-          activeDot={{ r: 3 }}
+          fill={`url(#${fillId})`}
+          fillOpacity={1}
+          dot={{
+            r: 3,
+            fill: "var(--color-value)",
+            stroke: "var(--card)",
+            strokeWidth: 1.5,
+          }}
+          activeDot={{ r: 4, stroke: "var(--card)", strokeWidth: 1.5 }}
         />
-      </LineChart>
+      </AreaChart>
     </ChartContainer>
   )
 }

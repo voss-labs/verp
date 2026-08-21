@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { DrawerSection } from "@/components/record-drawer"
+import { DialogSection } from "@/components/record-dialog"
 import { useCan } from "@/components/session-provider"
 import {
   getRecordHistoryAction,
@@ -15,9 +15,9 @@ import {
  * does this student's record look like this", because that means scrolling
  * thousands of unrelated rows. Same events, asked the other way round.
  *
- * Loaded when the drawer opens rather than with the table behind it: a roster
+ * Loaded when the dialog opens rather than with the table behind it: a roster
  * page would otherwise carry the audit trail of every student on it to render
- * one drawer.
+ * one record.
  */
 export function RecordHistory({
   targetType,
@@ -29,7 +29,7 @@ export function RecordHistory({
   const can = useCan()
   const allowed = can("audit:read")
   // Which record the loaded events belong to travels with them. Clearing them
-  // separately when the drawer moves on would mean writing state during the
+  // separately when the dialog moves on would mean writing state during the
   // effect, and for one render the previous student's history would sit under
   // the new one's name.
   const [loaded, setLoaded] = useState<{
@@ -56,7 +56,7 @@ export function RecordHistory({
   const failed = current != null && current.events === null
 
   return (
-    <DrawerSection title="History">
+    <DialogSection title="History">
       {failed ? (
         <p className="text-muted-foreground text-xs">
           Could not load the history for this record.
@@ -79,7 +79,7 @@ export function RecordHistory({
           ))}
         </ul>
       )}
-    </DrawerSection>
+    </DialogSection>
   )
 }
 

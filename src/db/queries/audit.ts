@@ -61,6 +61,24 @@ export async function getAuditLogs(params?: {
   return rows
 }
 
+export async function getAuditLogsByActor(actorUserId: string, limit: number) {
+  const rows = await db
+    .select({
+      id: auditLogs.id,
+      action: auditLogs.action,
+      targetType: auditLogs.targetType,
+      targetId: auditLogs.targetId,
+      details: auditLogs.details,
+      createdAt: auditLogs.createdAt,
+    })
+    .from(auditLogs)
+    .where(eq(auditLogs.actorId, actorUserId))
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(limit)
+
+  return rows
+}
+
 export async function getAuditActionTypes() {
   const rows = await db
     .selectDistinct({ action: auditLogs.action })

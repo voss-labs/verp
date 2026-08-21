@@ -49,6 +49,7 @@ export default async function DeptPage({
               id: c.id,
               classKey: c.classKey,
               label: `${yr ?? c.admissionYear} · ${c.departmentCode} · ${c.division}`,
+              yearDivision: `${yr ?? c.admissionYear} · ${c.division}`,
               departmentCode: c.departmentCode,
               admissionYear: c.admissionYear,
               division: c.division,

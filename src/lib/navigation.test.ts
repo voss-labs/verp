@@ -83,17 +83,23 @@ describe("buildNavigation", () => {
     expect(u.some((x) => x.includes("/admin"))).toBe(false)
   })
 
-  it("orders super_admin from institution down to the console", () => {
+  it("orders super_admin from institution down to imports", () => {
     expect(primary(ctxFor("super_admin")).items.map((i) => i.url)).toEqual([
       "/dashboard",
       "/dashboard/students",
       "/dashboard/faculty",
       "/dashboard/admin/departments",
+      "/dashboard/admin/appointments",
       "/dashboard/admin/roles",
       "/dashboard/audit",
       "/dashboard/imports",
-      "/dashboard/admin",
     ])
+  })
+
+  it("names every admin surface rather than pointing at the console", () => {
+    const u = urls(ctxFor("super_admin"))
+    expect(u).not.toContain("/dashboard/admin")
+    expect(u).toContain("/dashboard/admin/appointments")
   })
 
   it("hands super_admin department work in a trailing section", () => {
@@ -106,7 +112,7 @@ describe("buildNavigation", () => {
     ])
   })
 
-  it("orders an HOD from their department down to imports", () => {
+  it("orders an HOD from their department down to their own activity", () => {
     expect(
       primary(ctxFor("hod", ROLE_DEFAULTS.hod)).items.map((i) => i.url)
     ).toEqual([
@@ -117,6 +123,7 @@ describe("buildNavigation", () => {
       "/dashboard/students",
       "/dashboard/faculty",
       "/dashboard/imports",
+      "/dashboard/activity",
     ])
   })
 
@@ -214,6 +221,26 @@ describe("buildNavigation", () => {
     expect(urls(ctxFor("hod", ROLE_DEFAULTS.hod))).toContain(
       "/dashboard/students"
     )
+  })
+
+  it("gives staff their own activity and sends admins to the full log instead", () => {
+    expect(urls(ctxFor("hod", ROLE_DEFAULTS.hod))).toContain(
+      "/dashboard/activity"
+    )
+    expect(urls(ctxFor("faculty", ROLE_DEFAULTS.faculty))).toContain(
+      "/dashboard/activity"
+    )
+    expect(urls(ctxFor("super_admin"))).not.toContain("/dashboard/activity")
+    expect(urls(ctxFor("student", ROLE_DEFAULTS.student))).not.toContain(
+      "/dashboard/activity"
+    )
+  })
+
+  it("keeps My activity even for a faculty with nothing else to do", () => {
+    expect(urls(ctxFor("faculty", []))).toEqual([
+      "/dashboard",
+      "/dashboard/activity",
+    ])
   })
 
   it("gives an unplaced account nothing but the Overview", () => {

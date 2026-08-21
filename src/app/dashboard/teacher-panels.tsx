@@ -4,9 +4,12 @@ import {
   BookOpenIcon,
   CircleCheckIcon,
   ClockIcon,
+  TriangleAlertIcon,
+  UserRoundCheckIcon,
   type LucideIcon,
 } from "lucide-react"
 
+import { AttentionGroup } from "@/components/attention-card"
 import { EmptyState } from "@/components/empty-state"
 import { MarksSplitBar } from "@/components/marks-split-bar"
 import { Badge } from "@/components/ui/badge"
@@ -23,11 +26,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import type { AttentionSummary, Urgency } from "@/lib/attention"
 import type { Component } from "@/lib/marks-integrity"
 import type { OfferingCompletion } from "@/db/queries/overview"
 import { EmptyHint } from "./overview-cards"
 
 export type MySubject = OfferingCompletion & { classKey: string }
+
+export type QueuedEnrolment = {
+  requestId: string
+  classId: string
+  classKey: string
+  rollNumber: string
+  name: string
+}
 
 export type TodayClass = {
   classId: string
@@ -248,24 +260,20 @@ export function TodayQueue({
   )
 }
 
-export function MySubjectsTable({
+function SubjectsTable({
   subjects,
   canMarks,
+  showClass = false,
+  showTeacher = false,
+  empty,
 }: {
   subjects: MySubject[]
   canMarks: boolean
+  showClass?: boolean
+  showTeacher?: boolean
+  empty: ReactNode
 }) {
-  if (subjects.length === 0) {
-    return (
-      <EmptyState
-        icon={BookOpenIcon}
-        title="No subjects allocated to you"
-        description="A coordinator allocates subjects to teachers on the class."
-        variant="dashed"
-        action={<Cta href="/dashboard/class" label="My classes" />}
-      />
-    )
-  }
+  if (subjects.length === 0) return <>{empty}</>
 
   return (
     <Table>
@@ -273,7 +281,8 @@ export function MySubjectsTable({
         <TableRow>
           <TableHead>Code</TableHead>
           <TableHead>Subject</TableHead>
-          <TableHead>Class</TableHead>
+          {showClass && <TableHead>Class</TableHead>}
+          {showTeacher && <TableHead>Teacher</TableHead>}
           <TableHead className="text-right">Entered</TableHead>
           <TableHead>Status</TableHead>
         </TableRow>
@@ -298,11 +307,28 @@ export function MySubjectsTable({
                 {o.courseName}
               </span>
             </TableCell>
-            <TableCell>
-              <Badge variant="outline" className="identifier">
-                {o.classKey}
-              </Badge>
-            </TableCell>
+            {showClass && (
+              <TableCell>
+                <Badge variant="outline" className="identifier">
+                  {o.classKey}
+                </Badge>
+              </TableCell>
+            )}
+            {showTeacher && (
+              <TableCell>
+                {o.facultyName ? (
+                  <span className="block max-w-[10rem] truncate">
+                    {o.facultyName}
+                  </span>
+                ) : (
+                  <ToneChip
+                    tone="attention"
+                    icon={TriangleAlertIcon}
+                    label="Unallocated"
+                  />
+                )}
+              </TableCell>
+            )}
             <TableCell className="identifier text-right">
               {enteredOf(o)}/{capacityOf(o)}
             </TableCell>
@@ -321,5 +347,163 @@ export function MySubjectsTable({
         ))}
       </TableBody>
     </Table>
+  )
+}
+
+export function MySubjectsTable({
+  subjects,
+  canMarks,
+}: {
+  subjects: MySubject[]
+  canMarks: boolean
+}) {
+  return (
+    <SubjectsTable
+      subjects={subjects}
+      canMarks={canMarks}
+      showClass
+      empty={
+        <EmptyState
+          icon={BookOpenIcon}
+          title="No subjects allocated to you"
+          description="A coordinator allocates subjects to teachers on the class."
+          variant="dashed"
+          action={<Cta href="/dashboard/class" label="My classes" />}
+        />
+      }
+    />
+  )
+}
+
+export function ClassSubjectsTable({
+  subjects,
+  canMarks,
+  showClass,
+  subjectsHref,
+}: {
+  subjects: MySubject[]
+  canMarks: boolean
+  showClass: boolean
+  subjectsHref: string
+}) {
+  return (
+    <SubjectsTable
+      subjects={subjects}
+      canMarks={canMarks}
+      showClass={showClass}
+      showTeacher
+      empty={
+        <EmptyState
+          icon={BookOpenIcon}
+          title="No subjects offered yet"
+          description="A subject has to be offered on the class before anybody can be allocated to it."
+          variant="dashed"
+          action={<Cta href={subjectsHref} label="Subjects" />}
+        />
+      }
+    />
+  )
+}
+
+export function EnrolmentQueue({
+  requests,
+  remaining,
+  showClass,
+  canApprove,
+}: {
+  requests: QueuedEnrolment[]
+  remaining: number
+  showClass: boolean
+  canApprove: boolean
+}) {
+  if (requests.length === 0) {
+    return (
+      <EmptyState
+        icon={UserRoundCheckIcon}
+        title="Nobody is waiting"
+        description="Students who claim a roll number in your class arrive here."
+        variant="dashed"
+      />
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {requests.map((r) => (
+        <QueueRow
+          key={r.requestId}
+          head={
+            <>
+              <p className="truncate text-sm font-medium">{r.name}</p>
+              <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
+                <span className="identifier">{r.rollNumber}</span>
+                {showClass && (
+                  <Badge variant="outline" className="identifier">
+                    {r.classKey}
+                  </Badge>
+                )}
+              </p>
+            </>
+          }
+          action={
+            canApprove ? (
+              <Cta
+                href={`/dashboard/class/${r.classId}`}
+                label="Approve"
+                variant="default"
+              />
+            ) : undefined
+          }
+        />
+      ))}
+      {remaining > 0 && (
+        <EmptyHint>
+          {remaining} more {remaining === 1 ? "request" : "requests"} waiting.
+        </EmptyHint>
+      )}
+    </div>
+  )
+}
+
+const URGENCIES: Urgency[] = ["blocking", "overdue", "open"]
+
+const URGENCY_HEADING: Record<Urgency, string> = {
+  blocking: "Blocking",
+  overdue: "Overdue",
+  open: "Open",
+}
+
+export function AttentionFeed({ groups }: { groups: AttentionSummary[] }) {
+  if (groups.length === 0) {
+    return (
+      <EmptyState
+        icon={CircleCheckIcon}
+        title="All clear"
+        description="Nothing needs your attention."
+        variant="dashed"
+      />
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {URGENCIES.map((urgency) => {
+        const items = groups.filter((g) => g.urgency === urgency)
+        if (items.length === 0) return null
+        return (
+          <AttentionGroup
+            key={urgency}
+            heading={URGENCY_HEADING[urgency]}
+            items={items.map((g) => ({
+              severity: g.urgency,
+              title: g.title,
+              description: g.detail,
+              scopes: g.scopes,
+              href: g.href,
+            }))}
+          />
+        )
+      })}
+    </div>
   )
 }

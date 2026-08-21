@@ -8,7 +8,6 @@ export type NavIcon =
   | "roles"
   | "audit"
   | "imports"
-  | "console"
   | "classes"
   | "courses"
   | "dept"
@@ -38,6 +37,12 @@ const OVERVIEW: NavItem = {
   icon: "overview",
 }
 
+const MY_ACTIVITY: NavItem = {
+  title: "My activity",
+  url: "/dashboard/activity",
+  icon: "audit",
+}
+
 const canImport = (can: NavContext["can"]) =>
   can("student:update") ||
   can("faculty:create") ||
@@ -65,6 +70,11 @@ function superAdminSections(can: NavContext["can"]): NavSection[] {
     url: "/dashboard/admin/departments",
     icon: "departments",
   })
+  primary.push({
+    title: "Appointments",
+    url: "/dashboard/admin/appointments",
+    icon: "appoint",
+  })
   if (can("permission:manage")) {
     primary.push({
       title: "Roles & permissions",
@@ -86,8 +96,6 @@ function superAdminSections(can: NavContext["can"]): NavSection[] {
       icon: "imports",
     })
   }
-  primary.push({ title: "Console", url: "/dashboard/admin", icon: "console" })
-
   const department: NavItem[] = [
     { title: "Classes", url: "/dashboard/class", icon: "classes" },
   ]
@@ -151,6 +159,7 @@ function hodSections(ctx: NavContext): NavSection[] {
       icon: "imports",
     })
   }
+  primary.push(MY_ACTIVITY)
 
   const sections: NavSection[] = [{ items: primary }]
   if (ctx.hasClasses) {
@@ -190,6 +199,7 @@ function facultySections(ctx: NavContext): NavSection[] {
       icon: "imports",
     })
   }
+  primary.push(MY_ACTIVITY)
   return [{ items: primary }]
 }
 

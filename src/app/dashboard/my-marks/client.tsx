@@ -12,7 +12,7 @@ import { SubjectResultCells } from "@/components/subject-result"
 import { marksState, type CgpaResult } from "@/lib/sgpi"
 import { cn } from "@/lib/utils"
 
-import { SubjectDrawer, type OpenSubject } from "./subject-drawer"
+import { SubjectBreakdownRow } from "./subject-breakdown"
 import {
   MASKED_COLUMNS,
   buildBlocks,
@@ -43,7 +43,6 @@ export function MyMarksClient({
   attendance: AttendanceRow[]
   awaiting: Awaiting[]
 }) {
-  const [open, setOpen] = useState<OpenSubject | null>(null)
   const blocks = buildBlocks(semesters, awaiting, cgpa)
   const sessions = attendance.reduce((sum, r) => sum + r.total, 0)
   const attended = attendance.reduce((sum, r) => sum + r.present, 0)
@@ -95,28 +94,25 @@ export function MyMarksClient({
       </StatCardRow>
 
       {blocks.map((block) => (
-        <SemesterBlock
-          key={block.semester}
-          block={block}
-          onOpen={(subject) => setOpen({ subject, semester: block.semester })}
-        />
+        <SemesterBlock key={block.semester} block={block} />
       ))}
 
       <AttendanceTable rows={attendance} />
-
-      <SubjectDrawer open={open} onClose={() => setOpen(null)} />
     </div>
   )
 }
 
-function SemesterBlock({
-  block,
-  onOpen,
-}: {
-  block: Block
-  onOpen: (subject: Subject) => void
-}) {
+function SemesterBlock({ block }: { block: Block }) {
   const failed = block.sgpi?.hasFail === true
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
+
+  function toggle(code: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(code)) next.add(code)
+      return next
+    })
+  }
 
   return (
     <section className="bg-card overflow-hidden rounded-lg border">
@@ -189,7 +185,8 @@ function SemesterBlock({
                 <SubjectRow
                   key={row.code}
                   subject={row.subject}
-                  onOpen={onOpen}
+                  expanded={expanded.has(row.code)}
+                  onToggle={() => toggle(row.code)}
                 />
               ) : (
                 <AwaitingRow key={row.code} code={row.code} name={row.name} />
@@ -204,56 +201,69 @@ function SemesterBlock({
 
 function SubjectRow({
   subject,
-  onOpen,
+  expanded,
+  onToggle,
 }: {
   subject: Subject
-  onOpen: (subject: Subject) => void
+  expanded: boolean
+  onToggle: () => void
 }) {
   const hasMse = subject.course.maxMse > 0
   const entered = marksState(subject.marks, subject.course) !== "empty"
+  const open = entered && expanded
 
   return (
-    <tr
-      className={cn(
-        BODY_ROW,
-        entered &&
-          "hover:bg-muted/50 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2"
-      )}
-      {...(entered
-        ? {
-            role: "button" as const,
-            tabIndex: 0,
-            "aria-haspopup": "dialog" as const,
-            "aria-label": `${subject.code} breakdown`,
-            onClick: () => onOpen(subject),
-            onKeyDown: (e: React.KeyboardEvent) => {
-              if (e.key !== "Enter" && e.key !== " ") return
-              e.preventDefault()
-              onOpen(subject)
-            },
-          }
-        : {})}
-    >
-      <td className="identifier">{subject.code}</td>
-      <td className="max-w-[18rem] truncate whitespace-normal">
-        {subject.name}
-      </td>
-      <td className="tabular-nums">{subject.credits}</td>
-      <ComponentCell value={subject.marks.isa} max={subject.course.maxIsa} />
-      <ComponentCell
-        value={hasMse ? subject.marks.mse1 : null}
-        max={subject.course.maxMse}
-      />
-      <ComponentCell
-        value={hasMse ? subject.marks.mse2 : null}
-        max={subject.course.maxMse}
-      />
-      <ComponentCell value={subject.marks.ese} max={subject.course.maxEse} />
-      <SubjectResultCells marks={subject.marks} course={subject.course} />
-      <td className="text-muted-foreground">
-        {entered && <ChevronRightIcon className="size-3.5" aria-hidden />}
-      </td>
-    </tr>
+    <>
+      <tr
+        className={cn(
+          BODY_ROW,
+          entered &&
+            "hover:bg-muted/50 focus-visible:outline-ring cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2",
+          open && "bg-muted/25"
+        )}
+        {...(entered
+          ? {
+              role: "button" as const,
+              tabIndex: 0,
+              "aria-expanded": expanded,
+              "aria-label": `${subject.code} breakdown`,
+              onClick: onToggle,
+              onKeyDown: (e: React.KeyboardEvent) => {
+                if (e.key !== "Enter" && e.key !== " ") return
+                e.preventDefault()
+                onToggle()
+              },
+            }
+          : {})}
+      >
+        <td className="identifier">{subject.code}</td>
+        <td className="max-w-[18rem] truncate whitespace-normal">
+          {subject.name}
+        </td>
+        <td className="tabular-nums">{subject.credits}</td>
+        <ComponentCell value={subject.marks.isa} max={subject.course.maxIsa} />
+        <ComponentCell
+          value={hasMse ? subject.marks.mse1 : null}
+          max={subject.course.maxMse}
+        />
+        <ComponentCell
+          value={hasMse ? subject.marks.mse2 : null}
+          max={subject.course.maxMse}
+        />
+        <ComponentCell value={subject.marks.ese} max={subject.course.maxEse} />
+        <SubjectResultCells marks={subject.marks} course={subject.course} />
+        <td className="text-muted-foreground">
+          {entered && (
+            <ChevronRightIcon
+              data-open={open ? "" : undefined}
+              className="size-3.5 transition-transform duration-150 data-open:rotate-90"
+              aria-hidden
+            />
+          )}
+        </td>
+      </tr>
+      {open && <SubjectBreakdownRow subject={subject} />}
+    </>
   )
 }
 

@@ -62,6 +62,8 @@ export const COLUMNS = [
 
 export const MASKED_COLUMNS = COLUMNS.slice(2, 9)
 
+export const COLUMN_COUNT = COLUMNS.length + 1
+
 export function mark(value: number | null, max: number) {
   return value == null ? "—" : `${value}/${max}`
 }
