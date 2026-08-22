@@ -32,6 +32,7 @@ export type ClientSession = {
   scopeDepts: ScopeDept[]
   scopeClasses: ScopeClass[]
   rollNumber: string | null
+  bugReportConfigured: boolean
 }
 
 type Ctx = ClientSession & { capabilitySet: ReadonlySet<Capability> }

@@ -90,6 +90,7 @@ export default async function DashboardLayout({
         classIds: user.classIds,
         coordinatorClassIds: user.coordinatorClassIds,
         capabilities: [...user.capabilities],
+        bugReportConfigured: isBugReportConfigured(),
         ...scope,
       }}
     >
