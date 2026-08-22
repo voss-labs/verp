@@ -30,15 +30,12 @@ export function VossMark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "relative inline-flex items-center justify-center font-black select-none",
+        "inline-flex items-baseline gap-[2px] font-black select-none",
         className
       )}
     >
-      V
-      <span
-        aria-hidden
-        className="bg-blue absolute right-[3px] bottom-[5px] size-[5px]"
-      />
+      <span className="leading-none tracking-[-0.03em]">V</span>
+      <span aria-hidden className="bg-blue size-[5px] shrink-0" />
     </span>
   )
 }

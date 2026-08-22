@@ -55,4 +55,5 @@ next-env.d.ts
 !/scripts/setup.ts
 !/scripts/dev-setup.ts
 !/scripts/seed-dev.ts
+!/scripts/check-migrations.ts
 !/scripts/lib/
