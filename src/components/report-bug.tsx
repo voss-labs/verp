@@ -64,6 +64,24 @@ const ROLE_LABEL: Record<
 type Shot = { dataUrl: string; bytes: number }
 type Snapshot = { device: BugDevice; logs: BugLogEntry[]; capturedAt: string }
 
+export const OPEN_BUG_REPORT = "verp:open-bug-report"
+
+export type BugReportPrefill = { description?: string; digest?: string }
+
+export function openBugReport(prefill?: BugReportPrefill) {
+  document.dispatchEvent(
+    new CustomEvent(OPEN_BUG_REPORT, { detail: prefill ?? {} })
+  )
+}
+
+function seedDescription(prefill: BugReportPrefill): string {
+  const lines: string[] = []
+  const typed = prefill.description?.trim()
+  if (typed) lines.push(typed, "")
+  if (prefill.digest) lines.push(`Error reference: ${prefill.digest}`)
+  return lines.join("\n")
+}
+
 function takeSnapshot(): Snapshot {
   return {
     device: captureDevice(),
@@ -98,6 +116,19 @@ export function ReportBugButton({ appVersion }: { appVersion: string }) {
 
   React.useEffect(() => {
     startBugLogCapture()
+  }, [])
+
+  React.useEffect(() => {
+    const onOpen = (event: Event) => {
+      const prefill = (event as CustomEvent<BugReportPrefill>).detail ?? {}
+      const seed = seedDescription(prefill)
+      setSnapshot(takeSnapshot())
+      setShotError(null)
+      setDescription((current) => (current.trim() ? current : seed))
+      setOpen(true)
+    }
+    document.addEventListener(OPEN_BUG_REPORT, onOpen)
+    return () => document.removeEventListener(OPEN_BUG_REPORT, onOpen)
   }, [])
 
   function changeOpen(next: boolean) {

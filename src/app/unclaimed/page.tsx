@@ -66,6 +66,7 @@ export default async function UnclaimedPage() {
         scopeDepts: [],
         scopeClasses: [],
         rollNumber: null,
+        bugReportConfigured: false,
       }}
     >
       <SidebarProvider>
