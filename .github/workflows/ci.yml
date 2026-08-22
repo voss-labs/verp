@@ -38,3 +38,46 @@ jobs:
           DATABASE_URL: "postgresql://fake:fake@localhost/fake"
           BETTER_AUTH_SECRET: "ci-secret"
           BETTER_AUTH_URL: "http://localhost:3000"
+
+  migrations:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: verp
+          POSTGRES_PASSWORD: verp
+          POSTGRES_DB: verp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: "postgresql://verp:verp@localhost:5432/verp"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the schema the way a fresh install does
+        run: npx drizzle-kit push --force
+
+      - name: Apply migrations
+        run: npm run db:migrate
+
+      - name: Applying them again changes nothing
+        run: npm run db:migrate
+
+      - name: Every migration file is recorded as applied
+        run: npx tsx scripts/check-migrations.ts
