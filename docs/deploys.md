@@ -37,6 +37,39 @@ Add required reviewers on that environment if a deploy should wait for a human.
 The secrets are scoped to it, so nothing else in CI can read the production
 connection string.
 
+## Pointing at a new database
+
+The workflow migrates; it does not provision. Migrations assume the tables
+already exist — `0001` opens with `ALTER TABLE students`, and nothing in
+`src/db/migrations` creates the core tables. Those come from the Drizzle schema
+in `src/db/schema`, which `drizzle-kit push` builds. The migration files carry
+only what a push cannot express: partial unique indexes, check constraints,
+backfills.
+
+So an empty database is not something the deploy workflow can bring up. Running
+it against one fails on the first statement with `relation "students" does not
+exist`, and it fails before the deploy hook, so nothing ships against a database
+that is not there.
+
+Bringing up a new one is deliberate and manual, once:
+
+```
+DIRECT_URL="<the new unpooled url>" npm run db:setup
+```
+
+That pushes the schema, then runs the migrations over it — they are written to
+be re-runnable, so replaying them onto a freshly pushed schema is a no-op rather
+than a conflict. After that the ledger is populated and the workflow takes over.
+
+`drizzle-kit push` is deliberately not in the workflow. Push computes a diff
+against live tables and will happily propose dropping what it cannot see a
+reason for; it has already cost this project its migration ledger once. It stays
+a thing a person runs, having read what it intends to do.
+
+A new database also starts with no departments, faculty or students, and no way
+in. `SUPER_ADMIN_EMAILS` is the bootstrap: an address on that list is
+super-admin on first login with no seed data behind it.
+
 ## Running migrations without deploying
 
 Run the workflow by hand from the Actions tab. It migrates, checks the ledger,
