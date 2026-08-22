@@ -6,7 +6,6 @@ on:
     paths:
       - "src/db/migrations/**"
       - "src/db/migrate.ts"
-      - ".github/workflows/migrate.yml"
   workflow_dispatch:
 
 concurrency:
@@ -27,6 +26,13 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - name: Refuse without a database to migrate
+        if: ${{ secrets.PRODUCTION_DATABASE_URL == '' }}
+        run: |
+          echo "PRODUCTION_DATABASE_URL is not set on the production environment."
+          echo "Add it under Settings, Environments, production before running this."
+          exit 1
 
       - name: Show what is pending
         run: npm run db:migrate:status || true
