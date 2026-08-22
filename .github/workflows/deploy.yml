@@ -1,0 +1,71 @@
+name: Deploy production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production-database
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Check what this run is allowed to do
+        id: secrets
+        env:
+          DB: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$DB" ] || [ -z "$HOOK" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Deploy pipeline is not configured yet"
+              echo
+              [ -z "$DB" ] && echo "- \`PRODUCTION_DATABASE_URL\` is missing"
+              [ -z "$HOOK" ] && echo "- \`VERCEL_DEPLOY_HOOK_URL\` is missing"
+              echo
+              echo "Add them to the \`production-database\` environment."
+              echo "Until then Vercel keeps deploying on push and this run does nothing."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - run: npm ci
+        if: steps.secrets.outputs.ready == 'true'
+
+      - name: Apply migrations
+        if: steps.secrets.outputs.ready == 'true'
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+
+      - name: Confirm the schema matches the repo
+        if: steps.secrets.outputs.ready == 'true'
+        run: npx tsx scripts/check-migrations.ts
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+
+      - name: Deploy
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          code=$(curl -sS -X POST -o response.json -w '%{http_code}' \
+            "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}")
+          cat response.json
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "Deploy hook returned $code" >&2
+            exit 1
+          fi
+          echo "### Deployed after migrating" >> "$GITHUB_STEP_SUMMARY"
