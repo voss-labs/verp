@@ -35,6 +35,12 @@ export async function getFacultyByEmail(email: string) {
   })
 }
 
+export async function getFacultyByEmailIncludingInactive(email: string) {
+  return db.query.faculty.findFirst({
+    where: eq(faculty.email, email.toLowerCase()),
+  })
+}
+
 export async function linkFacultyToAuthUser(
   facultyId: string,
   authUserId: string

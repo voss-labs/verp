@@ -6,19 +6,25 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { getSessionUser, isUnbound } from "@/lib/session"
 import { devAuthProps } from "@/lib/dev-auth"
 import { getLatestRequestForUser } from "@/db/queries/onboarding"
+import { getLatestStaffRequestForUser } from "@/db/queries/staff-requests"
 import { getClassById } from "@/db/queries/classes"
 import { listClassStaff } from "@/db/queries/class-staff"
+import { getDepartment, listDepartments } from "@/db/queries/departments"
+import { getActiveHod } from "@/db/queries/appointments"
 import { expectedYear } from "@/lib/roll-number"
-import { RegisterForm, WithdrawRequest } from "./register-form"
+import { ClaimFlow } from "./claim-flow"
+import { WithdrawRequest } from "./register-form"
+import { WithdrawStaffRequest } from "./staff-form"
 
 export const dynamic = "force-dynamic"
 
 /**
- * The student's entry point. An unbound account either self-registers here (roll
- * + name; the email is the verified session, not typed) or, once submitted, sees
- * the status of that request. Rendered inside the app shell — they ARE in, just
- * not yet placed. The dashboard layout redirects unbound users here, so no data
- * route is reachable without a role.
+ * The unbound account's entry point. VOSS verified them, VERP cannot place them:
+ * they say whether they are a student or staff, that request goes to whoever can
+ * confirm it (class coordinator / HOD or an administrator), and until then this
+ * page is the status of it. Rendered inside the app shell — they ARE in, just not
+ * yet placed. The dashboard layout redirects unbound users here, so no data route
+ * is reachable without a role.
  */
 export default async function UnclaimedPage() {
   const user = await getSessionUser()
@@ -28,14 +34,25 @@ export default async function UnclaimedPage() {
   // Without this the "unplaced" persona is a trap: you land here, the shell has
   // no switcher, and the only way back is deleting a cookie by hand.
   const devAuth = await devAuthProps()
-  const req = await getLatestRequestForUser(user.id)
-  const showForm = !req || req.status === "rejected"
+  const [req, staffReq] = await Promise.all([
+    getLatestRequestForUser(user.id),
+    getLatestStaffRequestForUser(user.id),
+  ])
 
-  const queued = req?.status === "pending" ? req.classId : null
-  const [cls, staff] = await Promise.all([
+  const enrolment = req && req.status !== "rejected" ? req : null
+  const staffPending =
+    !enrolment && staffReq?.status === "pending" ? staffReq : null
+  const staffDeptCode = staffPending?.deptCode ?? null
+
+  const queued = enrolment?.status === "pending" ? enrolment.classId : null
+  const [cls, staff, staffDept, hod, depts] = await Promise.all([
     queued ? getClassById(queued) : null,
     queued ? listClassStaff([queued]) : [],
+    staffDeptCode ? getDepartment(staffDeptCode) : null,
+    staffDeptCode ? getActiveHod(staffDeptCode) : null,
+    enrolment || staffPending ? [] : listDepartments(),
   ])
+
   const coordinator = staff.find((s) => s.role === "academic_coordinator")
   const classLabel = cls
     ? `${expectedYear(cls.admissionYear, new Date()) ?? cls.admissionYear} · ${cls.departmentCode} · ${cls.division}`
@@ -44,6 +61,25 @@ export default async function UnclaimedPage() {
     coordinator && classLabel
       ? `${`${coordinator.firstName} ${coordinator.lastName}`.trim()}, the ${classLabel} coordinator`
       : null
+
+  const deptName = staffDept?.name ?? staffDeptCode ?? ""
+  const hodName = hod ? `${hod.firstName} ${hod.lastName}`.trim() : null
+  const deciderPhrase = hodName
+    ? `${hodName}, the head of ${deptName}, or an administrator`
+    : `the head of ${deptName}, or an administrator`
+
+  const studentRejection = req?.status === "rejected" ? req : null
+  const staffRejection = staffReq?.status === "rejected" ? staffReq : null
+  const initialRole =
+    studentRejection && staffRejection
+      ? staffRejection.updatedAt > studentRejection.updatedAt
+        ? "staff"
+        : "student"
+      : studentRejection
+        ? "student"
+        : staffRejection
+          ? "staff"
+          : null
 
   // AppSidebar reads the signed-in identity from context, so the shell has to
   // provide it. This page rendered the sidebar without a provider from #82
@@ -74,31 +110,62 @@ export default async function UnclaimedPage() {
         <SidebarInset>
           <div className="flex min-h-svh items-center justify-center p-6">
             <div className="w-full max-w-md">
-              {showForm ? (
-                <RegisterForm
-                  email={user.email}
-                  name={user.name}
-                  rejection={
-                    req?.status === "rejected" ? req.rejectionReason : null
-                  }
-                />
-              ) : req.status === "pending" ? (
+              {enrolment ? (
+                enrolment.status === "pending" ? (
+                  <Status
+                    icon={<ClockIcon className="size-5" />}
+                    title="Waiting for approval"
+                    body={
+                      coordinatorPhrase
+                        ? `Waiting for ${coordinatorPhrase}, to approve your claim on ${enrolment.rollNumber}. You'll be linked automatically the moment they do.`
+                        : `Your claim on ${enrolment.rollNumber} is with your class coordinator. You'll be linked automatically the moment they approve it.`
+                    }
+                    action={
+                      <WithdrawRequest rollNumber={enrolment.rollNumber} />
+                    }
+                  />
+                ) : (
+                  <Status
+                    icon={<AlertTriangleIcon className="size-5" />}
+                    title="Your class isn't set up yet"
+                    body={`We have your details for ${enrolment.rollNumber}, but your class has not been created in VERP yet. You'll be routed to your coordinator's queue automatically once it is — nothing more to do.`}
+                    action={
+                      <WithdrawRequest rollNumber={enrolment.rollNumber} />
+                    }
+                  />
+                )
+              ) : staffPending ? (
                 <Status
                   icon={<ClockIcon className="size-5" />}
                   title="Waiting for approval"
-                  body={
-                    coordinatorPhrase
-                      ? `Waiting for ${coordinatorPhrase}, to approve your claim on ${req.rollNumber}. You'll be linked automatically the moment they do.`
-                      : `Your claim on ${req.rollNumber} is with your class coordinator. You'll be linked automatically the moment they approve it.`
+                  body={`Waiting for ${deciderPhrase}, to confirm you as staff. You'll be placed automatically the moment they do.`}
+                  action={
+                    <WithdrawStaffRequest
+                      deptName={deptName}
+                      employeeId={staffPending.employeeId}
+                    />
                   }
-                  action={<WithdrawRequest rollNumber={req.rollNumber} />}
                 />
               ) : (
-                <Status
-                  icon={<AlertTriangleIcon className="size-5" />}
-                  title="Your class isn't set up yet"
-                  body={`We have your details for ${req.rollNumber}, but your class has not been created in VERP yet. You'll be routed to your coordinator's queue automatically once it is — nothing more to do.`}
-                  action={<WithdrawRequest rollNumber={req.rollNumber} />}
+                <ClaimFlow
+                  email={user.email}
+                  name={user.name}
+                  departments={depts
+                    .filter((d) => d.isActive)
+                    .map((d) => ({ code: d.code, name: d.name }))}
+                  initialRole={initialRole}
+                  studentRejection={studentRejection?.rejectionReason ?? null}
+                  staffRejection={staffRejection?.rejectionReason ?? null}
+                  staffDefaults={
+                    staffRejection
+                      ? {
+                          firstName: staffRejection.firstName,
+                          lastName: staffRejection.lastName,
+                          employeeId: staffRejection.employeeId,
+                          deptCode: staffRejection.deptCode,
+                        }
+                      : null
+                  }
                 />
               )}
             </div>

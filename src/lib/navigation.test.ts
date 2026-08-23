@@ -88,6 +88,7 @@ describe("buildNavigation", () => {
       "/dashboard",
       "/dashboard/students",
       "/dashboard/faculty",
+      "/dashboard/staff-requests",
       "/dashboard/admin/departments",
       "/dashboard/admin/appointments",
       "/dashboard/admin/roles",
@@ -122,9 +123,30 @@ describe("buildNavigation", () => {
       "/dashboard/dept/courses",
       "/dashboard/students",
       "/dashboard/faculty",
+      "/dashboard/staff-requests",
       "/dashboard/imports",
       "/dashboard/activity",
     ])
+  })
+
+  it("puts staff requests in front of both tiers that can decide them", () => {
+    expect(urls(ctxFor("super_admin"))).toContain("/dashboard/staff-requests")
+    expect(urls(ctxFor("hod", ROLE_DEFAULTS.hod))).toContain(
+      "/dashboard/staff-requests"
+    )
+    expect(urls(ctxFor("faculty", ROLE_DEFAULTS.faculty))).not.toContain(
+      "/dashboard/staff-requests"
+    )
+    expect(urls(ctxFor("student", ROLE_DEFAULTS.student))).not.toContain(
+      "/dashboard/staff-requests"
+    )
+  })
+
+  it("drops staff requests when the capability its actions check is revoked", () => {
+    const revoked = ROLE_DEFAULTS.hod.filter((c) => c !== "faculty:create")
+    expect(urls(ctxFor("hod", revoked))).not.toContain(
+      "/dashboard/staff-requests"
+    )
   })
 
   it("points an HOD's Classes at the department table, not the teaching list", () => {

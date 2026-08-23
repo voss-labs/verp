@@ -12,8 +12,10 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Badge } from "@/components/ui/badge"
-import { useSessionUser } from "@/components/session-provider"
-import { contextualRole } from "@/lib/navigation"
+import {
+  useContextualRole,
+  useSessionUser,
+} from "@/components/session-provider"
 
 /**
  * A segment of the academic context trail: VIT / EXCS / BE A / Data Analytics.
@@ -44,16 +46,7 @@ export function PageHeader({
   actions,
 }: PageHeaderProps) {
   const session = useSessionUser()
-  // The responsibility, not the database tier: a faculty member coordinating a
-  // class is a coordinator here, and "Faculty" told them nothing they did not
-  // already know.
-  const role = contextualRole({
-    tier: session.tier,
-    can: () => false,
-    isCoordinator: session.coordinatorClassIds.length > 0,
-    hasClasses: session.classIds.length > 0,
-    isTeacher: session.classIds.length > session.coordinatorClassIds.length,
-  })
+  const role = useContextualRole()
   const coordinated = session.scopeClasses
     .filter((c) => session.coordinatorClassIds.includes(c.id))
     .map((c) => c.classKey)

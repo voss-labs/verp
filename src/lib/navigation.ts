@@ -13,6 +13,7 @@ export type NavIcon =
   | "dept"
   | "appoint"
   | "marks"
+  | "staff"
 
 export type NavItem = { title: string; url: string; icon: NavIcon }
 export type NavSection = {
@@ -63,6 +64,13 @@ function superAdminSections(can: NavContext["can"]): NavSection[] {
       title: "Faculty",
       url: "/dashboard/faculty",
       icon: "faculty",
+    })
+  }
+  if (can("faculty:create")) {
+    primary.push({
+      title: "Staff requests",
+      url: "/dashboard/staff-requests",
+      icon: "staff",
     })
   }
   primary.push({
@@ -150,6 +158,13 @@ function hodSections(ctx: NavContext): NavSection[] {
       title: "Faculty",
       url: "/dashboard/faculty",
       icon: "faculty",
+    })
+  }
+  if (can("faculty:create")) {
+    primary.push({
+      title: "Staff requests",
+      url: "/dashboard/staff-requests",
+      icon: "staff",
     })
   }
   if (canImport(can)) {

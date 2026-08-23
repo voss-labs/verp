@@ -13,7 +13,7 @@ import {
   withdrawEnrollmentRequestAction,
 } from "../onboarding/actions"
 
-function splitName(name: string) {
+export function splitName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length <= 1) return { first: parts[0] ?? "", last: "" }
   return { first: parts[0], last: parts.slice(1).join(" ") }
@@ -81,7 +81,10 @@ export function RegisterForm({
       </p>
 
       {rejection && (
-        <p className="border-destructive/30 bg-destructive/5 text-destructive mt-4 rounded-lg border px-3 py-2 text-sm">
+        <p
+          role="alert"
+          className="border-destructive/30 bg-destructive/5 text-destructive mt-4 rounded-lg border px-3 py-2 text-sm"
+        >
           Your previous request was declined: {rejection}. You can correct it
           and submit again.
         </p>
@@ -106,7 +109,7 @@ export function RegisterForm({
             </div>
           )}
           {rollBad && (
-            <p className="text-destructive text-xs">
+            <p role="alert" className="text-destructive text-xs">
               That doesn&rsquo;t look like a valid roll number.
             </p>
           )}

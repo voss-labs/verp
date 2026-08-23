@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildAttention } from "./attention"
+import { buildAttention, groupAttention } from "./attention"
 import type { ClassWork, DeptHealth } from "@/db/queries/overview"
 
 const cls = (over: Partial<ClassWork> = {}): ClassWork => ({
@@ -30,8 +30,17 @@ const dept = (over: Partial<DeptHealth> = {}): DeptHealth => ({
   ...over,
 })
 
-const build = (classWork: ClassWork[], deptHealth: DeptHealth[] = []) =>
-  buildAttention({ classWork, deptHealth, today: "2026-08-13" })
+const build = (
+  classWork: ClassWork[],
+  deptHealth: DeptHealth[] = [],
+  staffRequests: { deptCode: string; pending: number }[] = []
+) =>
+  buildAttention({
+    classWork,
+    deptHealth,
+    staffRequests,
+    today: "2026-08-13",
+  })
 
 describe("buildAttention", () => {
   it("says nothing when there is nothing to do", () => {
@@ -141,6 +150,43 @@ describe("buildAttention", () => {
     expect(items.map((i) => i.href)).toContain(
       "/dashboard/students?department=EXCS"
     )
+  })
+
+  it("ranks a staff request as blocking, above an overdue register", () => {
+    const items = build(
+      [cls({ students: 60, markedToday: 20 })],
+      [],
+      [{ deptCode: "EXCS", pending: 1 }]
+    )
+    expect(items[0]).toMatchObject({
+      kind: "staff-request",
+      urgency: "blocking",
+      count: 1,
+      scope: "EXCS",
+      href: "/dashboard/staff-requests",
+    })
+    expect(items[0].title).toBe("1 staff request")
+    expect(items[1].urgency).toBe("overdue")
+  })
+
+  it("says nothing about a department with no staff waiting", () => {
+    expect(build([], [], [{ deptCode: "EXCS", pending: 0 }])).toEqual([])
+  })
+
+  it("collapses staff requests from several departments into one group", () => {
+    const groups = groupAttention(
+      build(
+        [],
+        [],
+        [
+          { deptCode: "EXCS", pending: 2 },
+          { deptCode: "EXTC", pending: 1 },
+        ]
+      )
+    )
+    expect(groups).toHaveLength(1)
+    expect(groups[0].title).toBe("3 staff requests")
+    expect(groups[0].scopes.map((s) => s.label)).toEqual(["EXCS", "EXTC"])
   })
 
   it("gives every item a distinct id so the list can key on it", () => {
