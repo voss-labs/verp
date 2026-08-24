@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { rollsInScope, studentsInClass, type ImportActor } from "./scope"
+import {
+  rollsInScope,
+  studentsInBatch,
+  studentsInClass,
+  studentsInPreBatchRegister,
+  type ImportActor,
+} from "./scope"
 
 describe("studentsInClass", () => {
   const roster = new Set(["a", "b", "c"])
@@ -23,6 +29,55 @@ describe("studentsInClass", () => {
   it("reports each offending id once", () => {
     const r = studentsInClass(roster, ["zzz", "zzz", "yyy"])
     if (!r.ok) expect(r.offending.sort()).toEqual(["yyy", "zzz"])
+  })
+})
+
+describe("studentsInBatch", () => {
+  const b1 = new Set(["a", "b"])
+
+  it("accepts a payload naming only batch members", () => {
+    expect(studentsInBatch(b1, ["a", "b"]).ok).toBe(true)
+  })
+
+  // A classmate in B2 is in the class and still outside this register.
+  it("rejects a classmate who sits in another batch", () => {
+    const r = studentsInBatch(b1, ["a", "c"])
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.offending).toEqual(["c"])
+  })
+})
+
+describe("studentsInPreBatchRegister", () => {
+  const recorded = new Set(["a", "b", "c"])
+
+  it("accepts a payload every one of whose students was already marked", () => {
+    expect(studentsInPreBatchRegister(recorded, ["a", "b", "c"]).ok).toBe(true)
+  })
+
+  it("accepts a subset of the students already marked", () => {
+    expect(studentsInPreBatchRegister(recorded, ["b"]).ok).toBe(true)
+  })
+
+  it("rejects the request when one student has no untagged row", () => {
+    const r = studentsInPreBatchRegister(recorded, ["a", "b", "d"])
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.offending).toEqual(["d"])
+  })
+
+  it("accepts an empty payload, which writes nothing", () => {
+    expect(studentsInPreBatchRegister(recorded, []).ok).toBe(true)
+    expect(studentsInPreBatchRegister(new Set(), []).ok).toBe(true)
+  })
+
+  it("rejects every student when nothing was recorded before the split", () => {
+    const r = studentsInPreBatchRegister(new Set(), ["a", "b"])
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.offending).toEqual(["a", "b"])
+  })
+
+  it("reports each offending id once", () => {
+    const r = studentsInPreBatchRegister(recorded, ["d", "d", "e"])
+    if (!r.ok) expect(r.offending.sort()).toEqual(["d", "e"])
   })
 })
 

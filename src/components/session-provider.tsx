@@ -2,6 +2,7 @@
 
 import { createContext, useContext } from "react"
 import type { Capability } from "@/lib/rbac"
+import { contextualRole } from "@/lib/navigation"
 
 export type ScopeDept = { code: string; name: string }
 export type ScopeClass = { id: string; classKey: string; label: string }
@@ -73,4 +74,16 @@ export function useCan(): (capability: Capability) => boolean {
     if (tier === "super_admin") return true
     return capabilitySet.has(capability)
   }
+}
+
+/** The one role string every surface reads, so the sidebar and the header can never disagree. */
+export function useContextualRole(): string {
+  const { tier, classIds, coordinatorClassIds } = useSessionUser()
+  return contextualRole({
+    tier,
+    can: () => false,
+    isCoordinator: coordinatorClassIds.length > 0,
+    hasClasses: classIds.length > 0,
+    isTeacher: classIds.length > coordinatorClassIds.length,
+  })
 }

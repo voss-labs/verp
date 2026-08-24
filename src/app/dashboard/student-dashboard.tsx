@@ -7,6 +7,7 @@ import {
 import { DashGrid, DashPanel } from "@/components/dash-panel"
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
+import { BatchChip } from "@/components/batch-chip"
 import { StatCard, StatCardRow } from "@/components/stat-card"
 import { getAttendanceBySubject } from "@/db/queries/attendance"
 import { getMarksForStudent } from "@/db/queries/marks"
@@ -297,9 +298,12 @@ function SubjectAttendance({ row }: { row: AttendanceRow }) {
   return (
     <li className="flex flex-col gap-1">
       <div className="flex items-baseline justify-between gap-2 text-xs">
-        <span className="min-w-0 truncate">
-          <span className="identifier text-muted-foreground">{row.code}</span>{" "}
-          {row.name}
+        <span className="flex min-w-0 items-baseline gap-1.5">
+          <span className="min-w-0 truncate">
+            <span className="identifier text-muted-foreground">{row.code}</span>{" "}
+            {row.name}
+          </span>
+          {row.batch && <BatchChip name={row.batch} />}
         </span>
         <span className="identifier shrink-0 whitespace-nowrap">
           {short && <span className="text-attention">Short </span>}

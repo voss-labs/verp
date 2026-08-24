@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/session"
 import { inDeptScope } from "@/lib/allocation"
 import { authorize, can, ROLE_DEFAULTS } from "@/lib/rbac"
 import { isCapability, isFacultyRole, isManageableTier } from "@/lib/validate"
-import { getErrorMessage } from "@/lib/error-utils"
+import { getErrorMessage, isUniqueViolation } from "@/lib/error-utils"
 import { createAuditLog } from "@/db/queries"
 import { setRoleOverride } from "@/db/queries/permissions"
 import {
@@ -18,8 +18,15 @@ import {
   updateFaculty,
   deactivateFaculty,
   getFacultyByEmail,
+  getFacultyByEmailIncludingInactive,
   getFacultyById,
+  linkFacultyToAuthUser,
 } from "@/db/queries/faculty"
+import {
+  getStaffRequestById,
+  updateStaffRequestStatus,
+} from "@/db/queries/staff-requests"
+import { getStudentByAuthUserId } from "@/db/queries/students"
 import {
   appointHod,
   appointCoordinator,
@@ -197,6 +204,124 @@ export async function deactivateFacultyAction(input: {
     return { error: null }
   } catch (err) {
     return { error: getErrorMessage(err, "Could not deactivate faculty") }
+  }
+}
+
+export async function approveStaffRequestAction(input: {
+  requestId: string
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "faculty:create")
+
+    const req = await getStaffRequestById(input.requestId)
+    if (!req) return { error: "No such request." }
+    if (req.status !== "pending")
+      return { error: "This request has already been decided." }
+    if (!inDeptScope(user!, req.deptCode))
+      return { error: "That department is not in your scope." }
+    if (await getStudentByAuthUserId(req.authUserId))
+      return {
+        error: `${req.email} has since been registered as a student. Reject this request.`,
+      }
+
+    const existing = await getFacultyByEmailIncludingInactive(req.email)
+    if (existing?.authUserId && existing.authUserId !== req.authUserId)
+      return { error: `${req.email} is linked to a different VOSS account.` }
+
+    let facultyId: string
+    if (existing) {
+      if (!inDeptScope(user!, existing.department))
+        return {
+          error: `${req.email} is already on the roster in ${existing.department}. Only that department can confirm them.`,
+        }
+      if (!existing.isActive)
+        await updateFaculty(existing.id, { isActive: true })
+      if (!existing.authUserId)
+        await linkFacultyToAuthUser(existing.id, req.authUserId)
+      facultyId = existing.id
+    } else {
+      const created = await createFaculty({
+        firstName: req.firstName,
+        lastName: req.lastName,
+        employeeId: req.employeeId,
+        email: req.email,
+        department: req.deptCode,
+        role: "faculty",
+        authUserId: req.authUserId,
+      }).catch((err) => {
+        if (isUniqueViolation(err)) return null
+        throw err
+      })
+      if (!created)
+        return {
+          error: `Could not add them — Employee ID ${req.employeeId} or ${req.email} is already on the roster.`,
+        }
+      facultyId = created.id
+    }
+
+    await updateStaffRequestStatus(req.id, {
+      status: "approved",
+      reviewedByFacultyId: user!.facultyId,
+    })
+    await createAuditLog({
+      action: "staff_request.approved",
+      actorId: user!.id,
+      targetType: "staff_request",
+      targetId: req.id,
+      details: {
+        facultyId,
+        employeeId: req.employeeId,
+        deptCode: req.deptCode,
+        email: req.email,
+      },
+    })
+    revalidatePath("/dashboard/admin/faculty")
+    revalidatePath("/dashboard/dept")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not approve") }
+  }
+}
+
+export async function rejectStaffRequestAction(input: {
+  requestId: string
+  reason: string
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "faculty:create")
+
+    const req = await getStaffRequestById(input.requestId)
+    if (!req) return { error: "No such request." }
+    if (req.status !== "pending")
+      return { error: "This request has already been decided." }
+    if (!inDeptScope(user!, req.deptCode))
+      return { error: "That department is not in your scope." }
+
+    const reason = input.reason.trim() || "Not recognised by this department"
+    await updateStaffRequestStatus(req.id, {
+      status: "rejected",
+      rejectionReason: reason,
+      reviewedByFacultyId: user!.facultyId,
+    })
+    await createAuditLog({
+      action: "staff_request.rejected",
+      actorId: user!.id,
+      targetType: "staff_request",
+      targetId: req.id,
+      details: {
+        employeeId: req.employeeId,
+        deptCode: req.deptCode,
+        email: req.email,
+        reason,
+      },
+    })
+    revalidatePath("/dashboard/admin/faculty")
+    revalidatePath("/dashboard/dept")
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not reject") }
   }
 }
 

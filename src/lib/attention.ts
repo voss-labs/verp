@@ -30,6 +30,7 @@ export type AttentionKind =
   | "coordinator"
   | "dept-subjects"
   | "unclaimed"
+  | "staff-request"
 
 export type AttentionScope = { label: string; href: string }
 
@@ -62,6 +63,7 @@ const plural = (n: number, one: string, many = `${one}s`) =>
 export function buildAttention(input: {
   classWork: ClassWork[]
   deptHealth: DeptHealth[]
+  staffRequests?: { deptCode: string; pending: number }[]
   /** Roster size is the yardstick for whether a subject's marks are complete. */
   today: string
 }): AttentionItem[] {
@@ -176,6 +178,21 @@ export function buildAttention(input: {
     }
   }
 
+  for (const s of input.staffRequests ?? []) {
+    if (s.pending > 0) {
+      items.push({
+        id: `staff-request:${s.deptCode}`,
+        kind: "staff-request",
+        urgency: "blocking",
+        title: `${s.pending} staff ${plural(s.pending, "request")}`,
+        detail: "A member of staff cannot sign in until this is decided.",
+        href: "/dashboard/staff-requests",
+        count: s.pending,
+        scope: s.deptCode,
+      })
+    }
+  }
+
   return items.sort(
     (a, b) => RANK[a.urgency] - RANK[b.urgency] || b.count - a.count
   )
@@ -195,6 +212,7 @@ const GROUP_TITLE: Record<
   "dept-subjects": (n) => `${n} unallocated ${plural(n, "subject")}`,
   unclaimed: (n) =>
     `${n} ${plural(n, "student")} ${plural(n, "has", "have")} never signed in`,
+  "staff-request": (n) => `${n} staff ${plural(n, "request")}`,
 }
 
 export function groupAttention(items: AttentionItem[]): AttentionSummary[] {

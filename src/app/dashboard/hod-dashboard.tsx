@@ -13,6 +13,7 @@ import { expectedYear, type Year } from "@/lib/roll-number"
 import type { SessionUser } from "@/lib/session"
 import { listClassStaff } from "@/db/queries/class-staff"
 import { listClassesForDepts } from "@/db/queries/classes"
+import { pendingStaffRequestsByDept } from "@/db/queries/staff-requests"
 import {
   attendanceTrendByScope,
   getClassWork,
@@ -51,19 +52,28 @@ export async function HodDashboard({
   const active = allClasses.filter((c) => c.isActive)
   const classIds = active.map((c) => c.id)
 
-  const [work, staff, registers, deptRegisters, deptMarks, trendPoints] =
-    await Promise.all([
-      getClassWork(classIds, null, today),
-      listClassStaff(classIds),
-      registersTodayByClass(classIds, today),
-      registersTodayByDept(deptCodes, today),
-      marksCompletionByDept(deptCodes),
-      attendanceTrendByScope({ deptCodes }, TREND_DAYS),
-    ])
+  const [
+    work,
+    staff,
+    registers,
+    deptRegisters,
+    deptMarks,
+    trendPoints,
+    staffRequests,
+  ] = await Promise.all([
+    getClassWork(classIds, null, today),
+    listClassStaff(classIds),
+    registersTodayByClass(classIds, today),
+    registersTodayByDept(deptCodes, today),
+    marksCompletionByDept(deptCodes),
+    attendanceTrendByScope({ deptCodes }, TREND_DAYS),
+    pendingStaffRequestsByDept(can(user, "faculty:create") ? deptCodes : []),
+  ])
 
   const attention = buildAttention({
     classWork: work,
     deptHealth: health,
+    staffRequests,
     today,
   }).filter((item) => item.kind !== "marks")
 

@@ -31,6 +31,7 @@ export type AttendanceRow = {
   offeringId: string | null
   code: string
   name: string
+  batch: string | null
   present: number
   total: number
   percent: number | null

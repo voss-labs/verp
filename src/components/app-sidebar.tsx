@@ -28,6 +28,7 @@ import {
   UserPlusIcon,
   ClipboardListIcon,
   SearchIcon,
+  UserRoundCheckIcon,
 } from "lucide-react"
 import { useSessionUser, useCan } from "@/components/session-provider"
 import { buildNavigation, type NavIcon } from "@/lib/navigation"
@@ -49,6 +50,7 @@ const NAV_ICON: Record<NavIcon, React.ReactNode> = {
   dept: <LayersIcon />,
   appoint: <UserPlusIcon />,
   marks: <ClipboardListIcon />,
+  staff: <UserRoundCheckIcon />,
 }
 
 export function AppSidebar({

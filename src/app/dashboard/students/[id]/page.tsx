@@ -8,6 +8,7 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { EmptyState } from "@/components/empty-state"
 import { StatCard, StatCardRow } from "@/components/stat-card"
+import { BatchChip } from "@/components/batch-chip"
 import { RecordHistory } from "@/components/record-history"
 import { SubjectResultCells } from "@/components/subject-result"
 import { Badge } from "@/components/ui/badge"
@@ -47,6 +48,7 @@ type AttendanceRow = {
   offeringId: string | null
   code: string
   name: string
+  batch: string | null
   present: number
   total: number
   percent: number | null
@@ -473,6 +475,9 @@ function AttendanceTable({ rows }: { rows: AttendanceRow[] }) {
                     <td className="identifier">{r.code}</td>
                     <td className="max-w-[14rem] truncate whitespace-normal">
                       {r.name}
+                      {r.batch && (
+                        <BatchChip name={r.batch} className="ml-1.5" />
+                      )}
                     </td>
                     <td className="identifier">
                       {r.present}

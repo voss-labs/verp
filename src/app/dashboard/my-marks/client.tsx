@@ -5,6 +5,7 @@ import { ChevronRightIcon, CopyIcon, GraduationCapIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { BatchChip } from "@/components/batch-chip"
 import { EmptyState } from "@/components/empty-state"
 import { MarksSplitBar } from "@/components/marks-split-bar"
 import { StatCard, StatCardRow } from "@/components/stat-card"
@@ -331,6 +332,7 @@ function AttendanceTable({ rows }: { rows: AttendanceRow[] }) {
                   <td className="identifier">{r.code}</td>
                   <td className="max-w-[18rem] truncate whitespace-normal">
                     {r.name}
+                    {r.batch && <BatchChip name={r.batch} className="ml-1.5" />}
                   </td>
                   <td className="identifier">
                     {r.present}

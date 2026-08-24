@@ -33,6 +33,7 @@ import type { SessionUser } from "@/lib/session"
 import { cn } from "@/lib/utils"
 import type { ImportKind, ImportStatus } from "@/db/schema/import-batches"
 import { listDepartments } from "@/db/queries/departments"
+import { pendingStaffRequestsByDept } from "@/db/queries/staff-requests"
 import {
   attendanceTrendByScope,
   getDeptHealth,
@@ -104,19 +105,28 @@ export async function AdminDashboard({
   const seesDept = can(user, "dept:read")
   const seesStudents = can(user, "student:read")
 
-  const [health, registers, marks, audit, imports, trend, pendingEnrolments] =
-    await Promise.all([
-      getDeptHealth(deptCodes),
-      registersTodayByDept(deptCodes, today),
-      marksCompletionByDept(deptCodes),
-      seesAudit ? recentAuditEntries(8) : Promise.resolve<AuditEntry[]>([]),
-      recentImportBatchesForScope(user, 5),
-      attendanceTrendByScope({ deptCodes }, 14),
-      pendingEnrolmentsForDepts(deptCodes),
-    ])
+  const [
+    health,
+    registers,
+    marks,
+    audit,
+    imports,
+    trend,
+    pendingEnrolments,
+    staffRequests,
+  ] = await Promise.all([
+    getDeptHealth(deptCodes),
+    registersTodayByDept(deptCodes, today),
+    marksCompletionByDept(deptCodes),
+    seesAudit ? recentAuditEntries(8) : Promise.resolve<AuditEntry[]>([]),
+    recentImportBatchesForScope(user, 5),
+    attendanceTrendByScope({ deptCodes }, 14),
+    pendingEnrolmentsForDepts(deptCodes),
+    pendingStaffRequestsByDept(null),
+  ])
 
   const attention = groupAttention(
-    buildAttention({ classWork: [], deptHealth: health, today })
+    buildAttention({ classWork: [], deptHealth: health, staffRequests, today })
   )
 
   const totals = health.reduce(

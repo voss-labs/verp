@@ -1,11 +1,18 @@
 import { and, eq, isNull, sql } from "drizzle-orm"
 import { db } from "@/db"
-import { attendance, courseOfferings, courses } from "@/db/schema"
+import {
+  attendance,
+  batchAssignments,
+  batches,
+  courseOfferings,
+  courses,
+} from "@/db/schema"
 
 type Entry = {
   studentId: string
   classId: string
   courseOfferingId: string | null
+  batchId: string | null
   sessionDate: string
   sessionSlot: string
   status: "present" | "absent" | "late" | "excused"
@@ -15,6 +22,7 @@ type Entry = {
 const overwrite = {
   status: sql`excluded.status`,
   recordedByFacultyId: sql`excluded.recorded_by_faculty_id`,
+  batchId: sql`excluded.batch_id`,
   updatedAt: new Date(),
 }
 
@@ -67,7 +75,8 @@ export async function getAttendanceForSession(
   classId: string,
   sessionDate: string,
   sessionSlot: string,
-  courseOfferingId: string | null
+  courseOfferingId: string | null,
+  batchId: string | null = null
 ) {
   return db
     .select({
@@ -84,9 +93,28 @@ export async function getAttendanceForSession(
         // on the same day; reading them together would show one as the other.
         courseOfferingId
           ? eq(attendance.courseOfferingId, courseOfferingId)
-          : isNull(attendance.courseOfferingId)
+          : isNull(attendance.courseOfferingId),
+        batchId ? eq(attendance.batchId, batchId) : isNull(attendance.batchId)
       )
     )
+}
+
+export async function hasUntaggedAttendance(
+  classId: string,
+  courseOfferingId: string
+) {
+  const [row] = await db
+    .select({ id: attendance.id })
+    .from(attendance)
+    .where(
+      and(
+        eq(attendance.classId, classId),
+        eq(attendance.courseOfferingId, courseOfferingId),
+        isNull(attendance.batchId)
+      )
+    )
+    .limit(1)
+  return !!row
 }
 
 // A student's overall attendance — present sessions over total recorded.
@@ -111,22 +139,46 @@ export async function getAttendanceSummaryForStudent(studentId: string) {
  * never which subject they were short in. VIT's 75% rule is enforced per
  * subject, so an overall number cannot answer the question anybody actually
  * asks.
+ *
+ * Lab batches need no filter here: a batch register only ever writes rows for
+ * the students sitting in that batch, so both counts are already confined to
+ * the sessions this student's batch actually had.
  */
 export async function getAttendanceBySubject(studentId: string) {
-  const rows = await db
-    .select({
-      offeringId: attendance.courseOfferingId,
-      code: courses.courseCode,
-      name: courses.courseName,
-      status: attendance.status,
-    })
-    .from(attendance)
-    .leftJoin(
-      courseOfferings,
-      eq(attendance.courseOfferingId, courseOfferings.id)
-    )
-    .leftJoin(courses, eq(courseOfferings.courseId, courses.id))
-    .where(eq(attendance.studentId, studentId))
+  const [rows, memberships] = await Promise.all([
+    db
+      .select({
+        offeringId: attendance.courseOfferingId,
+        code: courses.courseCode,
+        name: courses.courseName,
+        status: attendance.status,
+      })
+      .from(attendance)
+      .leftJoin(
+        courseOfferings,
+        eq(attendance.courseOfferingId, courseOfferings.id)
+      )
+      .leftJoin(courses, eq(courseOfferings.courseId, courses.id))
+      .where(eq(attendance.studentId, studentId)),
+    db
+      .select({
+        offeringId: batches.courseOfferingId,
+        name: batches.name,
+      })
+      .from(batchAssignments)
+      .innerJoin(batches, eq(batchAssignments.batchId, batches.id))
+      .where(
+        and(
+          eq(batchAssignments.studentId, studentId),
+          eq(batchAssignments.isActive, true),
+          eq(batches.isActive, true)
+        )
+      ),
+  ])
+
+  const batchByOffering = new Map(
+    memberships.map((m) => [m.offeringId, m.name])
+  )
 
   const bucket = new Map<
     string,
@@ -152,6 +204,7 @@ export async function getAttendanceBySubject(studentId: string) {
     .map(([key, v]) => ({
       ...v,
       offeringId: key === "__class" ? null : key,
+      batch: key === "__class" ? null : (batchByOffering.get(key) ?? null),
       percent: v.total > 0 ? Math.round((v.present / v.total) * 100) : null,
     }))
     .sort((a, b) => a.code.localeCompare(b.code))

@@ -27,6 +27,11 @@ import {
   MoonIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
+import { Badge } from "@/components/ui/badge"
+import {
+  useContextualRole,
+  useSessionUser,
+} from "@/components/session-provider"
 import { signOut } from "@/lib/auth-client"
 
 export function NavUser({
@@ -41,6 +46,8 @@ export function NavUser({
   const { isMobile } = useSidebar()
   const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
+  const { tier } = useSessionUser()
+  const role = useContextualRole()
 
   const initials = user.name
     .split(" ")
@@ -74,7 +81,17 @@ export function NavUser({
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-medium">{user.name}</span>
-              <span className="truncate text-xs">{user.email}</span>
+              <span className="flex items-center gap-1.5 text-xs">
+                {tier && (
+                  <Badge
+                    variant="secondary"
+                    className="h-4 px-1.5 text-[10px] group-data-[collapsible=icon]:hidden"
+                  >
+                    {role}
+                  </Badge>
+                )}
+                <span className="truncate">{user.email}</span>
+              </span>
             </div>
             <ChevronsUpDownIcon className="ml-auto size-4" />
           </DropdownMenuTrigger>
@@ -93,7 +110,17 @@ export function NavUser({
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">{user.name}</span>
-                    <span className="truncate text-xs">{user.email}</span>
+                    <span className="flex items-center gap-1.5 text-xs">
+                      {tier && (
+                        <Badge
+                          variant="secondary"
+                          className="h-4 px-1.5 text-[10px]"
+                        >
+                          {role}
+                        </Badge>
+                      )}
+                      <span className="truncate">{user.email}</span>
+                    </span>
                   </div>
                 </div>
               </DropdownMenuLabel>

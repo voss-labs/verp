@@ -38,6 +38,40 @@ export function studentsInClass(
   }
 }
 
+/** Every id must sit in the batch being marked, not merely in its class. */
+export function studentsInBatch(
+  members: Set<string>,
+  studentIds: string[]
+): ScopeResult {
+  const offending = [...new Set(studentIds)].filter((id) => !members.has(id))
+  if (offending.length === 0) return { ok: true }
+  return {
+    ok: false,
+    reason:
+      offending.length === 1
+        ? "One of the students is not in this batch."
+        : `${offending.length} of the students are not in this batch.`,
+    offending,
+  }
+}
+
+/** Every id must already have an untagged row in the session being corrected. */
+export function studentsInPreBatchRegister(
+  recorded: Set<string>,
+  studentIds: string[]
+): ScopeResult {
+  const offending = [...new Set(studentIds)].filter((id) => !recorded.has(id))
+  if (offending.length === 0) return { ok: true }
+  return {
+    ok: false,
+    reason:
+      offending.length === 1
+        ? "One of the students was not marked in this session before the lab was split."
+        : `${offending.length} of the students were not marked in this session before the lab was split.`,
+    offending,
+  }
+}
+
 export type ImportActor = {
   tier: "super_admin" | "hod" | "faculty" | "student" | null
   deptCodes: string[]
