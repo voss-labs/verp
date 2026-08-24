@@ -99,6 +99,24 @@ export async function getAttendanceForSession(
     )
 }
 
+export async function hasUntaggedAttendance(
+  classId: string,
+  courseOfferingId: string
+) {
+  const [row] = await db
+    .select({ id: attendance.id })
+    .from(attendance)
+    .where(
+      and(
+        eq(attendance.classId, classId),
+        eq(attendance.courseOfferingId, courseOfferingId),
+        isNull(attendance.batchId)
+      )
+    )
+    .limit(1)
+  return !!row
+}
+
 // A student's overall attendance — present sessions over total recorded.
 export async function getAttendanceSummaryForStudent(studentId: string) {
   const [row] = await db

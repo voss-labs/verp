@@ -12,8 +12,12 @@ import {
   getStudentsInBatch,
   listBatchesForOffering,
 } from "@/db/queries/batches"
-import { getAttendanceForSession } from "@/db/queries/attendance"
+import {
+  getAttendanceForSession,
+  hasUntaggedAttendance,
+} from "@/db/queries/attendance"
 import { canWriteOffering } from "@/lib/allocation"
+import { WHOLE_CLASS } from "@/lib/attendance"
 import { AttendanceClient } from "./client"
 
 type Status = "present" | "absent" | "late" | "excused"
@@ -102,7 +106,13 @@ export default async function AttendancePage({
     : []
   const batchId = batches.some((b) => b.id === sp.batch) ? sp.batch! : null
 
-  const needsBatch = batches.length > 0 && !batchId
+  const preBatchHistory =
+    offeringId && batches.length > 0
+      ? await hasUntaggedAttendance(classId, offeringId)
+      : false
+  const wholeClass = preBatchHistory && !batchId && sp.batch === WHOLE_CLASS
+
+  const needsBatch = batches.length > 0 && !batchId && !wholeClass
   const batchName = batches.find((b) => b.id === batchId)?.name ?? null
   const batchesHref =
     practical && selected && can(user, "marks:write")
@@ -125,9 +135,14 @@ export default async function AttendancePage({
   const subject = selected
     ? `${selected.course.courseCode} ${selected.course.courseName}`
     : "Class session, no subject"
+  const where = batchName
+    ? `, batch ${batchName}`
+    : wholeClass
+      ? ", whole class as it was before this lab was split into batches"
+      : ""
   const announcement = needsBatch
     ? `${subject}. No batch selected, so no register is open.`
-    : `${subject}${batchName ? `, batch ${batchName}` : ""}. ${roster.length} student${roster.length === 1 ? "" : "s"} in this register.`
+    : `${subject}${where}. ${roster.length} student${roster.length === 1 ? "" : "s"} in this register.`
 
   return (
     <>
@@ -143,7 +158,7 @@ export default async function AttendancePage({
           {announcement}
         </p>
         <AttendanceClient
-          key={`${date}|${slot}|${offeringId ?? ""}|${batchId ?? ""}`}
+          key={`${date}|${slot}|${offeringId ?? ""}|${batchId ?? (wholeClass ? WHOLE_CLASS : "")}`}
           classId={classId}
           date={date}
           dateLabel={SESSION_DAY.format(new Date(`${date}T00:00:00+05:30`))}
@@ -152,6 +167,8 @@ export default async function AttendancePage({
           batchId={batchId}
           practical={practical}
           needsBatch={needsBatch}
+          wholeClass={wholeClass}
+          preBatchHistory={preBatchHistory}
           batchesHref={batchesHref}
           offerings={offerings.map((o) => ({
             id: o.id,

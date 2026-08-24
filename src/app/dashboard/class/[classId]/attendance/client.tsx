@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { EmptyState } from "@/components/empty-state"
 import { cn } from "@/lib/utils"
+import { WHOLE_CLASS } from "@/lib/attendance"
 import { saveAttendanceAction } from "../../actions"
 
 // The schema has no "unmarked" value: an unmarked student is simply a row that
@@ -50,6 +51,8 @@ export function AttendanceClient({
   batchId,
   practical,
   needsBatch,
+  wholeClass,
+  preBatchHistory,
   batchesHref,
   offerings,
   batches,
@@ -63,6 +66,8 @@ export function AttendanceClient({
   batchId: string | null
   practical: boolean
   needsBatch: boolean
+  wholeClass: boolean
+  preBatchHistory: boolean
   batchesHref: string | null
   offerings: Offering[]
   batches: Batch[]
@@ -80,6 +85,7 @@ export function AttendanceClient({
 
   const subject = offerings.find((o) => o.id === offeringId) ?? null
   const batch = batches.find((b) => b.id === batchId) ?? null
+  const batchParam = batchId ?? (wholeClass ? WHOLE_CLASS : null)
   const showBatches = practical && batches.length > 0
 
   // Only fills the gaps. A blanket "all present" is how a register gets taken
@@ -104,7 +110,11 @@ export function AttendanceClient({
     const s = next.slot ?? slot
     const o = next.offering === undefined ? offeringId : next.offering
     const b =
-      next.batch !== undefined ? next.batch : o === offeringId ? batchId : null
+      next.batch !== undefined
+        ? next.batch
+        : o === offeringId
+          ? batchParam
+          : null
     const q = new URLSearchParams({ date: d, slot: s })
     if (o) q.set("offering", o)
     if (b) q.set("batch", b)
@@ -209,6 +219,10 @@ export function AttendanceClient({
         </h2>
         {batch ? (
           <Badge variant="outline">Batch {batch.name}</Badge>
+        ) : wholeClass ? (
+          <Badge className="bg-attention text-attention-foreground">
+            Whole class, before batches
+          </Badge>
         ) : needsBatch ? (
           <span className="text-attention text-xs font-medium">
             No batch selected
@@ -250,7 +264,7 @@ export function AttendanceClient({
           <label className="grid gap-1.5">
             <span className="text-muted-foreground text-xs">Batch</span>
             <select
-              value={batchId ?? ""}
+              value={batchParam ?? ""}
               onChange={(e) => go({ batch: e.target.value || null })}
               className="border-input bg-background h-9 rounded border px-2 text-sm"
             >
@@ -260,6 +274,11 @@ export function AttendanceClient({
                   {b.name} — {b.count} student{b.count === 1 ? "" : "s"}
                 </option>
               ))}
+              {preBatchHistory && (
+                <option value={WHOLE_CLASS}>
+                  Whole class (before batches)
+                </option>
+              )}
             </select>
           </label>
         )}
@@ -268,7 +287,7 @@ export function AttendanceClient({
             variant="outline"
             size="sm"
             className="flex-1 sm:flex-none"
-            disabled={remaining === 0}
+            disabled={remaining === 0 || wholeClass}
             onClick={() => {
               if (
                 window.confirm(
@@ -291,6 +310,15 @@ export function AttendanceClient({
           </Button>
         </div>
       </div>
+
+      {wholeClass && (
+        <p className="text-muted-foreground text-xs">
+          This is not a batch. It is the whole-class register from before this
+          lab was split, and every mark here stays untagged. You can correct a
+          student who was already marked in this session; a student who was not
+          cannot be added here, and the save will be refused.
+        </p>
+      )}
 
       {practical && batches.length === 0 && (
         <p className="text-muted-foreground text-xs">

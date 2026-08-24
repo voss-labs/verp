@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache"
 import { getSessionUser, type SessionUser } from "@/lib/session"
 import { authorize } from "@/lib/rbac"
-import { studentsInBatch, studentsInClass } from "@/lib/scope"
+import {
+  studentsInBatch,
+  studentsInClass,
+  studentsInPreBatchRegister,
+} from "@/lib/scope"
 import {
   type Component,
   incompleteMessage,
@@ -25,7 +29,10 @@ import {
   getStudentsByClassKeys,
 } from "@/db/queries/students"
 import { getRequestById, updateRequest } from "@/db/queries/onboarding"
-import { upsertAttendance } from "@/db/queries/attendance"
+import {
+  getAttendanceForSession,
+  upsertAttendance,
+} from "@/db/queries/attendance"
 import { getCourseByCode, createCourse } from "@/db/queries/courses"
 import {
   createOffering,
@@ -235,11 +242,29 @@ export async function saveAttendanceAction(input: {
     let batchName: string | null = null
     if (!batchId && offeringId) {
       const split = await listBatchesForOffering(offeringId)
-      if (split.length > 0)
-        return {
-          error:
-            "This subject is taught in batches. Pick the batch you are marking.",
-        }
+      if (split.length > 0) {
+        const recorded = new Set(
+          (
+            await getAttendanceForSession(
+              input.classId,
+              input.sessionDate,
+              input.sessionSlot,
+              offeringId,
+              null
+            )
+          ).map((r) => r.studentId)
+        )
+        if (recorded.size === 0)
+          return {
+            error:
+              "This subject is taught in batches. Pick the batch you are marking.",
+          }
+        const preBatch = studentsInPreBatchRegister(
+          recorded,
+          input.marks.map((m) => m.studentId)
+        )
+        if (!preBatch.ok) return { error: preBatch.reason }
+      }
     }
     if (batchId) {
       if (!offeringId) return { error: "A batch register needs a subject." }
