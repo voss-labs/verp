@@ -1,11 +1,14 @@
 "use client"
 
 import { useEffect, useRef, useState, useTransition } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { FlaskConicalIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { EmptyState } from "@/components/empty-state"
 import { cn } from "@/lib/utils"
 import { saveAttendanceAction } from "../../actions"
 
@@ -36,20 +39,33 @@ type Student = {
 }
 
 type Offering = { id: string; code: string; name: string }
+type Batch = { id: string; name: string; count: number }
 
 export function AttendanceClient({
   classId,
   date,
+  dateLabel,
   slot,
   offeringId,
+  batchId,
+  practical,
+  needsBatch,
+  batchesHref,
   offerings,
+  batches,
   students,
 }: {
   classId: string
   date: string
+  dateLabel: string
   slot: string
   offeringId: string | null
+  batchId: string | null
+  practical: boolean
+  needsBatch: boolean
+  batchesHref: string | null
   offerings: Offering[]
+  batches: Batch[]
   students: Student[]
 }) {
   const router = useRouter()
@@ -62,6 +78,10 @@ export function AttendanceClient({
   const rowRefs = useRef(new Map<string, HTMLLIElement>())
   const moveFocus = useRef(false)
 
+  const subject = offerings.find((o) => o.id === offeringId) ?? null
+  const batch = batches.find((b) => b.id === batchId) ?? null
+  const showBatches = practical && batches.length > 0
+
   // Only fills the gaps. A blanket "all present" is how a register gets taken
   // without being read; this leaves deliberate marks alone and says how many it
   // is about to touch.
@@ -70,19 +90,24 @@ export function AttendanceClient({
       Object.fromEntries(students.map((s) => [s.id, m[s.id] ?? status]))
     )
 
-  // Date, slot and subject together identify the session, so changing any of
-  // them navigates rather than mutating what is on screen: a half-marked
-  // register must not silently become another session's.
+  // Date, slot, subject and batch together identify the session, so changing
+  // any of them navigates rather than mutating what is on screen: a half-marked
+  // register must not silently become another session's. A batch belongs to one
+  // subject, so changing the subject drops it.
   const go = (next: {
     date?: string
     slot?: string
     offering?: string | null
+    batch?: string | null
   }) => {
     const d = next.date ?? date
     const s = next.slot ?? slot
     const o = next.offering === undefined ? offeringId : next.offering
+    const b =
+      next.batch !== undefined ? next.batch : o === offeringId ? batchId : null
     const q = new URLSearchParams({ date: d, slot: s })
     if (o) q.set("offering", o)
+    if (b) q.set("batch", b)
     router.push(`/dashboard/class/${classId}/attendance?${q}`)
   }
 
@@ -154,6 +179,7 @@ export function AttendanceClient({
         sessionDate: date,
         sessionSlot: slot,
         offeringId,
+        batchId,
         // Only what somebody actually marked. Sending the unmarked as present
         // is what produced a full register from an untouched page.
         marks: students
@@ -171,6 +197,28 @@ export function AttendanceClient({
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        <h2 className="text-base font-semibold tracking-tight">
+          {subject ? (
+            <>
+              <span className="identifier">{subject.code}</span> {subject.name}
+            </>
+          ) : (
+            "Class session (no subject)"
+          )}
+        </h2>
+        {batch ? (
+          <Badge variant="outline">Batch {batch.name}</Badge>
+        ) : needsBatch ? (
+          <span className="text-attention text-xs font-medium">
+            No batch selected
+          </span>
+        ) : null}
+        <p className="text-muted-foreground text-sm">
+          {dateLabel} · Slot {slot}
+        </p>
+      </div>
+
       <div className="flex flex-wrap items-end justify-between gap-3">
         <label className="grid gap-1.5">
           <span className="text-muted-foreground text-xs">Date</span>
@@ -198,6 +246,23 @@ export function AttendanceClient({
             ))}
           </select>
         </label>
+        {showBatches && (
+          <label className="grid gap-1.5">
+            <span className="text-muted-foreground text-xs">Batch</span>
+            <select
+              value={batchId ?? ""}
+              onChange={(e) => go({ batch: e.target.value || null })}
+              className="border-input bg-background h-9 rounded border px-2 text-sm"
+            >
+              <option value="">Select a batch</option>
+              {batches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name} — {b.count} student{b.count === 1 ? "" : "s"}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <div className="flex w-full items-center gap-2 sm:w-auto">
           <Button
             variant="outline"
@@ -207,7 +272,7 @@ export function AttendanceClient({
             onClick={() => {
               if (
                 window.confirm(
-                  `Mark the remaining ${remaining} student${remaining === 1 ? "" : "s"} present? Students you have already marked are left alone.`
+                  `Mark the remaining ${remaining} student${remaining === 1 ? "" : "s"}${batch ? ` in batch ${batch.name}` : ""} present? Students you have already marked are left alone.`
                 )
               ) {
                 markRemaining("present")
@@ -227,130 +292,166 @@ export function AttendanceClient({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      {practical && batches.length === 0 && (
         <p className="text-muted-foreground text-xs">
-          {markedCount} of {students.length} marked
-          {unsavedCount > 0 && (
-            <span className="text-foreground"> · {unsavedCount} unsaved</span>
-          )}
-          {remaining > 0 && (
-            <span className="text-attention">
+          This lab has not been split into batches yet, so the whole class is
+          shown.
+          {batchesHref && (
+            <>
               {" "}
-              · {remaining} still unmarked
-            </span>
+              <Link
+                href={batchesHref}
+                className="hover:text-foreground underline underline-offset-2"
+              >
+                Split it on the Batches tab
+              </Link>
+              .
+            </>
           )}
         </p>
-        <div className="ml-auto flex flex-wrap gap-1">
-          {(
-            [
-              ["all", `All ${students.length}`],
-              ["unmarked", `Unmarked ${remaining}`],
-              ...STATUSES.map((v) => [v, `${v} ${countOf(v)}`] as const),
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setFilter(key as typeof filter)}
-              className={cn(
-                "rounded border px-2.5 py-1.5 text-xs capitalize transition-colors sm:py-0.5",
-                filter === key
-                  ? "border-foreground text-foreground"
-                  : "border-border text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
 
-      {students.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          No students in this class yet.
-        </p>
-      ) : visible.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          No students match that filter.
-        </p>
+      {needsBatch ? (
+        <EmptyState
+          icon={FlaskConicalIcon}
+          variant="dashed"
+          title="Choose a batch to open its register"
+          description="This lab is taught one batch at a time, and each batch sits in a different session. Nothing is opened until you say which one you are teaching."
+        />
       ) : (
-        <div className="flex flex-col gap-2">
-          <p className="pointer-hint text-muted-foreground text-xs">
-            Keys: 1 present · 2 absent · 3 late · 4 excused · 0 clears
-          </p>
-          <div className="border-border overflow-hidden rounded border">
-            <ul className="divide-border divide-y">
-              {visible.map((s, i) => {
-                const status = marks[s.id]
-                return (
-                  // A register is taken standing up, on a phone, while looking
-                  // at the room. On a narrow screen the four buttons get a row
-                  // of their own under the name rather than being squeezed
-                  // beside it, and each is tall enough to hit without aiming.
-                  <li
-                    key={s.id}
-                    ref={(el) => {
-                      if (el) rowRefs.current.set(s.id, el)
-                      else rowRefs.current.delete(s.id)
-                    }}
-                    tabIndex={s.id === activeId ? 0 : -1}
-                    aria-label={`${s.rollNumber} ${s.name}`}
-                    onFocus={() => setFocusId(s.id)}
-                    onKeyDown={(e) => onRowKeyDown(e, i)}
-                    className="focus-visible:outline-ring flex flex-col gap-2 px-4 py-3 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-2.5"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Badge variant="outline" className="font-mono">
-                        {s.rollNumber}
-                      </Badge>
-                      <span className="text-sm">{s.name}</span>
-                      {status == null && (
-                        <span className="text-attention ml-auto text-xs sm:hidden">
-                          Unmarked
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {status == null && (
-                        <span className="text-attention hidden text-xs sm:inline">
-                          Unmarked
-                        </span>
-                      )}
-                      <div className="grid w-full grid-cols-4 overflow-hidden rounded border sm:flex sm:w-auto">
-                        {STATUSES.map((v) => (
-                          <button
-                            key={v}
-                            type="button"
-                            tabIndex={-1}
-                            aria-pressed={status === v}
-                            // Pressing the current value clears it, so a mark
-                            // made by mistake can be taken back to unmarked
-                            // rather than forced into being one of the other
-                            // four.
-                            onClick={() =>
-                              setMarks((m) => ({
-                                ...m,
-                                [s.id]: m[s.id] === v ? null : v,
-                              }))
-                            }
-                            className={cn(
-                              "min-h-11 px-3 text-xs font-medium capitalize transition-colors sm:min-h-0 sm:py-1",
-                              status === v
-                                ? STATUS_STYLE[v]
-                                : "text-muted-foreground hover:bg-muted"
-                            )}
-                          >
-                            {v}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-muted-foreground text-xs">
+              {markedCount} of {students.length} marked
+              {unsavedCount > 0 && (
+                <span className="text-foreground">
+                  {" "}
+                  · {unsavedCount} unsaved
+                </span>
+              )}
+              {remaining > 0 && (
+                <span className="text-attention">
+                  {" "}
+                  · {remaining} still unmarked
+                </span>
+              )}
+            </p>
+            <div className="ml-auto flex flex-wrap gap-1">
+              {(
+                [
+                  ["all", `All ${students.length}`],
+                  ["unmarked", `Unmarked ${remaining}`],
+                  ...STATUSES.map((v) => [v, `${v} ${countOf(v)}`] as const),
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFilter(key as typeof filter)}
+                  className={cn(
+                    "rounded border px-2.5 py-1.5 text-xs capitalize transition-colors sm:py-0.5",
+                    filter === key
+                      ? "border-foreground text-foreground"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+
+          {students.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              {batch
+                ? "No students in this batch yet."
+                : "No students in this class yet."}
+            </p>
+          ) : visible.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              No students match that filter.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <p className="pointer-hint text-muted-foreground text-xs">
+                Keys: 1 present · 2 absent · 3 late · 4 excused · 0 clears
+              </p>
+              <div className="border-border overflow-hidden rounded border">
+                <ul className="divide-border divide-y">
+                  {visible.map((s, i) => {
+                    const status = marks[s.id]
+                    return (
+                      // A register is taken standing up, on a phone, while
+                      // looking at the room. On a narrow screen the four
+                      // buttons get a row of their own under the name rather
+                      // than being squeezed beside it, and each is tall enough
+                      // to hit without aiming.
+                      <li
+                        key={s.id}
+                        ref={(el) => {
+                          if (el) rowRefs.current.set(s.id, el)
+                          else rowRefs.current.delete(s.id)
+                        }}
+                        tabIndex={s.id === activeId ? 0 : -1}
+                        aria-label={`${s.rollNumber} ${s.name}`}
+                        onFocus={() => setFocusId(s.id)}
+                        onKeyDown={(e) => onRowKeyDown(e, i)}
+                        className="focus-visible:outline-ring flex flex-col gap-2 px-4 py-3 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-2.5"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="font-mono">
+                            {s.rollNumber}
+                          </Badge>
+                          <span className="text-sm">{s.name}</span>
+                          {status == null && (
+                            <span className="text-attention ml-auto text-xs sm:hidden">
+                              Unmarked
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {status == null && (
+                            <span className="text-attention hidden text-xs sm:inline">
+                              Unmarked
+                            </span>
+                          )}
+                          <div className="grid w-full grid-cols-4 overflow-hidden rounded border sm:flex sm:w-auto">
+                            {STATUSES.map((v) => (
+                              <button
+                                key={v}
+                                type="button"
+                                tabIndex={-1}
+                                aria-pressed={status === v}
+                                // Pressing the current value clears it, so a
+                                // mark made by mistake can be taken back to
+                                // unmarked rather than forced into being one of
+                                // the other four.
+                                onClick={() =>
+                                  setMarks((m) => ({
+                                    ...m,
+                                    [s.id]: m[s.id] === v ? null : v,
+                                  }))
+                                }
+                                className={cn(
+                                  "min-h-11 px-3 text-xs font-medium capitalize transition-colors sm:min-h-0 sm:py-1",
+                                  status === v
+                                    ? STATUS_STYLE[v]
+                                    : "text-muted-foreground hover:bg-muted"
+                                )}
+                              >
+                                {v}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

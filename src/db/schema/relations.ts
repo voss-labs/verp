@@ -190,6 +190,10 @@ export const attendanceRelations = relations(attendance, ({ one }) => ({
     fields: [attendance.courseOfferingId],
     references: [courseOfferings.id],
   }),
+  batch: one(batches, {
+    fields: [attendance.batchId],
+    references: [batches.id],
+  }),
 }))
 
 // ── Audit ─────────────────────────────────────────────────────────────

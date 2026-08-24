@@ -11,6 +11,7 @@ import { sql } from "drizzle-orm"
 import { students } from "./students"
 import { classes } from "./classes"
 import { courseOfferings } from "./offerings"
+import { batches } from "./batches"
 import { faculty } from "./faculty"
 import { attendanceStatusEnum } from "./enums"
 
@@ -32,6 +33,9 @@ export const attendance = pgTable(
       () => courseOfferings.id,
       { onDelete: "set null" }
     ),
+    batchId: uuid("batch_id").references(() => batches.id, {
+      onDelete: "set null",
+    }),
     sessionDate: date("session_date").notNull(),
     sessionSlot: text("session_slot").notNull().default("1"),
     status: attendanceStatusEnum("status").notNull(),
@@ -60,5 +64,8 @@ export const attendance = pgTable(
       .where(sql`course_offering_id IS NULL`),
     index("attendance_class_date_idx").on(t.classId, t.sessionDate),
     index("attendance_student_idx").on(t.studentId),
+    index("attendance_batch_session_idx")
+      .on(t.batchId, t.sessionDate, t.sessionSlot)
+      .where(sql`batch_id IS NOT NULL`),
   ]
 )

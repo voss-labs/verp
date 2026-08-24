@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { rollsInScope, studentsInClass, type ImportActor } from "./scope"
+import {
+  rollsInScope,
+  studentsInBatch,
+  studentsInClass,
+  type ImportActor,
+} from "./scope"
 
 describe("studentsInClass", () => {
   const roster = new Set(["a", "b", "c"])
@@ -23,6 +28,21 @@ describe("studentsInClass", () => {
   it("reports each offending id once", () => {
     const r = studentsInClass(roster, ["zzz", "zzz", "yyy"])
     if (!r.ok) expect(r.offending.sort()).toEqual(["yyy", "zzz"])
+  })
+})
+
+describe("studentsInBatch", () => {
+  const b1 = new Set(["a", "b"])
+
+  it("accepts a payload naming only batch members", () => {
+    expect(studentsInBatch(b1, ["a", "b"]).ok).toBe(true)
+  })
+
+  // A classmate in B2 is in the class and still outside this register.
+  it("rejects a classmate who sits in another batch", () => {
+    const r = studentsInBatch(b1, ["a", "c"])
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.offending).toEqual(["c"])
   })
 })
 

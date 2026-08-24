@@ -8,20 +8,44 @@ import { expectedYear } from "@/lib/roll-number"
 import { getClassById } from "@/db/queries/classes"
 import { getStudentsByClassKeys } from "@/db/queries/students"
 import { listOfferingsForClass } from "@/db/queries/offerings"
+import {
+  getStudentsInBatch,
+  listBatchesForOffering,
+} from "@/db/queries/batches"
 import { getAttendanceForSession } from "@/db/queries/attendance"
 import { canWriteOffering } from "@/lib/allocation"
 import { AttendanceClient } from "./client"
 
 type Status = "present" | "absent" | "late" | "excused"
+type RosterRow = {
+  id: string
+  firstName: string
+  lastName: string
+  rollNumber: string
+}
+type MarkRow = { studentId: string; status: Status }
 
 export const dynamic = "force-dynamic"
+
+const SESSION_DAY = new Intl.DateTimeFormat("en-IN", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: "Asia/Kolkata",
+})
 
 export default async function AttendancePage({
   params,
   searchParams,
 }: {
   params: Promise<{ classId: string }>
-  searchParams: Promise<{ date?: string; slot?: string; offering?: string }>
+  searchParams: Promise<{
+    date?: string
+    slot?: string
+    offering?: string
+    batch?: string
+  }>
 }) {
   const { classId } = await params
   const sp = await searchParams
@@ -51,10 +75,10 @@ export default async function AttendancePage({
   const slot = sp.slot || "1"
   const offeringId = sp.offering || null
 
-  const [students, existing, allOfferings] = await Promise.all([
+  const [classRoster, allOfferings, offeringBatches] = await Promise.all([
     getStudentsByClassKeys([cls.classKey]),
-    getAttendanceForSession(classId, date, slot, offeringId),
     listOfferingsForClass(classId),
+    offeringId ? listBatchesForOffering(offeringId) : Promise.resolve([]),
   ])
 
   // Offering every subject to every teacher on the class invited them to take a
@@ -64,11 +88,46 @@ export default async function AttendancePage({
   const offerings = allOfferings.filter((o) =>
     canWriteOffering(user, o.facultyId, classId, cls.departmentCode)
   )
+
+  const selected = offeringId
+    ? offerings.find((o) => o.id === offeringId)
+    : undefined
+  const practical = !!selected && selected.course.courseType !== "theory"
+  const batches = practical
+    ? offeringBatches.map((b) => ({
+        id: b.id,
+        name: b.name,
+        count: b.assignments.filter((a) => a.student.isActive).length,
+      }))
+    : []
+  const batchId = batches.some((b) => b.id === sp.batch) ? sp.batch! : null
+
+  const needsBatch = batches.length > 0 && !batchId
+  const batchName = batches.find((b) => b.id === batchId)?.name ?? null
+  const batchesHref =
+    practical && selected && can(user, "marks:write")
+      ? `/dashboard/class/${classId}/batches?offering=${selected.id}`
+      : null
+
+  const rosterQuery: Promise<RosterRow[]> = batchId
+    ? getStudentsInBatch(batchId)
+    : Promise.resolve(needsBatch ? [] : classRoster)
+  const marksQuery: Promise<MarkRow[]> = needsBatch
+    ? Promise.resolve([])
+    : getAttendanceForSession(classId, date, slot, offeringId, batchId)
+  const [roster, existing] = await Promise.all([rosterQuery, marksQuery])
+
   const marked: Record<string, string> = {}
   for (const e of existing) marked[e.studentId] = e.status
 
   const yr = expectedYear(cls.admissionYear, new Date()) ?? cls.admissionYear
   const label = `${yr} · ${cls.departmentCode} · ${cls.division}`
+  const subject = selected
+    ? `${selected.course.courseCode} ${selected.course.courseName}`
+    : "Class session, no subject"
+  const announcement = needsBatch
+    ? `${subject}. No batch selected, so no register is open.`
+    : `${subject}${batchName ? `, batch ${batchName}` : ""}. ${roster.length} student${roster.length === 1 ? "" : "s"} in this register.`
 
   return (
     <>
@@ -80,18 +139,27 @@ export default async function AttendancePage({
       />
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <ClassTabs tabs={classTabs(classId, user, { canAllocate })} />
+        <p role="status" aria-live="polite" className="sr-only">
+          {announcement}
+        </p>
         <AttendanceClient
-          key={`${date}|${slot}|${offeringId ?? ""}`}
+          key={`${date}|${slot}|${offeringId ?? ""}|${batchId ?? ""}`}
           classId={classId}
           date={date}
+          dateLabel={SESSION_DAY.format(new Date(`${date}T00:00:00+05:30`))}
           slot={slot}
           offeringId={offeringId}
+          batchId={batchId}
+          practical={practical}
+          needsBatch={needsBatch}
+          batchesHref={batchesHref}
           offerings={offerings.map((o) => ({
             id: o.id,
             code: o.course.courseCode,
             name: o.course.courseName,
           }))}
-          students={students.map((s) => ({
+          batches={batches}
+          students={roster.map((s) => ({
             id: s.id,
             name: `${s.firstName} ${s.lastName}`.trim(),
             rollNumber: s.rollNumber,

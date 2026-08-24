@@ -1,6 +1,6 @@
-import { and, eq, inArray } from "drizzle-orm"
+import { and, asc, eq, inArray } from "drizzle-orm"
 import { db } from "@/db"
-import { batches, batchAssignments } from "@/db/schema"
+import { batches, batchAssignments, students } from "@/db/schema"
 
 /** Batches for one offering, each with the students sitting in it. */
 export async function listBatchesForOffering(courseOfferingId: string) {
@@ -28,6 +28,27 @@ export async function createBatch(input: {
     .values({ courseOfferingId: input.courseOfferingId, name: input.name })
     .returning()
   return row
+}
+
+/** The students sitting in one batch, in the shape a roster is rendered in. */
+export async function getStudentsInBatch(batchId: string) {
+  return db
+    .select({
+      id: students.id,
+      firstName: students.firstName,
+      lastName: students.lastName,
+      rollNumber: students.rollNumber,
+    })
+    .from(batchAssignments)
+    .innerJoin(students, eq(batchAssignments.studentId, students.id))
+    .where(
+      and(
+        eq(batchAssignments.batchId, batchId),
+        eq(batchAssignments.isActive, true),
+        eq(students.isActive, true)
+      )
+    )
+    .orderBy(asc(students.rollNumber))
 }
 
 export async function getBatchById(id: string) {
