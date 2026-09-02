@@ -210,6 +210,7 @@ async function main() {
     "batches",
     "course_offerings",
     "enrollment_requests",
+    "staff_requests",
     "faculty_class_assignments",
     "dept_appointments",
     "audit_logs",

@@ -150,6 +150,7 @@ export default async function UnclaimedPage() {
                 <ClaimFlow
                   email={user.email}
                   name={user.name}
+                  staffEnabled={!devAuth}
                   departments={depts
                     .filter((d) => d.isActive)
                     .map((d) => ({ code: d.code, name: d.name }))}

@@ -21,6 +21,7 @@ export function ClaimFlow({
   email,
   name,
   departments,
+  staffEnabled,
   initialRole,
   studentRejection,
   staffRejection,
@@ -29,12 +30,16 @@ export function ClaimFlow({
   email: string
   name: string
   departments: StaffDepartment[]
+  staffEnabled: boolean
   initialRole: Role | null
   studentRejection: string | null
   staffRejection: string | null
   staffDefaults: StaffDefaults | null
 }) {
   const [role, setRole] = useState<Role | null>(initialRole)
+
+  if (!staffEnabled)
+    return <RegisterForm email={email} name={name} rejection={studentRejection} />
 
   if (!role) return <RoleChoice email={email} onChoose={setRole} />
 
