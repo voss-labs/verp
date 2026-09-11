@@ -8,7 +8,7 @@ VERP handles the core academic operations of the college: student records, facul
 
 - **Framework**: Next.js 16 (App Router, Turbopack)
 - **Language**: TypeScript (strict mode)
-- **Database**: PostgreSQL on [Neon](https://neon.tech)
+- **Database**: PostgreSQL on [Neon](https://neon.com)
 - **ORM**: Drizzle ORM
 - **Auth**: VOSS OIDC via Better Auth (VERP holds no credentials)
 - **Styling**: Tailwind CSS 4, shadcn/ui
@@ -39,7 +39,7 @@ a Mac). Full detail, including why this cannot reach production, is in
 
 - Node.js 20+ (required by Next 16 / React 19)
 - Docker, for the local database
-- Or, to run against a hosted database instead: a [Neon](https://neon.tech)
+- Or, to run against a hosted database instead: a [Neon](https://neon.com)
   project and a VOSS client
 
 ### Setting up a hosted database
@@ -200,6 +200,12 @@ Schema is defined in `src/db/schema/` using Drizzle ORM. Queries are organized b
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup instructions and contribution guidelines.
+
+## Sponsors
+
+[Neon](https://neon.com) sponsors VERP's Postgres through the [Neon Open Source Program](https://neon.com/programs/open-source).
+
+<a href="https://neon.com"><img src="./docs/neon-logo.svg" alt="Neon" width="220"></a>
 
 ## License
 
