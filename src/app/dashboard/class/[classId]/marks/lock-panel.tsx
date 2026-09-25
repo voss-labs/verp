@@ -3,11 +3,12 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
-export type LockComponent = "isa" | "mse" | "ese"
+export type LockComponent = "isa" | "mse1" | "mse2" | "ese"
 
 export const LOCK_LABEL: Record<LockComponent, string> = {
   isa: "ISA",
-  mse: "MSE",
+  mse1: "MSE 1",
+  mse2: "MSE 2",
   ese: "ESE",
 }
 
@@ -25,7 +26,7 @@ export function LockPanel({
   onToggle: (c: LockComponent, next: boolean) => void
 }) {
   const components: LockComponent[] = hasMse
-    ? ["isa", "mse", "ese"]
+    ? ["isa", "mse1", "mse2", "ese"]
     : ["isa", "ese"]
   return (
     <div className="border-border flex flex-wrap items-center gap-2 rounded border px-3 py-2">

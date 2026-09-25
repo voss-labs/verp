@@ -104,9 +104,14 @@ describe("incompleteStudents", () => {
   // and published, and the students behind it saw a finished semester worth
   // nothing.
   it("reports every student when nobody has been marked", () => {
-    const res = incompleteStudents(roster, new Map(), ["isa", "mse", "ese"])
+    const res = incompleteStudents(roster, new Map(), [
+      "isa",
+      "mse1",
+      "mse2",
+      "ese",
+    ])
     expect(res).toHaveLength(3)
-    expect(res[0].missing).toEqual(["isa", "mse", "ese"])
+    expect(res[0].missing).toEqual(["isa", "mse1", "mse2", "ese"])
   })
 
   it("counts a student with no row at all as missing, not absent from the list", () => {
@@ -116,16 +121,12 @@ describe("incompleteStudents", () => {
     ).toEqual(["b", "c"])
   })
 
-  it("treats one MSE of two as unfinished", () => {
+  it("locks MSE1 and MSE2 independently — one entered does not finish the other", () => {
     const marks = new Map([["a", { ...blank, mse1: 25 }]])
-    expect(incompleteStudents(["a"], marks, ["mse"])[0].missing).toEqual([
-      "mse",
-    ])
-  })
-
-  it("is satisfied by both MSEs", () => {
-    const marks = new Map([["a", { ...blank, mse1: 25, mse2: 27 }]])
-    expect(incompleteStudents(["a"], marks, ["mse"])).toEqual([])
+    expect(incompleteStudents(["a"], marks, ["mse1"])).toEqual([])
+    expect(
+      incompleteStudents(["a"], marks, ["mse2"])[0].missing
+    ).toEqual(["mse2"])
   })
 
   it("treats a zero as marked", () => {
@@ -175,10 +176,10 @@ describe("mergeMarks", () => {
     })
   })
 
-  it("carries both MSE halves forward when MSE is locked", () => {
+  it("carries only the locked MSE half forward, leaving the other free", () => {
     const incoming = { ...blank, mse1: 1, mse2: 2 }
-    const merged = mergeMarks(stored, incoming, ["mse"])
-    expect([merged.mse1, merged.mse2]).toEqual([25, 27])
+    const merged = mergeMarks(stored, incoming, ["mse1"])
+    expect([merged.mse1, merged.mse2]).toEqual([25, 2])
   })
 
   it("writes an incoming value when the column is mapped and unlocked", () => {
@@ -199,7 +200,12 @@ describe("mergeMarks", () => {
 describe("requiredComponents", () => {
   it("does not ask a practical for an MSE it does not have", () => {
     expect(requiredComponents(practical)).toEqual(["isa", "ese"])
-    expect(requiredComponents(theory)).toEqual(["isa", "mse", "ese"])
+    expect(requiredComponents(theory)).toEqual([
+      "isa",
+      "mse1",
+      "mse2",
+      "ese",
+    ])
   })
 })
 

@@ -75,7 +75,7 @@ export function validateMarks(
   return { ok: true }
 }
 
-export type Component = "isa" | "mse" | "ese"
+export type Component = "isa" | "mse1" | "mse2" | "ese"
 
 /** Resolve one import row against stored marks: a column absent from the file keeps its stored value, a locked component never moves, and a real zero is written. */
 export function mergeMarks(
@@ -89,8 +89,8 @@ export function mergeMarks(
   }
   return {
     isa: resolve("isa", "isa"),
-    mse1: resolve("mse1", "mse"),
-    mse2: resolve("mse2", "mse"),
+    mse1: resolve("mse1", "mse1"),
+    mse2: resolve("mse2", "mse2"),
     ese: resolve("ese", "ese"),
   }
 }
@@ -100,14 +100,17 @@ function hasComponent(row: MarksInput | undefined, c: Component): boolean {
   if (!row) return false
   if (c === "isa") return row.isa != null
   if (c === "ese") return row.ese != null
-  // Both halves, because the two average into the single figure that enters the
-  // total. One MSE in is a subject still being marked, not a marked subject.
-  return row.mse1 != null && row.mse2 != null
+  if (c === "mse1") return row.mse1 != null
+  return row.mse2 != null
 }
 
-/** The components a course actually has. */
+/** The components a course actually has. MSE1 and MSE2 are named separately —
+ * they are submitted, locked, and published at different points, not as one
+ * unit. */
 export function requiredComponents(course: CourseInfo): Component[] {
-  return course.maxMse > 0 ? ["isa", "mse", "ese"] : ["isa", "ese"]
+  return course.maxMse > 0
+    ? ["isa", "mse1", "mse2", "ese"]
+    : ["isa", "ese"]
 }
 
 export type Incomplete = { studentId: string; missing: Component[] }
@@ -146,7 +149,8 @@ export function completeCount(
 
 const LABEL: Record<Component, string> = {
   isa: "ISA",
-  mse: "MSE",
+  mse1: "MSE 1",
+  mse2: "MSE 2",
   ese: "ESE",
 }
 

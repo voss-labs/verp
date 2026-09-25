@@ -26,14 +26,20 @@ export type MarksTableRow =
 
 type PublishedRow = Extract<MarksTableRow, { published: true }>
 
+// No default text-align here: a `[&>th]:text-left` on the row would win over
+// an individual header's own `text-right` regardless of source order — a
+// parent-scoped selector with a type selector (`> th`) outranks a bare class,
+// so every header rendered left-aligned even the ones marked text-right, and
+// no amount of column-width tuning could fix a text-align bug. Each `<th>`
+// below sets its own alignment instead.
 const HEAD =
-  "text-muted-foreground [&>th]:pb-2 [&>th]:text-left [&>th]:text-xs [&>th]:font-medium [&>th]:whitespace-nowrap"
+  "text-muted-foreground [&>th]:py-2 [&>th]:text-xs [&>th]:font-medium [&>th]:whitespace-nowrap [&>th]:align-middle"
 
-const BODY = "[&>td]:py-2 [&>td]:align-top"
+const BODY = "[&>td]:py-2 [&>td]:align-middle"
 
-const MASKED = ["ISA", "MSE", "ESE", "Total"]
+const MASKED = ["ISA", "MSE 1", "MSE 2", "ESE", "Total"]
 
-const COLUMN_COUNT = 8
+const COLUMN_COUNT = 9
 
 export function MarksTable({ rows }: { rows: MarksTableRow[] }) {
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set())
@@ -47,15 +53,33 @@ export function MarksTable({ rows }: { rows: MarksTableRow[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[34rem] text-sm">
+      {/* table-fixed: without it, column widths are auto-computed per row and
+          the header's declared widths are only a hint — the numeric columns
+          drift out of alignment with their own header the moment a neighbouring
+          cell (a wrapped subject name, a "provisional" note) changes what the
+          browser thinks that row needs. Fixed layout locks every column to the
+          width the header row declares, for every row underneath it.
+
+          Subject still has no fixed width of its own — it is meant to soak up
+          whatever room is left — but it needs a floor, and every other column
+          is kept as narrow as its content actually needs (a mark is never more
+          than "XX/YY"): this table sits in a `lg:col-span-8` card next to
+          others, and the four component columns plus Code, Total and Grade at
+          their old, more generous widths left Subject nothing to fall back on
+          — fixed layout gave it exactly zero, and its text spilled across the
+          columns after it. min-w-[37rem] on the whole table matches the sum of
+          every column's floor, so a card even narrower than that scrolls (the
+          wrapper is overflow-x-auto) instead of crushing one to nothing. */}
+      <table className="min-w-full table-fixed text-sm">
         <thead>
           <tr className={HEAD}>
-            <th className="w-24">Code</th>
-            <th>Subject</th>
-            <th className="w-20 text-right">ISA</th>
-            <th className="w-20 text-right">MSE</th>
-            <th className="w-20 text-right">ESE</th>
-            <th className="w-24 text-right">Total</th>
+            <th className="w-16 text-left">Code</th>
+            <th className="w-48 text-left">Subject</th>
+            <th className="w-14 text-right">ISA</th>
+            <th className="w-14 text-right">MSE 1</th>
+            <th className="w-14 text-right">MSE 2</th>
+            <th className="w-14 text-right">ESE</th>
+            <th className="w-20 text-right">Total</th>
             <th className="w-24 text-right">Grade</th>
             <th className="w-8">
               <span className="sr-only">Breakdown</span>
@@ -124,7 +148,11 @@ function SubjectRow({
         <td className="max-w-[16rem] pr-3">{row.name}</td>
         <ComponentCell value={row.marks.isa} max={row.course.maxIsa} />
         <ComponentCell
-          value={hasMse ? c.finalMse : null}
+          value={hasMse ? row.marks.mse1 : null}
+          max={row.course.maxMse}
+        />
+        <ComponentCell
+          value={hasMse ? row.marks.mse2 : null}
           max={row.course.maxMse}
         />
         <ComponentCell value={row.marks.ese} max={row.course.maxEse} />
