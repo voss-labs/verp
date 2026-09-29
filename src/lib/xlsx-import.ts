@@ -251,6 +251,40 @@ export function flagRow(input: RosterFields): PreviewRow {
 }
 
 /**
+ * Whether a roll number parses but names no department: its branch is one the
+ * roll map does not know. Only such a row needs a department set by hand. A
+ * roll that will not parse is fixed first, and its department then follows
+ * from it.
+ */
+export function rollNeedsDepartment(rollNumber: string): boolean {
+  try {
+    return parseRollNumber(rollNumber).department === null
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Apply one edit to every row `pick` chooses, and re-validate each of them.
+ *
+ * A year or department set on a whole selection is checked exactly as if it had
+ * been typed into each cell: a department the roll number disagrees with is
+ * still flagged. Rows it does not pick come back untouched, and anything the
+ * caller keeps on a row beside its fields (an id) comes back with it.
+ */
+export function editRows<T extends PreviewRow>(
+  rows: readonly T[],
+  pick: (row: T) => boolean,
+  patch: Partial<RosterFields>
+): T[] {
+  return rows.map((row) => {
+    if (!pick(row)) return row
+    const { flags: _drop, ...fields }: PreviewRow = row
+    return { ...row, ...flagRow({ ...fields, ...patch }) }
+  })
+}
+
+/**
  * Turn a mapped grid into validated preview rows. Splits a single "name" column
  * when there are no separate first/last columns, then delegates each row to
  * flagRow.
