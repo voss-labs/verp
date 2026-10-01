@@ -31,6 +31,12 @@ export const courseOfferings = pgTable(
     }),
     // 1..8 — which semester of the programme this offering runs in.
     semester: integer("semester").notNull(),
+    // Taught to the students who chose it rather than to the whole class. Its
+    // roster is then elective_enrollments (electives.ts), narrowed to this
+    // class, and every rule that asks whether everybody is marked asks it of
+    // that list. Measured against the division, an elective could never be
+    // locked: most of the class would never have a mark in it.
+    isElective: boolean("is_elective").notNull().default(false),
     // Publication is a governed state of its own, separate from entering marks
     // and from locking them. Locking says "I have finished"; publishing says
     // "the student may see this". Without it a half-entered ISA appeared on a

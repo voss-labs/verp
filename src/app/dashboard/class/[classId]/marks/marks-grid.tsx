@@ -335,6 +335,11 @@ export function MarksGrid({
             {offering.code}
           </Badge>
           <span className="text-sm font-medium">{offering.name}</span>
+          {offering.isElective && (
+            <Badge variant="secondary">
+              Elective · {rows.length} taking it
+            </Badge>
+          )}
           <Badge variant={grid.published ? "outline" : "secondary"}>
             {grid.published ? "Published" : "Not published"}
           </Badge>
@@ -412,7 +417,9 @@ export function MarksGrid({
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          No students in this class yet.
+          {offering.isElective
+            ? "Nobody is taking this elective yet. The class coordinator adds its students on the Electives tab."
+            : "No students in this class yet."}
         </p>
       ) : (
         <>

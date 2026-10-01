@@ -71,6 +71,15 @@ export function classTabs(
       href: `/dashboard/class/${classId}/subjects`,
     })
   }
+  // Only for whoever decides who takes an elective. A teacher sees the result
+  // where they work — the marks grid and the register list the students taking
+  // it — and a tab they could not use would be a locked door.
+  if (opts.canAllocate && can(user, "offering:update")) {
+    tabs.push({
+      label: "Electives",
+      href: `/dashboard/class/${classId}/electives`,
+    })
+  }
   // Write, not read. The destination is the register itself — an entry
   // surface — and it redirects anyone without attendance:write, so offering it
   // on read alone produced a tab that bounced you to the Overview.

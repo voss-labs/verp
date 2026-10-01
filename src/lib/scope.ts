@@ -55,6 +55,27 @@ export function studentsInBatch(
   }
 }
 
+/**
+ * Every id must be taking the elective, not merely sitting in its class. A
+ * classmate who chose a different elective belongs to the class and still has
+ * no business in this subject's marks, register or lab batches.
+ */
+export function studentsInElective(
+  members: Set<string>,
+  studentIds: string[]
+): ScopeResult {
+  const offending = [...new Set(studentIds)].filter((id) => !members.has(id))
+  if (offending.length === 0) return { ok: true }
+  return {
+    ok: false,
+    reason:
+      offending.length === 1
+        ? "One of the students is not taking this elective."
+        : `${offending.length} of the students are not taking this elective.`,
+    offending,
+  }
+}
+
 /** Every id must already have an untagged row in the session being corrected. */
 export function studentsInPreBatchRegister(
   recorded: Set<string>,

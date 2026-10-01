@@ -3,6 +3,7 @@ import {
   rollsInScope,
   studentsInBatch,
   studentsInClass,
+  studentsInElective,
   studentsInPreBatchRegister,
   type ImportActor,
 } from "./scope"
@@ -44,6 +45,38 @@ describe("studentsInBatch", () => {
     const r = studentsInBatch(b1, ["a", "c"])
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.offending).toEqual(["c"])
+  })
+})
+
+describe("studentsInElective", () => {
+  const taking = new Set(["a", "b"])
+
+  it("accepts a payload naming only students taking it", () => {
+    expect(studentsInElective(taking, ["a", "b"]).ok).toBe(true)
+  })
+
+  // In the class and still outside the subject: a classmate who chose a
+  // different elective has no mark or register row to be written here.
+  it("rejects a classmate who is not taking it", () => {
+    const r = studentsInElective(taking, ["a", "c"])
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.offending).toEqual(["c"])
+      expect(r.reason).toBe("One of the students is not taking this elective.")
+    }
+  })
+
+  it("counts each student it rejects once", () => {
+    const r = studentsInElective(taking, ["c", "d", "d"])
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.offending.sort()).toEqual(["c", "d"])
+      expect(r.reason).toBe("2 of the students are not taking this elective.")
+    }
+  })
+
+  it("rejects everybody for an elective nobody has been put on", () => {
+    expect(studentsInElective(new Set(), ["a"]).ok).toBe(false)
   })
 })
 

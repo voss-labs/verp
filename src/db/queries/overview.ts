@@ -16,9 +16,11 @@ import {
   requiredComponents,
   type Component,
 } from "@/lib/marks-integrity"
+import { offeringRoster } from "@/lib/electives"
 import type { CourseInfo, MarksInput } from "@/lib/sgpi"
 import type { ImportKind, ImportStatus } from "@/db/schema/import-batches"
 import { getAuditLogs } from "./audit"
+import { electiveMembersByOffering } from "./electives"
 import {
   importScopeFor,
   listImportBatches,
@@ -45,6 +47,7 @@ type OfferingRow = {
   code: string
   name: string
   publishedAt: Date | null
+  isElective: boolean
   maxIsa: number
   maxMse: number
   maxEse: number
@@ -75,6 +78,7 @@ async function activeOfferings(classIds: string[]): Promise<OfferingRow[]> {
       code: courses.courseCode,
       name: courses.courseName,
       publishedAt: courseOfferings.publishedAt,
+      isElective: courseOfferings.isElective,
       maxIsa: courses.maxIsa,
       maxMse: courses.maxMse,
       maxEse: courses.maxEse,
@@ -145,6 +149,34 @@ async function marksByOfferingId(
   return out
 }
 
+/**
+ * Who takes each elective among these offerings, in one read. An ordinary
+ * subject needs no lookup: its roster is the class.
+ */
+function electiveMembers(offerings: OfferingRow[]) {
+  return electiveMembersByOffering(
+    offerings.filter((o) => o.isElective).map((o) => o.id)
+  )
+}
+
+/**
+ * The roster a subject's marks are measured against: the class, or for an
+ * elective the students in it who are taking it. Against the whole class an
+ * elective could never read as complete, and every count below would report
+ * the students who chose something else as marks still to enter.
+ */
+function subjectRoster(
+  offering: OfferingRow,
+  classRoster: string[],
+  members: Map<string, Set<string>>
+): string[] {
+  return offeringRoster(
+    offering,
+    classRoster,
+    members.get(offering.id) ?? new Set()
+  )
+}
+
 export type ClassWork = {
   classId: string
   classKey: string
@@ -155,7 +187,14 @@ export type ClassWork = {
   students: number
   pendingRequests: number
   markedToday: number
-  mySubjects: { id: string; code: string; name: string; entered: number }[]
+  mySubjects: {
+    id: string
+    code: string
+    name: string
+    /** Who it is taught to: the class, or for an elective its own students. */
+    roster: number
+    entered: number
+  }[]
   unallocatedSubjects: number
 }
 
@@ -206,9 +245,10 @@ export async function getClassWork(
       .groupBy(enrollmentRequests.classId),
   ])
 
-  const [rosterIds, marksByOffering, todayMarked] = await Promise.all([
+  const [rosterIds, marksByOffering, members, todayMarked] = await Promise.all([
     rosterIdsByClassKey(rows.map((r) => r.classKey)),
     marksByOfferingId(offerings.map((o) => o.id)),
+    electiveMembers(offerings),
     db
       .select({
         classId: attendanceTable.classId,
@@ -254,16 +294,20 @@ export async function getClassWork(
       students: (rosterIds.get(c.classKey) ?? []).length,
       pendingRequests: pending.get(c.id) ?? 0,
       markedToday: marked.get(c.id) ?? 0,
-      mySubjects: mine.map((o) => ({
-        id: o.id,
-        code: o.code,
-        name: o.name,
-        entered: completeCount(
-          rosterIds.get(c.classKey) ?? [],
-          marksByOffering.get(o.id) ?? new Map(),
-          courseCaps(o)
-        ),
-      })),
+      mySubjects: mine.map((o) => {
+        const ids = subjectRoster(o, rosterIds.get(c.classKey) ?? [], members)
+        return {
+          id: o.id,
+          code: o.code,
+          name: o.name,
+          roster: ids.length,
+          entered: completeCount(
+            ids,
+            marksByOffering.get(o.id) ?? new Map(),
+            courseCaps(o)
+          ),
+        }
+      }),
       unallocatedSubjects: offerings.filter(
         (o) => o.classId === c.id && o.facultyId === null
       ).length,
@@ -563,9 +607,10 @@ export async function marksCompletionByDept(
   const codes = await scopedDeptCodes(deptCodes)
   const cls = await activeClassesInDepts(codes)
   const offerings = await activeOfferings(cls.map((c) => c.id))
-  const [roster, marks] = await Promise.all([
+  const [roster, marks, members] = await Promise.all([
     rosterIdsByClassKey(cls.map((c) => c.classKey)),
     marksByOfferingId(offerings.map((o) => o.id)),
+    electiveMembers(offerings),
   ])
 
   const keyOf = new Map(cls.map((c) => [c.id, c.classKey]))
@@ -578,7 +623,11 @@ export async function marksCompletionByDept(
       offeringsComplete: mine.filter((o) =>
         isFullyEntered(
           o,
-          roster.get(keyOf.get(o.classId) ?? "") ?? [],
+          subjectRoster(
+            o,
+            roster.get(keyOf.get(o.classId) ?? "") ?? [],
+            members
+          ),
           marks.get(o.id) ?? new Map()
         )
       ).length,
@@ -624,17 +673,22 @@ export async function marksCompletionByOffering(
     .from(classes)
     .where(inArray(classes.id, classIds))
   const offerings = await activeOfferings(cls.map((c) => c.id))
-  const [roster, marks, teachers] = await Promise.all([
+  const [roster, marks, teachers, members] = await Promise.all([
     rosterIdsByClassKey(cls.map((c) => c.classKey)),
     marksByOfferingId(offerings.map((o) => o.id)),
     facultyNamesByIds(
       offerings.flatMap((o) => (o.facultyId === null ? [] : [o.facultyId]))
     ),
+    electiveMembers(offerings),
   ])
 
   const keyOf = new Map(cls.map((c) => [c.id, c.classKey]))
   return offerings.map((o) => {
-    const ids = roster.get(keyOf.get(o.classId) ?? "") ?? []
+    const ids = subjectRoster(
+      o,
+      roster.get(keyOf.get(o.classId) ?? "") ?? [],
+      members
+    )
     const entered = marks.get(o.id) ?? new Map<string, MarksInput>()
     return {
       offeringId: o.id,

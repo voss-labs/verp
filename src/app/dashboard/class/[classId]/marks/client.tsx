@@ -96,6 +96,9 @@ function SubjectSetup({
                         {o.code}
                       </Badge>
                       <span className="text-sm">{o.name}</span>
+                      {o.isElective && (
+                        <Badge variant="secondary">Elective</Badge>
+                      )}
                     </div>
                     <span className="text-muted-foreground text-xs">
                       Sem {o.semester} ·{" "}

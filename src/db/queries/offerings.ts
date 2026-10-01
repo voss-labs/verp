@@ -82,3 +82,16 @@ export async function setOfferingPublished(
     .returning()
   return row
 }
+
+/**
+ * Teach a subject to the whole class, or make it an elective, whose roster is
+ * the students put on it (queries/electives.ts) rather than the class.
+ */
+export async function setOfferingElective(id: string, isElective: boolean) {
+  const [row] = await db
+    .update(courseOfferings)
+    .set({ isElective, updatedAt: new Date() })
+    .where(eq(courseOfferings.id, id))
+    .returning()
+  return row
+}

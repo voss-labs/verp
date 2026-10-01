@@ -6,6 +6,7 @@ import { authorize } from "@/lib/rbac"
 import {
   studentsInBatch,
   studentsInClass,
+  studentsInElective,
   studentsInPreBatchRegister,
 } from "@/lib/scope"
 import {
@@ -16,6 +17,16 @@ import {
   requiredComponents,
   validateMarks,
 } from "@/lib/marks-integrity"
+import {
+  emptyRosterMessage,
+  hasRecordedMark,
+  matchElectiveList,
+  rollsInSheet,
+  rosterFrozenReason,
+  sheetForSubject,
+  studentsWithMarks,
+} from "@/lib/electives"
+import { readSheets } from "@/lib/read-sheets"
 import { canAllocate, canReopenLock, canWriteOffering } from "@/lib/allocation"
 import { getErrorMessage } from "@/lib/error-utils"
 import { parseRollNumber, expectedYear } from "@/lib/roll-number"
@@ -37,17 +48,29 @@ import { getCourseByCode, createCourse } from "@/db/queries/courses"
 import {
   createOffering,
   getOfferingById,
+  setOfferingElective,
   setOfferingFaculty,
   setOfferingPublished,
 } from "@/db/queries/offerings"
 import {
   createBatch,
   getBatchById,
+  getBatchedStudentIds,
   getStudentsInBatch,
   listBatchesForOffering,
   assignStudentsToBatch,
   removeStudentFromBatch,
+  restoreBatchPlaces,
+  retireBatchPlaces,
 } from "@/db/queries/batches"
+import {
+  clearElective,
+  deleteBlankMarks,
+  enrollInElective,
+  getElectiveMemberIds,
+  getOfferingRoster,
+  removeFromElective,
+} from "@/db/queries/electives"
 import {
   upsertMarks,
   getMarksForOffering,
@@ -235,6 +258,19 @@ export async function saveAttendanceAction(input: {
         )
       ) {
         return { error: "That subject is allocated to another teacher." }
+      }
+      // An elective's register is the students taking it. The class check
+      // above lets through a classmate who chose a different elective, and a
+      // row for them would count against a subject they do not attend.
+      if (offering.isElective) {
+        const takers = new Set(
+          (await getOfferingRoster(offering, cls.classKey)).map((s) => s.id)
+        )
+        const electiveScope = studentsInElective(
+          takers,
+          input.marks.map((m) => m.studentId)
+        )
+        if (!electiveScope.ok) return { error: electiveScope.reason }
       }
     }
 
@@ -455,13 +491,15 @@ export async function saveMarksAction(input: {
     // the payload names. Without this, a teacher holding one class could attach
     // marks from their offering to a student in another — and getMarksForStudent
     // reads by student id alone, so it would surface in that student's record.
+    // An elective narrows it again, for the same reason: a row for a classmate
+    // who chose a different elective is a result in a subject they never sat.
     const roster = new Set(
-      (await getStudentsByClassKeys([cls.classKey])).map((s) => s.id)
+      (await getOfferingRoster(offering, cls.classKey)).map((s) => s.id)
     )
-    const scope = studentsInClass(
-      roster,
-      input.rows.map((r) => r.studentId)
-    )
+    const ids = input.rows.map((r) => r.studentId)
+    const scope = offering.isElective
+      ? studentsInElective(roster, ids)
+      : studentsInClass(roster, ids)
     if (!scope.ok) return refuse(scope.reason)
 
     // The number inputs carry min/max, but that is a courtesy to whoever is
@@ -556,23 +594,28 @@ export async function saveMarksAction(input: {
  * Asked of the roster, not of the marks table. Counting rows in `marks` answers
  * "how many students has somebody touched", and the question that decides
  * whether a result may be frozen or shown is "is anybody still unmarked".
+ *
+ * The roster is the subject's own: for an elective, the students taking it.
+ * Asked of the whole class, an elective could never be locked, because the
+ * students who chose something else will never have a mark in it. Whether it
+ * is empty comes back too: an empty roster has nobody missing, and would
+ * otherwise pass as complete.
  */
 async function rosterIncomplete(
-  offeringId: string,
+  offering: { id: string; isElective: boolean },
   classKey: string,
-  course: { maxIsa: number; maxMse: number; maxEse: number },
   components: Component[]
 ) {
   const [roster, existing] = await Promise.all([
-    getStudentsByClassKeys([classKey]),
-    getMarksForOffering(offeringId),
+    getOfferingRoster(offering, classKey),
+    getMarksForOffering(offering.id),
   ])
   const byStudent = new Map(existing.map((m) => [m.studentId, m]))
-  return incompleteStudents(
-    roster.map((r) => r.id),
-    byStudent,
-    components
-  )
+  const ids = roster.map((r) => r.id)
+  return {
+    empty: ids.length === 0,
+    missing: incompleteStudents(ids, byStudent, components),
+  }
 }
 
 export async function setMarksLockAction(input: {
@@ -612,14 +655,12 @@ export async function setMarksLockAction(input: {
       // Locking says "these figures are final". It cannot be true of a
       // component nobody has entered — and once locked, publication accepted
       // it, so a blank register reached students as a completed result.
-      const missing = await rosterIncomplete(
-        input.offeringId,
-        cls.classKey,
-        offering.course,
-        [component]
-      )
-      if (missing.length > 0) {
-        return { error: incompleteMessage(missing, "Lock") }
+      const check = await rosterIncomplete(offering, cls.classKey, [component])
+      if (check.empty) {
+        return { error: emptyRosterMessage(offering.isElective, "Lock") }
+      }
+      if (check.missing.length > 0) {
+        return { error: incompleteMessage(check.missing, "Lock") }
       }
     }
 
@@ -741,6 +782,15 @@ export async function assignBatchAction(input: {
     )
     const scope = studentsInClass(roster, input.studentIds)
     if (!scope.ok) return { error: scope.reason }
+
+    // A lab that is also an elective is split among the students taking it.
+    if (offering.isElective) {
+      const takers = new Set(
+        (await getOfferingRoster(offering, cls2.classKey)).map((s) => s.id)
+      )
+      const electiveScope = studentsInElective(takers, input.studentIds)
+      if (!electiveScope.ok) return { error: electiveScope.reason }
+    }
 
     await assignStudentsToBatch({
       batchId: input.batchId,
@@ -901,14 +951,12 @@ export async function setPublishedAction(input: {
       // this rule exist — the live EC33T offering was locked and published over
       // an almost entirely blank register, and every student behind it was
       // shown a finished semester worth zero credits.
-      const missing = await rosterIncomplete(
-        input.offeringId,
-        cls.classKey,
-        offering.course,
-        required
-      )
-      if (missing.length > 0) {
-        return { error: incompleteMessage(missing, "Publish") }
+      const check = await rosterIncomplete(offering, cls.classKey, required)
+      if (check.empty) {
+        return { error: emptyRosterMessage(offering.isElective, "Publish") }
+      }
+      if (check.missing.length > 0) {
+        return { error: incompleteMessage(check.missing, "Publish") }
       }
     }
 
@@ -929,5 +977,322 @@ export async function setPublishedAction(input: {
     return { error: null }
   } catch (err) {
     return { error: getErrorMessage(err, "Could not change publication") }
+  }
+}
+
+// ── electives ──────────────────────────────────────────────────────────────
+
+// Who takes an elective is the coordinator's decision, like allocating the
+// subject. Its roster is what "every student is marked" is measured against,
+// so the teacher entering its marks is not the one who should be able to
+// shorten it.
+const ELECTIVE_OWNER =
+  "Only the class coordinator, the HOD, or an admin can decide who takes an elective."
+
+/** rosterFrozenReason for one subject, read from its publication and locks. */
+async function rosterFrozen(offering: {
+  id: string
+  publishedAt: Date | null
+}) {
+  const locked = await getLockedComponents(offering.id)
+  return rosterFrozenReason({
+    published: offering.publishedAt != null,
+    locked: locked.map((l) => l.component),
+  })
+}
+
+/**
+ * Teach a subject to the whole class, or make it an elective taught to the
+ * students put on it.
+ *
+ * Marks already entered say who was taking it, so becoming an elective puts
+ * those students on it rather than stranding their marks outside the roster —
+ * which is the state of a subject taught as whole-class by mistake. The empty
+ * rows the whole-class grid saved for everybody else are cleared, because an
+ * empty row still lists the subject on that student's own record.
+ *
+ * Going back to the whole class ends the elective's list rather than parking
+ * it. Made an elective again, the subject starts from whoever has marks then,
+ * which is what the coordinator is told, not from a list nobody could see.
+ *
+ * A lab's batches follow the list, so its Batches tab never shows somebody its
+ * register leaves out. Becoming an elective takes everybody not on it out of
+ * its batches, and going back to the whole class gives them their places back.
+ */
+export async function setElectiveAction(input: {
+  offeringId: string
+  elective: boolean
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "offering:update")
+    const offering = await getOfferingById(input.offeringId)
+    if (!offering) return { error: "No such subject." }
+    const { ok, cls } = await classInScope(user!, offering.classId)
+    if (!ok || !cls) return { error: "That class is not in your scope." }
+    if (!canAllocate(user!, offering.classId, cls.departmentCode)) {
+      return { error: ELECTIVE_OWNER }
+    }
+    if (offering.isElective === input.elective) return { error: null }
+
+    const frozen = await rosterFrozen(offering)
+    if (frozen) return { error: frozen }
+
+    const courseCode = offering.course.courseCode
+    let details: Record<string, unknown>
+    if (input.elective) {
+      const existing = await getMarksForOffering(input.offeringId)
+      const marked = studentsWithMarks(
+        new Map(existing.map((m) => [m.studentId, m]))
+      )
+      await enrollInElective({
+        courseOfferingId: input.offeringId,
+        studentIds: marked,
+      })
+      const cleared = await deleteBlankMarks(input.offeringId)
+      const taking = await getElectiveMemberIds(input.offeringId)
+      const batched = await getBatchedStudentIds(input.offeringId)
+      const unbatched = await retireBatchPlaces(
+        input.offeringId,
+        [...batched].filter((id) => !taking.has(id))
+      )
+      details = { courseCode, enrolled: marked.length, cleared, unbatched }
+    } else {
+      const released = await clearElective(input.offeringId)
+      const classRoster = await getStudentsByClassKeys([cls.classKey])
+      const rebatched = await restoreBatchPlaces(
+        input.offeringId,
+        classRoster.map((s) => s.id)
+      )
+      details = { courseCode, released, rebatched }
+    }
+    await setOfferingElective(input.offeringId, input.elective)
+    await createAuditLog({
+      action: input.elective ? "elective.enabled" : "elective.disabled",
+      actorId: user!.id,
+      targetType: "offering",
+      targetId: input.offeringId,
+      details,
+    })
+    revalidatePath(`/dashboard/class/${offering.classId}/electives`)
+    revalidatePath(`/dashboard/class/${offering.classId}/marks`)
+    revalidatePath(`/dashboard/class/${offering.classId}/batches`)
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not change the subject") }
+  }
+}
+
+/**
+ * Put students on an elective. Only from the class it is offered on: the same
+ * boundary every academic write keeps, since nothing below this would stop a
+ * student from another division being added.
+ */
+export async function enrollElectiveAction(input: {
+  offeringId: string
+  studentIds: string[]
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "offering:update")
+    const offering = await getOfferingById(input.offeringId)
+    if (!offering) return { error: "No such subject." }
+    const { ok, cls } = await classInScope(user!, offering.classId)
+    if (!ok || !cls) return { error: "That class is not in your scope." }
+    if (!canAllocate(user!, offering.classId, cls.departmentCode)) {
+      return { error: ELECTIVE_OWNER }
+    }
+    if (!offering.isElective) {
+      return {
+        error:
+          "This subject is taught to the whole class. Make it an elective first.",
+      }
+    }
+    const frozen = await rosterFrozen(offering)
+    if (frozen) return { error: frozen }
+
+    // The same id twice is still one student.
+    const studentIds = [...new Set(input.studentIds)]
+    const roster = new Set(
+      (await getStudentsByClassKeys([cls.classKey])).map((s) => s.id)
+    )
+    const scope = studentsInClass(roster, studentIds)
+    if (!scope.ok) return { error: scope.reason }
+
+    await enrollInElective({ courseOfferingId: input.offeringId, studentIds })
+    // Back into the lab batch they were in before they came off it.
+    const rebatched = await restoreBatchPlaces(input.offeringId, studentIds)
+    await createAuditLog({
+      action: "elective.enrolled",
+      actorId: user!.id,
+      targetType: "offering",
+      targetId: input.offeringId,
+      details: {
+        courseCode: offering.course.courseCode,
+        count: studentIds.length,
+        rebatched,
+      },
+    })
+    revalidatePath(`/dashboard/class/${offering.classId}/electives`)
+    revalidatePath(`/dashboard/class/${offering.classId}/marks`)
+    revalidatePath(`/dashboard/class/${offering.classId}/batches`)
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not add the students") }
+  }
+}
+
+/** A student as an imported elective list shows them. */
+type ListedStudent = { id: string; rollNumber: string; name: string }
+
+/**
+ * Read who takes an elective from an uploaded sheet, and change nothing.
+ *
+ * The coordinator sees who the sheet would add, who is on the elective already,
+ * and any roll number this class does not have, then adds them with
+ * enrollElectiveAction, so an imported list gets every check a hand-picked one
+ * does. A list only ever adds: nobody already on the elective is taken off.
+ *
+ * A workbook with a tab per elective opens on the tab named for this subject,
+ * else on the first tab with a roll number on it.
+ */
+export async function readElectiveListAction(form: FormData): Promise<
+  Result & {
+    list?: {
+      sheetNames: string[]
+      activeSheet: string
+      add: ListedStudent[]
+      already: ListedStudent[]
+      notInClass: string[]
+    }
+  }
+> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "offering:update")
+    const file = form.get("file")
+    if (!(file instanceof File)) return { error: "Choose a file to import." }
+    const offeringId = form.get("offeringId")
+    if (typeof offeringId !== "string" || !offeringId) {
+      return { error: "No such subject." }
+    }
+    const offering = await getOfferingById(offeringId)
+    if (!offering) return { error: "No such subject." }
+    const { ok, cls } = await classInScope(user!, offering.classId)
+    if (!ok || !cls) return { error: "That class is not in your scope." }
+    if (!canAllocate(user!, offering.classId, cls.departmentCode)) {
+      return { error: ELECTIVE_OWNER }
+    }
+    if (!offering.isElective) {
+      return {
+        error:
+          "This subject is taught to the whole class. Make it an elective first.",
+      }
+    }
+
+    const sheets = await readSheets(file)
+    if (sheets.length === 0) return { error: "That file has no sheets." }
+    const names = sheets.map((s) => s.name)
+    const named = sheetForSubject(names, offering.course.courseCode)
+    const requested = form.get("sheet")
+    const sheet =
+      sheets.find((s) => s.name === requested) ??
+      sheets.find((s) => s.name === named) ??
+      sheets.find((s) => rollsInSheet(s.grid).length > 0) ??
+      sheets[0]
+
+    const [roster, members] = await Promise.all([
+      getStudentsByClassKeys([cls.classKey]),
+      getElectiveMemberIds(offering.id),
+    ])
+    const { add, already, notInClass } = matchElectiveList(
+      rollsInSheet(sheet.grid),
+      roster.map((s) => ({
+        id: s.id,
+        rollNumber: s.rollNumber,
+        name: `${s.firstName} ${s.lastName}`.trim(),
+      })),
+      members
+    )
+    return {
+      error: null,
+      list: {
+        sheetNames: names,
+        activeSheet: sheet.name,
+        add,
+        already,
+        notInClass,
+      },
+    }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not read that file") }
+  }
+}
+
+/**
+ * Take a student off an elective.
+ *
+ * Refused once they have a mark in it: their row would stay, and the student
+ * would go on seeing a subject no grid lists any more, where nobody could
+ * correct or finish it. Clearing the mark first is the deliberate version of
+ * the same change.
+ */
+export async function removeFromElectiveAction(input: {
+  offeringId: string
+  studentId: string
+}): Promise<Result> {
+  try {
+    const user = await getSessionUser()
+    authorize(user, "offering:update")
+    const offering = await getOfferingById(input.offeringId)
+    if (!offering) return { error: "No such subject." }
+    const { ok, cls } = await classInScope(user!, offering.classId)
+    if (!ok || !cls) return { error: "That class is not in your scope." }
+    if (!canAllocate(user!, offering.classId, cls.departmentCode)) {
+      return { error: ELECTIVE_OWNER }
+    }
+    const frozen = await rosterFrozen(offering)
+    if (frozen) return { error: frozen }
+
+    // The same roster check enrolling makes, as removeFromBatchAction mirrors
+    // assignBatchAction.
+    const roster = new Set(
+      (await getStudentsByClassKeys([cls.classKey])).map((s) => s.id)
+    )
+    const scope = studentsInClass(roster, [input.studentId])
+    if (!scope.ok) return { error: scope.reason }
+
+    const existing = await getMarksForOffering(input.offeringId)
+    const row = existing.find((m) => m.studentId === input.studentId)
+    if (hasRecordedMark(row)) {
+      return {
+        error:
+          "This student already has marks in this subject. Clear them on the Marks tab before taking them off it.",
+      }
+    }
+
+    await removeFromElective({
+      courseOfferingId: input.offeringId,
+      studentId: input.studentId,
+    })
+    // An empty row would still list the subject on their own record.
+    await deleteBlankMarks(input.offeringId, input.studentId)
+    // Out of its lab batches too, until they are put back on it.
+    const unbatched = await retireBatchPlaces(input.offeringId, [
+      input.studentId,
+    ])
+    await createAuditLog({
+      action: "elective.removed",
+      actorId: user!.id,
+      targetType: "offering",
+      targetId: input.offeringId,
+      details: { courseCode: offering.course.courseCode, unbatched },
+    })
+    revalidatePath(`/dashboard/class/${offering.classId}/electives`)
+    revalidatePath(`/dashboard/class/${offering.classId}/marks`)
+    revalidatePath(`/dashboard/class/${offering.classId}/batches`)
+    return { error: null }
+  } catch (err) {
+    return { error: getErrorMessage(err, "Could not remove the student") }
   }
 }

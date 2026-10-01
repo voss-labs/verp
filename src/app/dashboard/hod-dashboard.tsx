@@ -101,6 +101,7 @@ export async function HodDashboard({
       subjects: subjects.length,
       unallocated: w?.unallocatedSubjects ?? 0,
       entered: subjects.reduce((n, s) => n + s.entered, 0),
+      capacity: subjects.reduce((n, s) => n + s.roster, 0),
       pendingRequests: w?.pendingRequests ?? 0,
     }
   })

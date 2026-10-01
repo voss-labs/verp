@@ -64,6 +64,7 @@ into `deptCodes`, `classIds`, `classKeys`, `coordinatorClassIds` and
 | `canWriteOffering(user, offeringFacultyId, classId, dept)` | `canAllocate`, **or** the teacher the subject is allocated to                                      |
 | `canReopenLock(user, classId, dept, lockedBy)`             | `canAllocate`, **or** the teacher who placed that lock                                             |
 | `studentsInClass(roster, ids)`                             | every submitted id is on the class roster — rejects the **whole** request otherwise                |
+| `studentsInElective(members, ids)`                         | every submitted id is taking the elective — the class roster narrowed to its enrolments            |
 | `rollsInScope(user, rolls, storedKeys)`                    | every roll's class key is in the caller's scope; a stored key beats the derived one, for repeaters |
 
 A capability is never a scope. A teacher holding `marks:write` still cannot
@@ -214,6 +215,10 @@ A missing capability throws inside `authorize()` and is caught, so it surfaces a
 | `createBatchAction`           | `marks:write`        | `classInScope`, then `canWriteOffering`                                         |
 | `assignBatchAction`           | `marks:write`        | batch → offering, `classInScope`, `canWriteOffering`, `studentsInClass`         |
 | `removeFromBatchAction`       | `marks:write`        | batch → offering, `classInScope`, `canWriteOffering`                            |
+| `setElectiveAction`           | `offering:update`    | `classInScope`, then `canAllocate`; refused while locked or published           |
+| `enrollElectiveAction`        | `offering:update`    | as `setElectiveAction`, then `studentsInClass`                                  |
+| `removeFromElectiveAction`    | `offering:update`    | as `enrollElectiveAction`; also refused if they have marks                      |
+| `readElectiveListAction`      | `offering:update`    | `classInScope`, then `canAllocate`; reads a sheet and changes nothing           |
 
 Three of these are worth reading twice:
 
@@ -224,8 +229,27 @@ Three of these are worth reading twice:
 - **Locking now requires completeness.** A component cannot be locked until
   every active student on the roster has it, and publishing re-checks the whole
   set. Before that, a register of 89 blank rows could be locked and published.
+  An empty roster does not count as complete: with nobody on it, there is
+  nothing to lock or publish.
 - **Marks are validated at this boundary**, against the course's own maxima, and
   a payload with any bad value is rejected whole.
+
+**An elective narrows the roster.** For a subject marked elective, every roster
+above — the students `saveMarksAction`, `saveAttendanceAction` and
+`assignBatchAction` accept, and the ones locking and publishing wait for — is
+the class narrowed to the students taking it, checked with `studentsInElective`.
+Deciding who takes it is `canAllocate`, not `canWriteOffering`: the roster is
+what "every student is marked" is measured against, so the teacher entering the
+marks is not the one who can shorten it. It cannot change while a component is
+locked or the results are published, a student with a mark in it cannot be
+taken off, and an elective with nobody on it cannot be locked or published.
+A lab's batches follow the list. A student who stops taking it, or is not on
+it when a lab already split into batches becomes an elective, leaves its
+batches, and taking it again gives back the place they had, so a batch only
+ever holds students taking the subject. A list can also come from a sheet:
+`readElectiveListAction` reads the roll numbers in it without writing anything,
+and the students it finds are added through `enrollElectiveAction`, like a list
+picked by hand.
 
 ### Department workspace — `src/app/dashboard/dept/actions.ts`
 
