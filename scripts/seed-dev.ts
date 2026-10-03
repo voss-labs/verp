@@ -567,7 +567,7 @@ async function main() {
   await insertAll(schema.marks, marks)
 
   await db.insert(schema.marksLocks).values(
-    (["isa", "mse", "ese"] as const).map((component) => ({
+    (["isa", "mse1", "mse2", "ese"] as const).map((component) => ({
       courseOfferingId: oDav.id,
       component,
       isLocked: true,

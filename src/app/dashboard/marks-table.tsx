@@ -26,14 +26,20 @@ export type MarksTableRow =
 
 type PublishedRow = Extract<MarksTableRow, { published: true }>
 
+// No default text-align here: a `[&>th]:text-left` on the row would win over
+// an individual header's own `text-right` regardless of source order — a
+// parent-scoped selector with a type selector (`> th`) outranks a bare class,
+// so every header rendered left-aligned even the ones marked text-right, and
+// no amount of column-width tuning could fix a text-align bug. Each `<th>`
+// below sets its own alignment instead.
 const HEAD =
-  "text-muted-foreground [&>th]:pb-2 [&>th]:text-left [&>th]:text-xs [&>th]:font-medium [&>th]:whitespace-nowrap"
+  "text-muted-foreground [&>th]:py-2 [&>th]:text-xs [&>th]:font-medium [&>th]:whitespace-nowrap [&>th]:align-middle"
 
-const BODY = "[&>td]:py-2 [&>td]:align-top"
+const BODY = "[&>td]:py-2 [&>td]:align-middle"
 
-const MASKED = ["ISA", "MSE", "ESE", "Total"]
+const MASKED = ["ISA", "MSE 1", "MSE 2", "ESE", "Total"]
 
-const COLUMN_COUNT = 8
+const COLUMN_COUNT = 9
 
 export function MarksTable({ rows }: { rows: MarksTableRow[] }) {
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set())
@@ -47,15 +53,22 @@ export function MarksTable({ rows }: { rows: MarksTableRow[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[34rem] text-sm">
+      {/* table-fixed with a width on every column: without it, widths are
+          computed per row, so the header's declared width is only a hint and
+          drifts out of alignment the moment a row's content differs (a
+          wrapped subject name, a "provisional" note). Fixed layout locks
+          every column to what the header row declares, for every row
+          beneath it. */}
+      <table className="min-w-full table-fixed text-sm">
         <thead>
           <tr className={HEAD}>
-            <th className="w-24">Code</th>
-            <th>Subject</th>
-            <th className="w-20 text-right">ISA</th>
-            <th className="w-20 text-right">MSE</th>
-            <th className="w-20 text-right">ESE</th>
-            <th className="w-24 text-right">Total</th>
+            <th className="w-16 text-left">Code</th>
+            <th className="w-48 text-left">Subject</th>
+            <th className="w-14 text-right">ISA</th>
+            <th className="w-14 text-right">MSE 1</th>
+            <th className="w-14 text-right">MSE 2</th>
+            <th className="w-14 text-right">ESE</th>
+            <th className="w-20 text-right">Total</th>
             <th className="w-24 text-right">Grade</th>
             <th className="w-8">
               <span className="sr-only">Breakdown</span>
@@ -124,7 +137,11 @@ function SubjectRow({
         <td className="max-w-[16rem] pr-3">{row.name}</td>
         <ComponentCell value={row.marks.isa} max={row.course.maxIsa} />
         <ComponentCell
-          value={hasMse ? c.finalMse : null}
+          value={hasMse ? row.marks.mse1 : null}
+          max={row.course.maxMse}
+        />
+        <ComponentCell
+          value={hasMse ? row.marks.mse2 : null}
           max={row.course.maxMse}
         />
         <ComponentCell value={row.marks.ese} max={row.course.maxEse} />

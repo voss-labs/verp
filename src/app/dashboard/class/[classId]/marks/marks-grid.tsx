@@ -32,12 +32,6 @@ type Field = Bound["field"]
 
 const BLANK: MarksInput = { isa: null, mse1: null, mse2: null, ese: null }
 
-function componentOf(field: Field): LockComponent {
-  if (field === "isa") return "isa"
-  if (field === "ese") return "ese"
-  return "mse"
-}
-
 export function MarksGrid({
   classId,
   offering,
@@ -65,7 +59,9 @@ export function MarksGrid({
   const mayUnlock = (c: LockComponent) =>
     locked.find((l) => l.component === c)?.canUnlock ?? false
   const allLocked =
-    isLocked("isa") && isLocked("ese") && (!hasMse || isLocked("mse"))
+    isLocked("isa") &&
+    isLocked("ese") &&
+    (!hasMse || (isLocked("mse1") && isLocked("mse2")))
 
   useEffect(() => {
     if (!dirty) return
@@ -231,7 +227,7 @@ export function MarksGrid({
       line.forEach((raw, dc) => {
         const target = next[row + dr]
         const column = columns[col + dc]
-        if (!target || !column || isLocked(componentOf(column.field))) {
+        if (!target || !column || isLocked(column.field)) {
           skipped++
           return
         }
@@ -382,8 +378,8 @@ export function MarksGrid({
         </Badge>
         <span className="text-muted-foreground text-xs">
           {grid.published
-            ? "Students can see their grade for this subject."
-            : "Students cannot see a grade for this subject yet."}
+            ? "Students can see whichever components are locked."
+            : "Students cannot see any marks for this subject yet."}
         </span>
         {grid.canPublish ? (
           <Button
@@ -445,7 +441,7 @@ export function MarksGrid({
                           label={`${r.rollNumber} ${c.label}`}
                           value={r[c.field]}
                           max={c.max}
-                          locked={isLocked(componentOf(c.field))}
+                          locked={isLocked(c.field)}
                           invalid={invalid[`${r.studentId}:${c.field}`]}
                           register={register}
                           onChange={handleChange}

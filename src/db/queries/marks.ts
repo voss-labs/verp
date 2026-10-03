@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm"
+import { eq, inArray, sql } from "drizzle-orm"
 import { db } from "@/db"
 import { marks, marksLocks, courseOfferings, courses } from "@/db/schema"
 
@@ -56,15 +56,13 @@ export async function getMarksForStudent(studentId: string) {
 // ── locks ──────────────────────────────────────────────────────────────────
 //
 // A component is frozen once its marks are submitted upstream: ISA when
-// internals go in, MSE after mid-sems, ESE at the end of term. They are locked
-// separately because they are finished at different points — freezing the whole
-// subject the moment ISA is done would block the ESE column for the rest of the
-// semester.
-//
-// `mse` covers both mse1 and mse2: they are two halves of one component that is
-// averaged into a single mark, so they are never submitted apart.
+// internals go in, MSE1 after the first mid-sem, MSE2 after the second, ESE at
+// the end of term. They are locked separately because they are finished at
+// different points — freezing the whole subject the moment ISA is done would
+// block the ESE column for the rest of the semester, and the same is true
+// between the two MSEs: the second is often weeks behind the first.
 
-export const LOCKABLE_COMPONENTS = ["isa", "mse", "ese"] as const
+export const LOCKABLE_COMPONENTS = ["isa", "mse1", "mse2", "ese"] as const
 export type LockComponent = (typeof LOCKABLE_COMPONENTS)[number]
 
 export function isLockComponent(v: string): v is LockComponent {
@@ -102,6 +100,34 @@ export async function getLockedComponents(
       component: r.component as LockComponent,
       lockedByFacultyId: r.lockedByFacultyId,
     }))
+}
+
+/**
+ * Locked components across many offerings in one query, keyed by offering id.
+ * For masking a student's marks across every subject they take without an
+ * N+1 — getLockedComponents above is for the marks grid, which only ever
+ * looks at one offering at a time.
+ */
+export async function getLockedComponentsByOffering(
+  courseOfferingIds: string[]
+): Promise<Map<string, LockComponent[]>> {
+  const out = new Map<string, LockComponent[]>()
+  if (courseOfferingIds.length === 0) return out
+  const rows = await db
+    .select({
+      courseOfferingId: marksLocks.courseOfferingId,
+      component: marksLocks.component,
+      isLocked: marksLocks.isLocked,
+    })
+    .from(marksLocks)
+    .where(inArray(marksLocks.courseOfferingId, courseOfferingIds))
+  for (const r of rows) {
+    if (!r.isLocked || !isLockComponent(r.component)) continue
+    const list = out.get(r.courseOfferingId) ?? []
+    list.push(r.component)
+    out.set(r.courseOfferingId, list)
+  }
+  return out
 }
 
 /**

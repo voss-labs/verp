@@ -3,11 +3,13 @@ import {
   completeCount,
   incompleteStudents,
   invalidReason,
+  isPublishable,
+  maskUnlockedMarks,
   mergeMarks,
   requiredComponents,
   validateMarks,
 } from "./marks-integrity"
-import type { CourseInfo, MarksInput } from "./sgpi"
+import { marksState, type CourseInfo, type MarksInput } from "./sgpi"
 
 const theory: CourseInfo = {
   courseType: "theory",
@@ -104,9 +106,14 @@ describe("incompleteStudents", () => {
   // and published, and the students behind it saw a finished semester worth
   // nothing.
   it("reports every student when nobody has been marked", () => {
-    const res = incompleteStudents(roster, new Map(), ["isa", "mse", "ese"])
+    const res = incompleteStudents(roster, new Map(), [
+      "isa",
+      "mse1",
+      "mse2",
+      "ese",
+    ])
     expect(res).toHaveLength(3)
-    expect(res[0].missing).toEqual(["isa", "mse", "ese"])
+    expect(res[0].missing).toEqual(["isa", "mse1", "mse2", "ese"])
   })
 
   it("counts a student with no row at all as missing, not absent from the list", () => {
@@ -116,16 +123,12 @@ describe("incompleteStudents", () => {
     ).toEqual(["b", "c"])
   })
 
-  it("treats one MSE of two as unfinished", () => {
+  it("locks MSE1 and MSE2 independently — one entered does not finish the other", () => {
     const marks = new Map([["a", { ...blank, mse1: 25 }]])
-    expect(incompleteStudents(["a"], marks, ["mse"])[0].missing).toEqual([
-      "mse",
+    expect(incompleteStudents(["a"], marks, ["mse1"])).toEqual([])
+    expect(incompleteStudents(["a"], marks, ["mse2"])[0].missing).toEqual([
+      "mse2",
     ])
-  })
-
-  it("is satisfied by both MSEs", () => {
-    const marks = new Map([["a", { ...blank, mse1: 25, mse2: 27 }]])
-    expect(incompleteStudents(["a"], marks, ["mse"])).toEqual([])
   })
 
   it("treats a zero as marked", () => {
@@ -175,10 +178,10 @@ describe("mergeMarks", () => {
     })
   })
 
-  it("carries both MSE halves forward when MSE is locked", () => {
+  it("carries only the locked MSE half forward, leaving the other free", () => {
     const incoming = { ...blank, mse1: 1, mse2: 2 }
-    const merged = mergeMarks(stored, incoming, ["mse"])
-    expect([merged.mse1, merged.mse2]).toEqual([25, 27])
+    const merged = mergeMarks(stored, incoming, ["mse1"])
+    expect([merged.mse1, merged.mse2]).toEqual([25, 2])
   })
 
   it("writes an incoming value when the column is mapped and unlocked", () => {
@@ -199,7 +202,7 @@ describe("mergeMarks", () => {
 describe("requiredComponents", () => {
   it("does not ask a practical for an MSE it does not have", () => {
     expect(requiredComponents(practical)).toEqual(["isa", "ese"])
-    expect(requiredComponents(theory)).toEqual(["isa", "mse", "ese"])
+    expect(requiredComponents(theory)).toEqual(["isa", "mse1", "mse2", "ese"])
   })
 })
 
@@ -214,5 +217,53 @@ describe("completeCount", () => {
       ["c", blank],
     ])
     expect(completeCount(roster, marks, theory)).toBe(1)
+  })
+})
+
+describe("isPublishable", () => {
+  it("refuses when nothing is locked", () => {
+    expect(isPublishable([])).toBe(false)
+  })
+
+  // #117: a subject with only MSE1 locked — nothing else entered — must be
+  // publishable. It previously required ISA specifically.
+  it("allows publishing on MSE1 alone", () => {
+    expect(isPublishable(["mse1"])).toBe(true)
+  })
+})
+
+describe("maskUnlockedMarks", () => {
+  const full: MarksInput = { isa: 18, mse1: 25, mse2: 27, ese: 40 }
+
+  it("keeps a locked component's value", () => {
+    expect(maskUnlockedMarks(full, ["mse1"]).mse1).toBe(25)
+  })
+
+  // The whole point: a value the teacher has typed but not locked must not
+  // reach a student, published subject or not.
+  it("blanks every component that isn't locked", () => {
+    expect(maskUnlockedMarks(full, ["mse1"])).toEqual({
+      isa: null,
+      mse1: 25,
+      mse2: null,
+      ese: null,
+    })
+  })
+
+  it("locking one more component later shows up without re-publishing", () => {
+    const afterIsaLock = maskUnlockedMarks(full, ["mse1"])
+    const afterBothLocked = maskUnlockedMarks(full, ["mse1", "isa"])
+    expect(afterIsaLock.isa).toBeNull()
+    expect(afterBothLocked.isa).toBe(18)
+  })
+
+  it("produces no grade until every component is locked", () => {
+    const masked = maskUnlockedMarks(full, ["isa", "mse1"])
+    expect(marksState(masked, theory)).toBe("partial")
+  })
+
+  it("produces a grade once every component is locked", () => {
+    const masked = maskUnlockedMarks(full, ["isa", "mse1", "mse2", "ese"])
+    expect(marksState(masked, theory)).toBe("graded")
   })
 })
