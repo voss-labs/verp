@@ -12,6 +12,7 @@ import {
   type Component,
   incompleteMessage,
   incompleteStudents,
+  isPublishable,
   mergeMarks,
   validateMarks,
 } from "@/lib/marks-integrity"
@@ -854,17 +855,10 @@ export async function assignOfferingFacultyAction(input: {
 /**
  * Publish a subject's results, or withdraw them.
  *
- * Locking is the teacher saying one component's figures are final; publishing
- * is the coordinator saying the student may see them. The two are not
- * collapsed into one button, but publishing does not wait for every component
- * either — ISA, MSE1, MSE2 and ESE are locked at different points in the term,
- * often weeks apart, and a coordinator who has ISA and MSE1 locked should be
- * able to let students see those without waiting on ESE. ISA is the one
- * component publishing always insists on: a subject cannot be published with
- * nothing final about it at all. Whatever else is locked at the time of
- * publishing is what gets shown; a component still open remains provisional
- * until it is locked too (no republish needed — the student view already
- * reads live).
+ * Needs at least one locked component — there has to be something final to
+ * show. Which components a student actually sees is decided separately, at
+ * read time, from the locks (see maskUnlockedMarks): locking one more
+ * component later shows up without a republish.
  */
 export async function setPublishedAction(input: {
   offeringId: string
@@ -887,25 +881,19 @@ export async function setPublishedAction(input: {
     }
 
     if (input.published) {
-      // ISA is the only lock publishing insists on. Everything else the course
-      // has — MSE1, MSE2, ESE — is locked and published independently: a
-      // teacher who has only submitted MSE1 should not have to wait on MSE2 or
-      // ESE before the coordinator can publish what is actually final.
-      const required: Component[] = ["isa"]
       const locked = (await getLockedComponents(input.offeringId)).map(
         (l) => l.component
       )
-      const open = required.filter((c) => !locked.includes(c))
-      if (open.length > 0) {
+      if (!isPublishable(locked)) {
         return {
-          error: `Lock ${open.join(", ").toUpperCase()} before publishing — publishing says these marks are final.`,
+          error:
+            "Lock at least one component before publishing — publishing says it is final.",
         }
       }
 
-      // Checked again here rather than trusted from the locks, and scoped to
-      // whatever is actually locked rather than just the minimum above — a
-      // lock only means "final" if the whole roster carries it, and locks
-      // predating that guarantee exist. The live EC33T offering was locked and
+      // Checked again here rather than trusted from the locks: a lock only
+      // means "final" if the whole roster carries it, and locks predating
+      // that guarantee exist. The live EC33T offering was locked and
       // published over an almost entirely blank register, and every student
       // behind it was shown a finished semester worth zero credits.
       const missing = await rosterIncomplete(

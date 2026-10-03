@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm"
+import { eq, inArray, sql } from "drizzle-orm"
 import { db } from "@/db"
 import { marks, marksLocks, courseOfferings, courses } from "@/db/schema"
 
@@ -100,6 +100,34 @@ export async function getLockedComponents(
       component: r.component as LockComponent,
       lockedByFacultyId: r.lockedByFacultyId,
     }))
+}
+
+/**
+ * Locked components across many offerings in one query, keyed by offering id.
+ * For masking a student's marks across every subject they take without an
+ * N+1 — getLockedComponents above is for the marks grid, which only ever
+ * looks at one offering at a time.
+ */
+export async function getLockedComponentsByOffering(
+  courseOfferingIds: string[]
+): Promise<Map<string, LockComponent[]>> {
+  const out = new Map<string, LockComponent[]>()
+  if (courseOfferingIds.length === 0) return out
+  const rows = await db
+    .select({
+      courseOfferingId: marksLocks.courseOfferingId,
+      component: marksLocks.component,
+      isLocked: marksLocks.isLocked,
+    })
+    .from(marksLocks)
+    .where(inArray(marksLocks.courseOfferingId, courseOfferingIds))
+  for (const r of rows) {
+    if (!r.isLocked || !isLockComponent(r.component)) continue
+    const list = out.get(r.courseOfferingId) ?? []
+    list.push(r.component)
+    out.set(r.courseOfferingId, list)
+  }
+  return out
 }
 
 /**

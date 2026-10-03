@@ -378,8 +378,8 @@ export function MarksGrid({
         </Badge>
         <span className="text-muted-foreground text-xs">
           {grid.published
-            ? "Students can see their grade for this subject."
-            : "Students cannot see a grade for this subject yet."}
+            ? "Students can see whichever components are locked."
+            : "Students cannot see any marks for this subject yet."}
         </span>
         {grid.canPublish ? (
           <Button

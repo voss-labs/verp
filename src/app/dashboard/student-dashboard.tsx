@@ -10,7 +10,11 @@ import { PageHeader } from "@/components/page-header"
 import { BatchChip } from "@/components/batch-chip"
 import { StatCard, StatCardRow } from "@/components/stat-card"
 import { getAttendanceBySubject } from "@/db/queries/attendance"
-import { getMarksForStudent } from "@/db/queries/marks"
+import {
+  getLockedComponentsByOffering,
+  getMarksForStudent,
+} from "@/db/queries/marks"
+import { maskUnlockedMarks } from "@/lib/marks-integrity"
 import type { SessionUser } from "@/lib/session"
 import { computeCgpa, groupBySemester, marksState } from "@/lib/sgpi"
 import { cn } from "@/lib/utils"
@@ -42,10 +46,19 @@ export async function StudentDashboard({ user }: { user: SessionUser }) {
     )
   }
 
-  const [rows, attendance] = await Promise.all([
+  const [rawRows, attendance] = await Promise.all([
     getMarksForStudent(studentId),
     getAttendanceBySubject(studentId),
   ])
+  const locksByOffering = await getLockedComponentsByOffering(
+    rawRows.map((m) => m.courseOfferingId)
+  )
+  // Only a locked component is final — an unlocked figure the teacher is
+  // still typing must never reach a student, published subject or not.
+  const rows = rawRows.map((m) => ({
+    ...m,
+    ...maskUnlockedMarks(m, locksByOffering.get(m.courseOfferingId) ?? []),
+  }))
 
   const published = rows.filter((m) => m.courseOffering.publishedAt != null)
   const unpublished = rows.filter((m) => m.courseOffering.publishedAt == null)

@@ -53,23 +53,12 @@ export function MarksTable({ rows }: { rows: MarksTableRow[] }) {
 
   return (
     <div className="overflow-x-auto">
-      {/* table-fixed: without it, column widths are auto-computed per row and
-          the header's declared widths are only a hint — the numeric columns
-          drift out of alignment with their own header the moment a neighbouring
-          cell (a wrapped subject name, a "provisional" note) changes what the
-          browser thinks that row needs. Fixed layout locks every column to the
-          width the header row declares, for every row underneath it.
-
-          Subject still has no fixed width of its own — it is meant to soak up
-          whatever room is left — but it needs a floor, and every other column
-          is kept as narrow as its content actually needs (a mark is never more
-          than "XX/YY"): this table sits in a `lg:col-span-8` card next to
-          others, and the four component columns plus Code, Total and Grade at
-          their old, more generous widths left Subject nothing to fall back on
-          — fixed layout gave it exactly zero, and its text spilled across the
-          columns after it. min-w-[37rem] on the whole table matches the sum of
-          every column's floor, so a card even narrower than that scrolls (the
-          wrapper is overflow-x-auto) instead of crushing one to nothing. */}
+      {/* table-fixed with a width on every column: without it, widths are
+          computed per row, so the header's declared width is only a hint and
+          drifts out of alignment the moment a row's content differs (a
+          wrapped subject name, a "provisional" note). Fixed layout locks
+          every column to what the header row declares, for every row
+          beneath it. */}
       <table className="min-w-full table-fixed text-sm">
         <thead>
           <tr className={HEAD}>

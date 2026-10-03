@@ -1,8 +1,12 @@
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/page-header"
 import { getSessionUser } from "@/lib/session"
-import { getMarksForStudent } from "@/db/queries/marks"
+import {
+  getLockedComponentsByOffering,
+  getMarksForStudent,
+} from "@/db/queries/marks"
 import { getAttendanceBySubject } from "@/db/queries/attendance"
+import { maskUnlockedMarks } from "@/lib/marks-integrity"
 import { computeCgpa, groupBySemester } from "@/lib/sgpi"
 import { MyMarksClient } from "./client"
 
@@ -14,10 +18,19 @@ export default async function MyMarksPage() {
   // Staff have no marks of their own; the dashboard is where they belong.
   if (!user.studentId) redirect("/dashboard")
 
-  const [rows, attendance] = await Promise.all([
+  const [rawRows, attendance] = await Promise.all([
     getMarksForStudent(user.studentId),
     getAttendanceBySubject(user.studentId),
   ])
+  const locksByOffering = await getLockedComponentsByOffering(
+    rawRows.map((m) => m.courseOfferingId)
+  )
+  // Only a locked component is final — an unlocked figure the teacher is
+  // still typing must never reach a student, published subject or not.
+  const rows = rawRows.map((m) => ({
+    ...m,
+    ...maskUnlockedMarks(m, locksByOffering.get(m.courseOfferingId) ?? []),
+  }))
   // Only published subjects count toward SGPI and CGPA. An unpublished subject
   // is work in progress; folding it into an average would present a figure that
   // moves every time a teacher saves, and that nobody has declared final.

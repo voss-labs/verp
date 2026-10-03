@@ -108,9 +108,7 @@ function hasComponent(row: MarksInput | undefined, c: Component): boolean {
  * they are submitted, locked, and published at different points, not as one
  * unit. */
 export function requiredComponents(course: CourseInfo): Component[] {
-  return course.maxMse > 0
-    ? ["isa", "mse1", "mse2", "ese"]
-    : ["isa", "ese"]
+  return course.maxMse > 0 ? ["isa", "mse1", "mse2", "ese"] : ["isa", "ese"]
 }
 
 export type Incomplete = { studentId: string; missing: Component[] }
@@ -164,4 +162,29 @@ export function incompleteMessage(
     .map((c) => LABEL[c])
     .join(", ")
   return `${n} student${n === 1 ? " has" : "s have"} no ${missing} mark yet. ${action} once every student on the roster is marked, or deactivate anyone who has left the class.`
+}
+
+/** Whether publishing may proceed: there has to be at least one locked component — something final to show. Which one doesn't matter; a subject can be published on MSE1 alone. */
+export function isPublishable(locked: Component[]): boolean {
+  return locked.length > 0
+}
+
+/**
+ * Blank every component that isn't locked, so an unlocked figure never
+ * reaches a student. A locked component's value passes through unchanged;
+ * everything else reads exactly like a blank the teacher never typed —
+ * computeMarks and marksState already treat that as not yet graded, so a
+ * subject shows a grade only once every component is locked, and locking one
+ * more component later shows up without a republish.
+ */
+export function maskUnlockedMarks(
+  marks: MarksInput,
+  locked: Component[]
+): MarksInput {
+  return {
+    isa: locked.includes("isa") ? marks.isa : null,
+    mse1: locked.includes("mse1") ? marks.mse1 : null,
+    mse2: locked.includes("mse2") ? marks.mse2 : null,
+    ese: locked.includes("ese") ? marks.ese : null,
+  }
 }
