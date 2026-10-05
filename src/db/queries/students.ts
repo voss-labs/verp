@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm"
+import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm"
 import { db } from "@/db"
 import { classes, courseOfferings, courses, marks, students } from "@/db/schema"
 import { getAttendanceBySubject } from "./attendance"
@@ -28,9 +28,12 @@ export async function getStudentsByDepartments(departments: string[]) {
   })
 }
 
-export async function getStudentById(id: string) {
+export async function getStudentById(id: string, includeInactive = false) {
   return db.query.students.findFirst({
-    where: and(eq(students.id, id), eq(students.isActive, true)),
+    where: and(
+      eq(students.id, id),
+      includeInactive ? undefined : eq(students.isActive, true)
+    ),
   })
 }
 
@@ -70,22 +73,25 @@ export async function linkStudentToAuthUser(
   return row
 }
 
-export async function getAllStudents(filters?: {
-  department?: string
-  year?: string
-}) {
+export async function getAllStudents(
+  filters?: {
+    department?: string
+    year?: string
+  },
+  includeInactive = false
+) {
   return db.query.students.findMany({
     where: and(
-      eq(students.isActive, true),
+      includeInactive ? undefined : eq(students.isActive, true),
       filters?.department
         ? eq(students.department, filters.department)
         : undefined,
       filters?.year ? eq(students.year, filters.year) : undefined
     ),
-    orderBy: (students, { asc }) => [
-      asc(students.lastName),
-      asc(students.firstName),
-    ],
+    orderBy: (students, { asc }) =>
+      includeInactive
+        ? [desc(students.createdAt), asc(students.lastName)]
+        : [asc(students.lastName), asc(students.firstName)],
   })
 }
 
@@ -191,7 +197,24 @@ export async function updateStudent(
 }
 
 export async function deactivateStudent(id: string) {
-  return updateStudent(id, { isActive: false })
+  return setStudentActive(id, false)
+}
+
+export async function setStudentActive(id: string, isActive: boolean) {
+  const [result] = await db
+    .update(students)
+    .set({ isActive, updatedAt: new Date() })
+    .where(eq(students.id, id))
+    .returning()
+  return result
+}
+
+export async function deleteStudent(id: string) {
+  const [result] = await db
+    .delete(students)
+    .where(eq(students.id, id))
+    .returning()
+  return result
 }
 
 export async function deactivateStudentsByIds(ids: string[]) {

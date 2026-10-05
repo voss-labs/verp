@@ -33,6 +33,7 @@ import {
 } from "@/lib/sgpi"
 import { can } from "@/lib/rbac"
 import { cn } from "@/lib/utils"
+import { StudentLifecycleActions } from "../client"
 
 export const dynamic = "force-dynamic"
 
@@ -75,7 +76,7 @@ export default async function StudentDetailPage({
   if (!user) redirect("/login")
   if (!can(user, "student:read")) redirect("/dashboard")
 
-  const student = await getStudentById(id)
+  const student = await getStudentById(id, user.tier === "super_admin")
   if (!student) return notFound()
 
   // Scope: the record must be within the viewer's reach — their class (coordinator)
@@ -152,6 +153,15 @@ export default async function StudentDetailPage({
         trail={[{ label: "Students" }]}
         parent="All students"
         parentHref="/dashboard/students"
+        actions={
+          user.tier === "super_admin" ? (
+            <StudentLifecycleActions
+              id={student.id}
+              name={studentName}
+              isActive={student.isActive}
+            />
+          ) : undefined
+        }
       />
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <div className="grid items-start gap-4 lg:grid-cols-3">

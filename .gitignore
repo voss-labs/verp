@@ -57,3 +57,6 @@ next-env.d.ts
 !/scripts/seed-dev.ts
 !/scripts/check-migrations.ts
 !/scripts/lib/
+
+# local screenshots used for PR review
+/img/

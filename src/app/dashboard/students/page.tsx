@@ -4,6 +4,7 @@ import { UploadIcon } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { buttonVariants } from "@/components/ui/button-variants"
 import { StudentsClient } from "./client"
+import { StudentFormDialog } from "./client"
 import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
 import { currentYear } from "@/lib/roll-number"
@@ -16,6 +17,7 @@ import {
   latestImportByKind,
   type ImportBatchScope,
 } from "@/db/queries/import-batches"
+import { listDepartments } from "@/db/queries/departments"
 
 export const dynamic = "force-dynamic"
 
@@ -34,7 +36,7 @@ export default async function StudentsPage({
   // classes they run. The capability says "may read students"; scope says "which".
   const data =
     user.tier === "super_admin"
-      ? await getAllStudents()
+      ? await getAllStudents(undefined, true)
       : user.tier === "hod"
         ? await getStudentsByDepartments(user.deptCodes)
         : await getStudentsByClassKeys(user.classKeys)
@@ -48,6 +50,12 @@ export default async function StudentsPage({
   const lastRoster = can(user, "student:update")
     ? await latestImportByKind("roster", importScope)
     : null
+  const departments =
+    user.tier === "super_admin"
+      ? (await listDepartments())
+          .filter((d) => d.isActive)
+          .map((d) => ({ code: d.code, name: d.name }))
+      : []
 
   // Year is derived per render, not read from the column: the stored value is a
   // snapshot of import day and goes stale the moment the cohort advances.
@@ -65,19 +73,26 @@ export default async function StudentsPage({
         parentHref="/dashboard/students"
         description="Every student in your scope"
         actions={
-          <Link
-            href="/dashboard/students/import"
-            className={buttonVariants({ variant: "outline" })}
-          >
-            <UploadIcon className="mr-2 h-4 w-4" />
-            Import roster
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {user.tier === "super_admin" && (
+              <StudentFormDialog departments={departments} />
+            )}
+            <Link
+              href="/dashboard/students/import"
+              className={buttonVariants({ variant: "outline" })}
+            >
+              <UploadIcon className="mr-2 h-4 w-4" />
+              Import roster
+            </Link>
+          </div>
         }
       />
       <div className="@container/main flex flex-1 flex-col gap-4 p-4 lg:p-6">
         <StudentsClient
           data={rows}
           canDeactivate={can(user, "student:deactivate")}
+          canManage={user.tier === "super_admin"}
+          departments={departments}
           department={department}
           lastImport={
             lastRoster
