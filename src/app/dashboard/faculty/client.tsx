@@ -12,6 +12,8 @@ import {
 
 import { exportTableCsv, exportTableXlsx } from "@/lib/xlsx-export"
 import { downloadBase64File } from "@/lib/utils"
+import { EmptyState } from "@/components/empty-state"
+import { GraduationCapIcon } from "lucide-react"
 
 export function FacultyClient({ data }: { data: FacultyRow[] }) {
   const [open, setOpen] = useState<FacultyRow | null>(null)
@@ -78,6 +80,13 @@ export function FacultyClient({ data }: { data: FacultyRow[] }) {
           filename: "Faculty",
           onExport: handleExport,
         }}
+        emptyContent={
+          <EmptyState
+            icon={GraduationCapIcon}
+            title="No faculty found"
+            description="Faculty records will appear here once they are added to your scope."
+          />
+        }
         rowId={(f) => f.id}
         onRowClick={setOpen}
         mobileRow={(f) => ({

@@ -78,6 +78,7 @@ export default async function StudentsPage({
         <StudentsClient
           data={rows}
           canDeactivate={can(user, "student:deactivate")}
+          canImport={can(user, "student:update")}
           department={department}
           lastImport={
             lastRoster

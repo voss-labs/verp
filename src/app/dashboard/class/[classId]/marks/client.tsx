@@ -4,6 +4,8 @@ import Link from "next/link"
 
 import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
+import { EmptyState } from "@/components/empty-state"
+import { BookOpenIcon } from "lucide-react"
 import { MarksGrid } from "./marks-grid"
 import type { Grid, Offering } from "./types"
 
@@ -74,9 +76,20 @@ function SubjectSetup({
           </button>
         </div>
         {offerings.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No subjects yet. Add one to start entering marks.
-          </p>
+          <EmptyState
+            icon={BookOpenIcon}
+            variant="dashed"
+            title="No course offerings found"
+            description="Create offerings first to manage marks."
+            action={
+              <Link
+                href={`/dashboard/class/${classId}/subjects`}
+                className="text-blue text-sm underline underline-offset-2"
+              >
+                Manage offerings
+              </Link>
+            }
+          />
         ) : (
           <div className="border-border overflow-hidden rounded border">
             <ul className="divide-border divide-y">

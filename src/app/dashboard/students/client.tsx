@@ -13,18 +13,22 @@ import { downloadBase64File } from "@/lib/utils"
 import Link from "next/link"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Trash2Icon } from "lucide-react"
+import { UsersIcon } from "lucide-react"
 import { RecordDialog } from "@/components/record-dialog"
 import { RecordHistory } from "@/components/record-history"
+import { EmptyState } from "@/components/empty-state"
 import { bulkDeactivateStudentsAction } from "./actions"
 
 export function StudentsClient({
   data,
   canDeactivate,
+  canImport,
   department,
   lastImport,
 }: {
   data: StudentRow[]
   canDeactivate: boolean
+  canImport: boolean
   department?: string
   lastImport?: { when: string; by: string } | null
 }) {
@@ -110,6 +114,23 @@ export function StudentsClient({
           department ? [{ id: "department", value: department }] : undefined
         }
         exportConfig={{ filename: "Students", onExport: handleExport }}
+        emptyContent={
+          <EmptyState
+            icon={UsersIcon}
+            title="No students found"
+            description="Add students to get started."
+            action={
+              canImport ? (
+                <Link
+                  href="/dashboard/students/import"
+                  className={buttonVariants({ size: "sm" })}
+                >
+                  Import students
+                </Link>
+              ) : undefined
+            }
+          />
+        }
         rowId={(s) => s.id}
         onRowClick={setOpen}
         mobileRow={(s) => ({

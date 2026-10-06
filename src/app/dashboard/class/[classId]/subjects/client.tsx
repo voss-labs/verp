@@ -150,11 +150,11 @@ export function SubjectsClient({
           <EmptyState
             icon={BookOpenIcon}
             variant="dashed"
-            title="No subjects yet"
+            title="No offerings for this semester"
             description={
               canAllocate
-                ? "Add one from the catalogue on the right to start allocating teachers."
-                : "The class coordinator or HOD adds them."
+                ? "Add a course from the catalogue to start allocating teachers."
+                : "The class coordinator or HOD adds course offerings for this class."
             }
           />
         ) : (

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { FlaskConicalIcon } from "lucide-react"
+import { FlaskConicalIcon, SearchXIcon, UsersIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -390,15 +390,23 @@ export function AttendanceClient({
           </div>
 
           {students.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              {batch
-                ? "No students in this batch yet."
-                : "No students in this class yet."}
-            </p>
+            <EmptyState
+              icon={UsersIcon}
+              variant="dashed"
+              title={
+                batch
+                  ? "No students in this batch yet"
+                  : "No students in this class yet"
+              }
+              description="Add students to the class roster before taking attendance."
+            />
           ) : visible.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              No students match that filter.
-            </p>
+            <EmptyState
+              icon={SearchXIcon}
+              variant="dashed"
+              title="No students match that filter"
+              description="Choose a different attendance filter to see students."
+            />
           ) : (
             <div className="flex flex-col gap-2">
               <p className="pointer-hint text-muted-foreground text-xs">

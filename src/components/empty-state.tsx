@@ -29,7 +29,9 @@ export function EmptyState({
         className
       )}
     >
-      <Icon className="text-muted-foreground size-5" strokeWidth={1.5} />
+      <div className="bg-muted text-muted-foreground mb-1 flex size-10 items-center justify-center rounded-full">
+        <Icon className="size-5" strokeWidth={1.5} />
+      </div>
       <p className="text-sm font-medium">{title}</p>
       {description && (
         <p className="text-muted-foreground max-w-sm text-xs text-balance">
