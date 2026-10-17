@@ -9,6 +9,7 @@ import { getClassById } from "@/db/queries/classes"
 import { getStudentsByClassKeys } from "@/db/queries/students"
 import { listOfferingsForClass } from "@/db/queries/offerings"
 import { listBatchesForOffering } from "@/db/queries/batches"
+import { getOfferingRoster } from "@/db/queries/electives"
 import { BatchesClient } from "./client"
 
 export const dynamic = "force-dynamic"
@@ -53,7 +54,11 @@ export default async function BatchesPage({
     : offerings[0]
 
   const [students, batches] = await Promise.all([
-    getStudentsByClassKeys([cls.classKey]),
+    // A lab that is also an elective is split among the students taking it,
+    // so they are the ones offered for a batch.
+    selected
+      ? getOfferingRoster(selected, cls.classKey)
+      : getStudentsByClassKeys([cls.classKey]),
     selected ? listBatchesForOffering(selected.id) : Promise.resolve([]),
   ])
 

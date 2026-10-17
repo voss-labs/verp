@@ -6,7 +6,7 @@ import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
 import { expectedYear } from "@/lib/roll-number"
 import { getClassById } from "@/db/queries/classes"
-import { getStudentsByClassKeys } from "@/db/queries/students"
+import { getOfferingRoster } from "@/db/queries/electives"
 import { listOfferingsForClass, getOfferingById } from "@/db/queries/offerings"
 import { getMarksForOffering, getLockedComponents } from "@/db/queries/marks"
 import { MarksClient } from "./client"
@@ -56,7 +56,9 @@ export default async function MarksPage({
       : null
   if (selected) {
     const [students, existing, locked] = await Promise.all([
-      getStudentsByClassKeys([cls.classKey]),
+      // The class, or for an elective the students taking it: exactly who
+      // locking and publishing will wait for.
+      getOfferingRoster(selected, cls.classKey),
       getMarksForOffering(selected.id),
       getLockedComponents(selected.id),
     ])
@@ -112,6 +114,7 @@ export default async function MarksPage({
             code: o.course.courseCode,
             name: o.course.courseName,
             semester: o.semester,
+            isElective: o.isElective,
             facultyId: o.faculty?.id ?? null,
             facultyName: o.faculty
               ? `${o.faculty.firstName} ${o.faculty.lastName}`.trim()

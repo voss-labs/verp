@@ -208,6 +208,7 @@ async function main() {
     "marks",
     "batch_assignments",
     "batches",
+    "elective_enrollments",
     "course_offerings",
     "enrollment_requests",
     "staff_requests",
@@ -445,6 +446,23 @@ async function main() {
       }
     }
   }
+  // One elective, for the focus class below. A division splits across its
+  // electives, so this is a subject part of the class takes and the rest never
+  // see.
+  const cloud: CourseRow = {
+    id: uid(),
+    courseCode: "EC37T",
+    courseName: "Cloud Computing",
+    departmentCode: "EXCS",
+    courseType: "theory",
+    credits: 3,
+    maxIsa: 20,
+    maxMse: 30,
+    maxEse: 50,
+    maxTotal: 100,
+    year: "BE",
+  }
+  courses.push(cloud)
   await insertAll(schema.courses, courses)
   const courseFor = (dept: string, year: string, suffix: string) =>
     courses.find(
@@ -494,6 +512,17 @@ async function main() {
   oCn.facultyId = fCn
   oMl.facultyId = null // nobody teaches it: top of the attention inbox
   oLab.facultyId = fDav
+  // Taught by the CN teacher, so that persona's marks grid is where a roster
+  // narrower than the division shows up.
+  const oCloud: OffRow = {
+    id: uid(),
+    courseId: cloud.id,
+    classId: classA,
+    facultyId: fCn,
+    semester: oDav.semester,
+    isElective: true,
+  }
+  offerings.push(oCloud)
   await insertAll(schema.courseOfferings, offerings)
 
   // ── students ───────────────────────────────────────────────────────────
@@ -533,6 +562,14 @@ async function main() {
     }
   }
   await insertAll(schema.students, students)
+
+  // A third of the focus class chose the elective; the rest are on none of its
+  // registers or marksheets.
+  const taking = idsA.filter((_, i) => i % 3 === 0)
+  await insertAll(
+    schema.electiveEnrollments,
+    taking.map((studentId) => ({ courseOfferingId: oCloud.id, studentId }))
+  )
 
   // ── marks, in three deliberately different states ──────────────────────
   //
@@ -653,6 +690,7 @@ BE EXCS A is the class wired end to end:
   EC34T  ISA only — provisional, "In progress", 0 of 62 complete
   EC35T  no teacher — top of the attention inbox
   EC36P  untouched lab
+  EC37T  elective — ${taking.length} of ${idsA.length} take it, so its grid and register list only them
   today's register deliberately not taken
 
 Pick who you are from the switcher beside the VOSS mark in the sidebar.

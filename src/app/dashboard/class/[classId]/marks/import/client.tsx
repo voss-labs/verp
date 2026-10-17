@@ -43,10 +43,13 @@ export function ImportClient({
   classId,
   offerings,
   canAllocate,
+  electives,
 }: {
   classId: string
   offerings: Offering[]
   canAllocate: boolean
+  /** Each elective subject, with the students taking it. */
+  electives: Record<string, string[]>
 }) {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -56,6 +59,15 @@ export function ImportClient({
   const [mapping, setMapping] = useState<MarkTarget[]>([])
   const [offeringId, setOfferingId] = useState("")
   const [committing, start] = useTransition()
+
+  // An elective's marks belong to the students taking it, and the save refuses
+  // anybody else whole. Narrowing here says so row by row, before Save.
+  const takers: string[] | undefined = electives[offeringId]
+  const taking = takers ? new Set(takers) : null
+  const onRoster = (r: PreviewRow) =>
+    r.matched &&
+    r.studentId !== null &&
+    (taking === null || taking.has(r.studentId))
 
   async function runPreview() {
     if (!file) return
@@ -98,14 +110,16 @@ export function ImportClient({
       toast.error("Map at least one column to a mark field.")
       return
     }
-    const rows = preview.rows
-      .filter((r) => r.matched && r.studentId)
-      .map((r) => ({
-        studentId: r.studentId!,
-        ...applyMapping(r.marks, mapping),
-      }))
+    const rows = preview.rows.filter(onRoster).map((r) => ({
+      studentId: r.studentId!,
+      ...applyMapping(r.marks, mapping),
+    }))
     if (rows.length === 0) {
-      toast.error("No parsed students match this class roster.")
+      toast.error(
+        taking
+          ? "No parsed students are taking this elective."
+          : "No parsed students match this class roster."
+      )
       return
     }
     start(async () => {
@@ -125,7 +139,8 @@ export function ImportClient({
     })
   }
 
-  const unmatched = preview ? preview.totalRows - preview.matchedRows : 0
+  const matched = preview ? preview.rows.filter(onRoster).length : 0
+  const unmatched = preview ? preview.totalRows - matched : 0
   const written = [
     mapping.some((t) => t === "isa") && "ISA",
     mapping.some((t) => t === "mse_avg" || t === "mse1" || t === "mse2") &&
@@ -158,7 +173,8 @@ export function ImportClient({
         </Button>
         <p className="text-muted-foreground w-full text-xs leading-relaxed">
           Roll numbers are matched to this class. Rows from other divisions or
-          students not yet enrolled are ignored.
+          students not yet enrolled are ignored. For an elective, so are
+          students who are not taking it.
         </p>
       </div>
 
@@ -257,10 +273,10 @@ export function ImportClient({
 
             <div className="flex flex-wrap items-center gap-3">
               <Button size="sm" disabled={committing} onClick={commit}>
-                {committing ? "Saving…" : `Save ${preview.matchedRows} matched`}
+                {committing ? "Saving…" : `Save ${matched} matched`}
               </Button>
               <span className="text-muted-foreground text-xs">
-                {preview.matchedRows} matched · {unmatched} ignored
+                {matched} matched · {unmatched} ignored
                 {preview.truncated ? " · file truncated" : ""}
               </span>
             </div>
@@ -286,7 +302,7 @@ export function ImportClient({
                   <tr
                     key={`${r.rollNumber}-${idx}`}
                     className={
-                      r.matched
+                      onRoster(r)
                         ? "[&>td]:px-3 [&>td]:py-1.5"
                         : "text-muted-foreground [&>td]:px-3 [&>td]:py-1.5"
                     }
@@ -299,10 +315,14 @@ export function ImportClient({
                       </td>
                     ))}
                     <td>
-                      {r.matched ? (
-                        <Badge variant="outline">In class</Badge>
+                      {onRoster(r) ? (
+                        <Badge variant="outline">
+                          {taking ? "Taking it" : "In class"}
+                        </Badge>
                       ) : (
-                        <Badge variant="secondary">Not in class</Badge>
+                        <Badge variant="secondary">
+                          {r.matched ? "Not taking it" : "Not in class"}
+                        </Badge>
                       )}
                     </td>
                   </tr>

@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm"
 import { db } from "@/db"
 import { batches, batchAssignments, students } from "@/db/schema"
+import { batchPlacesToRestore } from "@/lib/electives"
 
 /** Batches for one offering, each with the students sitting in it. */
 export async function listBatchesForOffering(courseOfferingId: string) {
@@ -125,4 +126,88 @@ export async function removeStudentFromBatch(input: {
         eq(batchAssignments.studentId, input.studentId)
       )
     )
+}
+
+/** The students holding a place in any of one offering's batches. */
+export async function getBatchedStudentIds(
+  courseOfferingId: string
+): Promise<Set<string>> {
+  const rows = await db
+    .select({ studentId: batchAssignments.studentId })
+    .from(batchAssignments)
+    .innerJoin(batches, eq(batchAssignments.batchId, batches.id))
+    .where(
+      and(
+        eq(batches.courseOfferingId, courseOfferingId),
+        eq(batchAssignments.isActive, true)
+      )
+    )
+  return new Set(rows.map((r) => r.studentId))
+}
+
+/**
+ * Take students out of an offering's batches, as when they stop taking it. The
+ * place is switched off rather than deleted, so restoreBatchPlaces can give it
+ * back if they take the subject again.
+ */
+export async function retireBatchPlaces(
+  courseOfferingId: string,
+  studentIds: string[]
+) {
+  if (studentIds.length === 0) return 0
+  const siblings = await db
+    .select({ id: batches.id })
+    .from(batches)
+    .where(eq(batches.courseOfferingId, courseOfferingId))
+  if (siblings.length === 0) return 0
+  const rows = await db
+    .update(batchAssignments)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(
+      and(
+        inArray(
+          batchAssignments.batchId,
+          siblings.map((b) => b.id)
+        ),
+        inArray(batchAssignments.studentId, studentIds),
+        eq(batchAssignments.isActive, true)
+      )
+    )
+    .returning({ id: batchAssignments.id })
+  return rows.length
+}
+
+/**
+ * Give students who take an offering again the batch place they last held in
+ * it. batchPlacesToRestore decides which, and leaves anybody already in one of
+ * its batches where they are.
+ */
+export async function restoreBatchPlaces(
+  courseOfferingId: string,
+  studentIds: string[]
+) {
+  if (studentIds.length === 0) return 0
+  const places = await db
+    .select({
+      id: batchAssignments.id,
+      studentId: batchAssignments.studentId,
+      isActive: batchAssignments.isActive,
+      batchActive: batches.isActive,
+      updatedAt: batchAssignments.updatedAt,
+    })
+    .from(batchAssignments)
+    .innerJoin(batches, eq(batchAssignments.batchId, batches.id))
+    .where(
+      and(
+        eq(batches.courseOfferingId, courseOfferingId),
+        inArray(batchAssignments.studentId, studentIds)
+      )
+    )
+  const ids = batchPlacesToRestore(places)
+  if (ids.length === 0) return 0
+  await db
+    .update(batchAssignments)
+    .set({ isActive: true, updatedAt: new Date() })
+    .where(inArray(batchAssignments.id, ids))
+  return ids.length
 }

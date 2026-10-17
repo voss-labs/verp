@@ -25,6 +25,12 @@ export type HodClassRow = {
   subjects: number
   unallocated: number
   entered: number
+  /**
+   * The most `entered` can reach: every subject's own roster, summed. Not
+   * roster × subjects, which holds an elective to the whole division and keeps
+   * a finished class below 100% for good.
+   */
+  capacity: number
   pendingRequests: number
 }
 
@@ -81,7 +87,7 @@ export function HodClassesTable({
       </TableHeader>
       <TableBody>
         {rows.map((row) => {
-          const scale = row.roster * row.subjects
+          const scale = row.capacity
           const marks =
             scale > 0 ? Math.round((row.entered / scale) * 100) : null
           return (

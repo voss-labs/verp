@@ -119,9 +119,12 @@ export function buildAttention(input: {
       })
     }
 
+    // Measured against each subject's own roster rather than the class: an
+    // elective is taught to the students who chose it, and held to the whole
+    // division it would read as unmarked for good.
     for (const s of c.mySubjects) {
-      if (c.students === 0 || s.entered >= c.students) continue
-      const missing = c.students - s.entered
+      if (s.roster === 0 || s.entered >= s.roster) continue
+      const missing = s.roster - s.entered
       items.push({
         id: `marks:${s.id}`,
         kind: "marks",

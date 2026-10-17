@@ -16,7 +16,9 @@ import {
   getAttendanceForSession,
   hasUntaggedAttendance,
 } from "@/db/queries/attendance"
+import { getElectiveMemberIds } from "@/db/queries/electives"
 import { canWriteOffering } from "@/lib/allocation"
+import { offeringRoster } from "@/lib/electives"
 import { WHOLE_CLASS } from "@/lib/attendance"
 import { AttendanceClient } from "./client"
 
@@ -96,12 +98,31 @@ export default async function AttendancePage({
   const selected = offeringId
     ? offerings.find((o) => o.id === offeringId)
     : undefined
+  // An elective's register is the students taking it, not the division: the
+  // rest of the class is in another lecture, and marking them absent would
+  // count against a subject they never chose. Its lab batches hold only them,
+  // but a batch register is narrowed too, by the class as well as the
+  // enrolments, as the save is, so a batch member who has since left the class
+  // is not offered either.
+  const takers = selected?.isElective
+    ? new Set(
+        offeringRoster(
+          selected,
+          classRoster,
+          await getElectiveMemberIds(selected.id)
+        ).map((s) => s.id)
+      )
+    : null
+  const onSubject = <T extends { id: string }>(rows: T[]) =>
+    takers ? rows.filter((s) => takers.has(s.id)) : rows
   const practical = !!selected && selected.course.courseType !== "theory"
   const batches = practical
     ? offeringBatches.map((b) => ({
         id: b.id,
         name: b.name,
-        count: b.assignments.filter((a) => a.student.isActive).length,
+        count: b.assignments.filter(
+          (a) => a.student.isActive && (!takers || takers.has(a.student.id))
+        ).length,
       }))
     : []
   const batchId = batches.some((b) => b.id === sp.batch) ? sp.batch! : null
@@ -120,8 +141,8 @@ export default async function AttendancePage({
       : null
 
   const rosterQuery: Promise<RosterRow[]> = batchId
-    ? getStudentsInBatch(batchId)
-    : Promise.resolve(needsBatch ? [] : classRoster)
+    ? getStudentsInBatch(batchId).then((rows) => onSubject(rows))
+    : Promise.resolve(needsBatch ? [] : onSubject(classRoster))
   const marksQuery: Promise<MarkRow[]> = needsBatch
     ? Promise.resolve([])
     : getAttendanceForSession(classId, date, slot, offeringId, batchId)

@@ -50,7 +50,7 @@ the only thing being faked.
 | Sunita Rane    | HOD         | EXTC — nothing in EXCS is visible        |
 | Priya Nair     | Coordinator | BE EXCS A — publishes, decides enrolment |
 | Mandar Patil   | Teacher     | BE EXCS A — Data Analytics only          |
-| Kavita Joshi   | Teacher     | BE EXCS A — Computer Networks only       |
+| Kavita Joshi   | Teacher     | BE EXCS A — Computer Networks + elective |
 | Imran Shaikh   | Teacher     | BE EXCS B — a different division         |
 | Neha Bhosale   | Student     | 23108A0001, has published results        |
 | Omkar Sawant   | Student     | 23108A0002, nothing published yet        |
@@ -96,6 +96,7 @@ against a thousand.
 - `EC34T` ISA only — provisional, "In progress", 0 of 62 complete
 - `EC35T` no teacher — top of the attention inbox
 - `EC36P` an untouched lab
+- `EC37T` an elective, taught by the CN teacher to the 21 students who chose it
 - today's register deliberately not taken, so there is work waiting
 - one pending enrolment request for the coordinator to decide
 - one student below the 75% attendance rule, so the warning has something to say

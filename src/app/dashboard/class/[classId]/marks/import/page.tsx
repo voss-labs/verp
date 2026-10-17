@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/session"
 import { can } from "@/lib/rbac"
 import { expectedYear } from "@/lib/roll-number"
 import { getClassById } from "@/db/queries/classes"
+import { electiveMembersByOffering } from "@/db/queries/electives"
 import { listOfferingsForClass } from "@/db/queries/offerings"
 import { ImportClient } from "./client"
 
@@ -37,6 +38,11 @@ export default async function MarksImportPage({
   const offerings = canAllocate
     ? await listOfferingsForClass(classId)
     : await listOfferingsForClass(classId, user.facultyId ?? undefined)
+  // An elective's marksheet belongs to the students taking it, and the save
+  // refuses anybody else. Handing the list over lets the preview say so row by
+  // row, before Save rather than after it.
+  const electiveIds = offerings.filter((o) => o.isElective).map((o) => o.id)
+  const members = await electiveMembersByOffering(electiveIds)
   const yr = expectedYear(cls.admissionYear, new Date()) ?? cls.admissionYear
   const label = `${yr} · ${cls.departmentCode} · ${cls.division}`
 
@@ -56,6 +62,9 @@ export default async function MarksImportPage({
             code: o.course.courseCode,
             name: o.course.courseName,
           }))}
+          electives={Object.fromEntries(
+            electiveIds.map((id) => [id, [...(members.get(id) ?? [])]])
+          )}
         />
       </div>
     </>

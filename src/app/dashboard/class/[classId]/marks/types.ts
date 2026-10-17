@@ -6,6 +6,8 @@ export type Offering = {
   code: string
   name: string
   semester: number
+  /** Taught to the students put on it rather than the whole class. */
+  isElective: boolean
   facultyId: string | null
   facultyName: string | null
 }

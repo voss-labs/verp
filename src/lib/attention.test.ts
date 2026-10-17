@@ -53,7 +53,9 @@ describe("buildAttention", () => {
       cls({
         markedToday: 60,
         unallocatedSubjects: 1,
-        mySubjects: [{ id: "o1", code: "EC33T", name: "DAV", entered: 0 }],
+        mySubjects: [
+          { id: "o1", code: "EC33T", name: "DAV", roster: 60, entered: 0 },
+        ],
       }),
     ])
     expect(items.map((i) => i.urgency)).toEqual(["blocking", "open"])
@@ -79,7 +81,9 @@ describe("buildAttention", () => {
       build([
         cls({
           students: 0,
-          mySubjects: [{ id: "o1", code: "EC33T", name: "DAV", entered: 0 }],
+          mySubjects: [
+            { id: "o1", code: "EC33T", name: "DAV", roster: 0, entered: 0 },
+          ],
         }),
       ])
     ).toEqual([])
@@ -104,7 +108,9 @@ describe("buildAttention", () => {
     const items = build([
       cls({
         markedToday: 60,
-        mySubjects: [{ id: "o1", code: "EC33T", name: "DAV", entered: 45 }],
+        mySubjects: [
+          { id: "o1", code: "EC33T", name: "DAV", roster: 60, entered: 45 },
+        ],
       }),
     ])
     expect(items[0].count).toBe(15)
@@ -116,10 +122,31 @@ describe("buildAttention", () => {
       build([
         cls({
           markedToday: 60,
-          mySubjects: [{ id: "o1", code: "EC33T", name: "DAV", entered: 60 }],
+          mySubjects: [
+            { id: "o1", code: "EC33T", name: "DAV", roster: 60, entered: 60 },
+          ],
         }),
       ])
     ).toEqual([])
+  })
+
+  // An elective is taught to the students who chose it. Held to the whole
+  // division it would report the rest of the class as unmarked for good.
+  it("measures an elective against the students taking it", () => {
+    const elective = { id: "o2", code: "EC37T", name: "Cloud", roster: 21 }
+    const done = cls({
+      markedToday: 60,
+      mySubjects: [{ ...elective, entered: 21 }],
+    })
+    expect(build([done])).toEqual([])
+
+    const part = cls({
+      markedToday: 60,
+      mySubjects: [{ ...elective, entered: 15 }],
+    })
+    const items = build([part])
+    expect(items[0].count).toBe(6)
+    expect(items[0].title).toContain("6 students unmarked")
   })
 
   it("agrees in number, both noun and verb", () => {
@@ -138,7 +165,9 @@ describe("buildAttention", () => {
         cls({
           pendingRequests: 2,
           unallocatedSubjects: 1,
-          mySubjects: [{ id: "o1", code: "EC33T", name: "DAV", entered: 0 }],
+          mySubjects: [
+            { id: "o1", code: "EC33T", name: "DAV", roster: 60, entered: 0 },
+          ],
         }),
       ],
       [dept({ classesWithoutCoordinator: 1, unclaimedStudents: 4 })]

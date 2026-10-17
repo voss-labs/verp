@@ -69,7 +69,7 @@ export const DEV_PERSONAS: DevPersona[] = [
     email: "dev.teacher.cn@vit.edu.in",
     name: "Kavita Joshi",
     role: "Teacher",
-    scope: "BE EXCS A — Computer Networks only",
+    scope: "BE EXCS A — Computer Networks + elective",
   },
   {
     key: "teacher-b",
