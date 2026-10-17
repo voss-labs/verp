@@ -12,9 +12,16 @@ import { exportTableCsv, exportTableXlsx } from "@/lib/xlsx-export"
 import { downloadBase64File } from "@/lib/utils"
 import Link from "next/link"
 import { Button, buttonVariants } from "@/components/ui/button"
-import { Loader2Icon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import {
+  Loader2Icon,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+  UsersIcon,
+} from "lucide-react"
 import { RecordDialog } from "@/components/record-dialog"
 import { RecordHistory } from "@/components/record-history"
+import { EmptyState } from "@/components/empty-state"
 import { bulkDeactivateStudentsAction } from "./actions"
 import { ConfirmAction } from "@/components/confirm-action"
 import { Input } from "@/components/ui/input"
@@ -43,6 +50,7 @@ export function StudentsClient({
   data,
   canDeactivate,
   canManage,
+  canImport,
   department,
   lastImport,
   departments,
@@ -50,6 +58,7 @@ export function StudentsClient({
   data: StudentRow[]
   canDeactivate: boolean
   canManage: boolean
+  canImport: boolean
   departments: Department[]
   department?: string
   lastImport?: { when: string; by: string } | null
@@ -194,6 +203,23 @@ export function StudentsClient({
           department ? [{ id: "department", value: department }] : undefined
         }
         exportConfig={{ filename: "Students", onExport: handleExport }}
+        emptyContent={
+          <EmptyState
+            icon={UsersIcon}
+            title="No students found"
+            description="Add students to get started."
+            action={
+              canImport ? (
+                <Link
+                  href="/dashboard/students/import"
+                  className={buttonVariants({ size: "sm" })}
+                >
+                  Import students
+                </Link>
+              ) : undefined
+            }
+          />
+        }
         rowId={(s) => s.id}
         onRowClick={setOpen}
         mobileRow={(s) => ({

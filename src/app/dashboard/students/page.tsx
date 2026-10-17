@@ -93,6 +93,7 @@ export default async function StudentsPage({
           canDeactivate={can(user, "student:deactivate")}
           canManage={user.tier === "super_admin"}
           departments={departments}
+          canImport={can(user, "student:update")}
           department={department}
           lastImport={
             lastRoster

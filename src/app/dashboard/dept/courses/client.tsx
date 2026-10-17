@@ -202,8 +202,8 @@ export function CoursesClient({
         <EmptyState
           icon={BookOpenIcon}
           variant="dashed"
-          title="No courses yet"
-          description="Import a syllabus, or add a course — one is also created the first time a subject is added to a class."
+          title="No courses found"
+          description="Import a syllabus or add a course to get started."
         />
       ) : (
         <div className="border-border overflow-x-auto rounded border">

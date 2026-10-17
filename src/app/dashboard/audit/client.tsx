@@ -220,8 +220,8 @@ export function AuditLogClient({
                   {logs.length === 0 ? (
                     <EmptyState
                       icon={ScrollTextIcon}
-                      title="No audit entries yet"
-                      description="Administrative actions appear here as they happen."
+                      title="No activity logged yet"
+                      description="Administrative actions will appear here as they happen."
                     />
                   ) : (
                     <EmptyState
