@@ -39,7 +39,9 @@ export function ClaimFlow({
   const [role, setRole] = useState<Role | null>(initialRole)
 
   if (!staffEnabled)
-    return <RegisterForm email={email} name={name} rejection={studentRejection} />
+    return (
+      <RegisterForm email={email} name={name} rejection={studentRejection} />
+    )
 
   if (!role) return <RoleChoice email={email} onChoose={setRole} />
 

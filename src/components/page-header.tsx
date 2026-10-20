@@ -12,6 +12,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Badge } from "@/components/ui/badge"
+import { NotificationBell } from "@/components/notification-bell"
 import {
   useContextualRole,
   useSessionUser,
@@ -105,6 +106,7 @@ export function PageHeader({
               {role}
             </Badge>
           )}
+          <NotificationBell className={session.tier ? "" : "ml-auto"} />
         </div>
       </header>
       {(description || actions) && (

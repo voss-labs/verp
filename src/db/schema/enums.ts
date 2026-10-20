@@ -49,3 +49,9 @@ export const courseTypeEnum = pgEnum("course_type", [
   "practical",
   "project",
 ])
+
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "info",
+  "warning",
+  "action",
+])

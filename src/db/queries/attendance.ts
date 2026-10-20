@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm"
+import { and, eq, inArray, isNull, sql } from "drizzle-orm"
 import { db } from "@/db"
 import {
   attendance,
@@ -127,6 +127,35 @@ export async function getAttendanceSummaryForStudent(studentId: string) {
     .from(attendance)
     .where(eq(attendance.studentId, studentId))
   return { present: row?.present ?? 0, total: row?.total ?? 0 }
+}
+
+export async function getAttendancePercentages(
+  studentIds: string[],
+  offeringId: string | null
+) {
+  if (!studentIds.length) return new Map<string, number>()
+  const rows = await db
+    .select({
+      studentId: attendance.studentId,
+      present: sql<number>`count(*) filter (where status in ('present', 'late'))::int`,
+      total: sql<number>`count(*)::int`,
+    })
+    .from(attendance)
+    .where(
+      and(
+        inArray(attendance.studentId, studentIds),
+        offeringId
+          ? eq(attendance.courseOfferingId, offeringId)
+          : isNull(attendance.courseOfferingId)
+      )
+    )
+    .groupBy(attendance.studentId)
+  return new Map(
+    rows.map((row) => [
+      row.studentId,
+      Math.round((row.present / row.total) * 100),
+    ])
+  )
 }
 
 /**

@@ -13,11 +13,16 @@ import { batches, batchAssignments } from "./batches"
 import { marks } from "./marks"
 import { attendance } from "./attendance"
 import { auditLogs } from "./audit"
+import { notifications } from "./notifications"
 
 // ── Auth ──────────────────────────────────────────────────────────────
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
+  notifications: many(notifications),
+}))
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(user, { fields: [notifications.userId], references: [user.id] }),
 }))
 export const sessionRelations = relations(session, ({ one }) => ({
   user: one(user, { fields: [session.userId], references: [user.id] }),
