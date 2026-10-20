@@ -16,7 +16,12 @@ import {
   updateCourse,
   setCourseActive,
 } from "@/db/queries/courses"
-import { graduateClassKey, ungraduateClassKey } from "@/db/queries/students"
+import {
+  graduateClassKey,
+  ungraduateClassKey,
+  getStudentsByClassKeys,
+} from "@/db/queries/students"
+import { notifyUsers } from "@/db/queries/notifications"
 import {
   createOffering,
   listOfferingsForClass,
@@ -735,6 +740,15 @@ export async function assignSubjectToTeacherAction(input: {
         facultyId: input.facultyId,
         semester: input.semester,
       })
+      const roster = await getStudentsByClassKeys([cls.classKey])
+      await notifyUsers(
+        roster.map((student) => student.authUserId),
+        {
+          title: "New course offering",
+          message: `You are enrolled in ${course.courseCode} — ${course.courseName}.`,
+          type: "action",
+        }
+      )
     }
 
     await createAuditLog({

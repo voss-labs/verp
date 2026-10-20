@@ -1,6 +1,7 @@
 import { and, eq, ne, inArray } from "drizzle-orm"
 import { db } from "@/db"
-import { facultyClassAssignments, faculty } from "@/db/schema"
+import { facultyClassAssignments, faculty, classes } from "@/db/schema"
+import { notifyUsers } from "./notifications"
 
 type ClassRole = "academic_coordinator" | "tr"
 
@@ -11,6 +12,17 @@ export async function assignClassRole(
   role: ClassRole,
   assignedBy: string | null
 ) {
+  const [previous] = await db
+    .select({ isActive: facultyClassAssignments.isActive })
+    .from(facultyClassAssignments)
+    .where(
+      and(
+        eq(facultyClassAssignments.classId, classId),
+        eq(facultyClassAssignments.facultyId, facultyId),
+        eq(facultyClassAssignments.role, role)
+      )
+    )
+    .limit(1)
   if (role === "academic_coordinator") {
     const now = new Date()
     await db
@@ -45,20 +57,37 @@ export async function assignClassRole(
           eq(facultyClassAssignments.role, role)
         )
       )
-    return
+  } else {
+    await db
+      .insert(facultyClassAssignments)
+      .values({ classId, facultyId, role, assignedBy })
+      .onConflictDoUpdate({
+        target: [
+          facultyClassAssignments.classId,
+          facultyClassAssignments.facultyId,
+          facultyClassAssignments.role,
+        ],
+        set: { isActive: true, assignedBy, updatedAt: new Date() },
+      })
   }
 
-  await db
-    .insert(facultyClassAssignments)
-    .values({ classId, facultyId, role, assignedBy })
-    .onConflictDoUpdate({
-      target: [
-        facultyClassAssignments.classId,
-        facultyClassAssignments.facultyId,
-        facultyClassAssignments.role,
-      ],
-      set: { isActive: true, assignedBy, updatedAt: new Date() },
+  if (!previous?.isActive) {
+    const [target] = await db
+      .select({ authUserId: faculty.authUserId })
+      .from(faculty)
+      .where(eq(faculty.id, facultyId))
+      .limit(1)
+    const [cls] = await db
+      .select({ classKey: classes.classKey })
+      .from(classes)
+      .where(eq(classes.id, classId))
+      .limit(1)
+    await notifyUsers([target?.authUserId], {
+      title: "Role assigned",
+      message: `You were assigned as ${role === "tr" ? "a teacher" : "the class coordinator"}${cls ? ` for ${cls.classKey}` : ""}.`,
+      type: "action",
     })
+  }
 }
 
 /** Take a faculty member off a class. Soft, so the history survives. */

@@ -7,6 +7,7 @@ import { authorize, can, ROLE_DEFAULTS } from "@/lib/rbac"
 import { isCapability, isFacultyRole, isManageableTier } from "@/lib/validate"
 import { getErrorMessage, isUniqueViolation } from "@/lib/error-utils"
 import { createAuditLog } from "@/db/queries"
+import { notifyUsers } from "@/db/queries/notifications"
 import { setRoleOverride } from "@/db/queries/permissions"
 import {
   createDepartment,
@@ -164,6 +165,13 @@ export async function setFacultyRoleAction(input: {
 
     const row = await updateFaculty(input.facultyId, { role: input.role })
     if (!row) return { error: "No such faculty." }
+    if (target.role !== input.role) {
+      await notifyUsers([target.authUserId], {
+        title: "Role updated",
+        message: `Your faculty role is now ${input.role}.`,
+        type: "action",
+      })
+    }
     await createAuditLog({
       action: "faculty.role_changed",
       actorId: user!.id,
@@ -350,6 +358,11 @@ export async function appointHodAction(input: {
       return { error: `${target.firstName} already heads ${dept.code}.` }
 
     await appointHod(dept.code, target.id, user!.facultyId)
+    await notifyUsers([target.authUserId], {
+      title: "Department role assigned",
+      message: `You have been appointed HOD of ${dept.code}.`,
+      type: "action",
+    })
     await createAuditLog({
       action: "dept.hod_appointed",
       actorId: user!.id,
@@ -386,6 +399,11 @@ export async function appointCoordinatorAction(input: {
       return { error: "That faculty member is in another department." }
 
     await appointCoordinator(input.deptCode, input.facultyId, user!.facultyId)
+    await notifyUsers([target.authUserId], {
+      title: "Department role assigned",
+      message: `You have been appointed department coordinator for ${input.deptCode}.`,
+      type: "action",
+    })
     await createAuditLog({
       action: "dept.coordinator_appointed",
       actorId: user!.id,

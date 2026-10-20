@@ -31,6 +31,7 @@ import { canAllocate, canReopenLock, canWriteOffering } from "@/lib/allocation"
 import { getErrorMessage } from "@/lib/error-utils"
 import { parseRollNumber, expectedYear } from "@/lib/roll-number"
 import { createAuditLog } from "@/db/queries"
+import { notifyUsers } from "@/db/queries/notifications"
 import { createImportBatch } from "@/db/queries/import-batches"
 import { getClassById } from "@/db/queries/classes"
 import { listClassStaff } from "@/db/queries/class-staff"
@@ -42,6 +43,7 @@ import {
 import { getRequestById, updateRequest } from "@/db/queries/onboarding"
 import {
   getAttendanceForSession,
+  getAttendancePercentages,
   upsertAttendance,
 } from "@/db/queries/attendance"
 import { getCourseByCode, createCourse } from "@/db/queries/courses"
@@ -150,6 +152,11 @@ export async function approveEnrollmentAction(input: {
       reviewedByFacultyId: user!.facultyId,
       reviewedAt: now,
     })
+    await notifyUsers([req.authUserId], {
+      title: "Enrollment approved",
+      message: `Your enrollment in ${cls.classKey} has been approved.`,
+      type: "action",
+    })
     await createAuditLog({
       action: "enrollment.approved",
       actorId: user!.id,
@@ -229,9 +236,8 @@ export async function saveAttendanceAction(input: {
     // refused rather than the offending rows dropped: a partial write looks
     // successful, so a forged id would leave no trace and a genuine bug would
     // look like attendance that quietly went missing.
-    const roster = new Set(
-      (await getStudentsByClassKeys([cls.classKey])).map((s) => s.id)
-    )
+    const classRoster = await getStudentsByClassKeys([cls.classKey])
+    const roster = new Set(classRoster.map((s) => s.id))
     const attScope = studentsInClass(
       roster,
       input.marks.map((m) => m.studentId)
@@ -242,10 +248,12 @@ export async function saveAttendanceAction(input: {
     // otherwise the class scope check above is worked around by pointing at
     // another class's offering.
     const offeringId = input.offeringId ?? null
+    let attendanceCourseCode: string | null = offeringId ? null : cls.classKey
     if (offeringId) {
       const offering = await getOfferingById(offeringId)
       if (!offering || offering.classId !== input.classId)
         return { error: "That subject is not taught in this class." }
+      attendanceCourseCode = offering.course.courseCode
       // Belonging to the class is not enough. A subject register is that
       // teacher's record of their own lecture; a colleague filling it in is the
       // same mistake as entering their marks, and the same rule settles it.
@@ -331,7 +339,33 @@ export async function saveAttendanceAction(input: {
       status: m.status,
       recordedByFacultyId: user!.facultyId,
     }))
+    const studentIds = [...new Set(entries.map((entry) => entry.studentId))]
+    const before = await getAttendancePercentages(studentIds, offeringId)
     await upsertAttendance(entries)
+    const after = await getAttendancePercentages(studentIds, offeringId)
+    const newlyBelow = new Set(
+      studentIds.filter((id) => {
+        const previous = before.get(id)
+        const current = after.get(id)
+        return (
+          current != null &&
+          current < 75 &&
+          (previous == null || previous >= 75)
+        )
+      })
+    )
+    if (attendanceCourseCode) {
+      await notifyUsers(
+        classRoster
+          .filter((student) => newlyBelow.has(student.id))
+          .map((student) => student.authUserId),
+        {
+          title: "Attendance below 75%",
+          message: `Your attendance in ${attendanceCourseCode} is below 75%.`,
+          type: "warning",
+        }
+      )
+    }
 
     await createAuditLog({
       action: "attendance.recorded",
@@ -409,6 +443,15 @@ export async function createSubjectAction(input: {
       facultyId: input.facultyId ?? null,
       semester: input.semester,
     })
+    const roster = await getStudentsByClassKeys([cls.classKey])
+    await notifyUsers(
+      roster.map((student) => student.authUserId),
+      {
+        title: "New course offering",
+        message: `You are enrolled in ${course.courseCode} — ${course.courseName}.`,
+        type: "action",
+      }
+    )
     await createAuditLog({
       action: "offering.created",
       actorId: user!.id,
@@ -681,12 +724,28 @@ export async function setMarksLockAction(input: {
       }
     }
 
+    const wasLocked =
+      input.locked &&
+      (await getLockedComponents(input.offeringId)).some(
+        (lock) => lock.component === component
+      )
     await setMarksLock({
       courseOfferingId: input.offeringId,
       component,
       locked: input.locked,
       facultyId: user!.facultyId,
     })
+    if (input.locked && !wasLocked && offering.publishedAt) {
+      const roster = await getOfferingRoster(offering, cls.classKey)
+      await notifyUsers(
+        roster.map((student) => student.authUserId),
+        {
+          title: "Marks updated",
+          message: `${component.toUpperCase()} marks for ${offering.course.courseCode} — ${offering.course.courseName} are now available.`,
+          type: "info",
+        }
+      )
+    }
     await createAuditLog({
       action: input.locked ? "marks.locked" : "marks.unlocked",
       actorId: user!.id,
@@ -962,6 +1021,17 @@ export async function setPublishedAction(input: {
       user!.facultyId,
       input.published
     )
+    if (input.published && !offering.publishedAt) {
+      const roster = await getOfferingRoster(offering, cls.classKey)
+      await notifyUsers(
+        roster.map((student) => student.authUserId),
+        {
+          title: "Results published",
+          message: `Results for ${offering.course.courseCode} — ${offering.course.courseName} are now available.`,
+          type: "info",
+        }
+      )
+    }
     await createAuditLog({
       action: input.published ? "marks.published" : "marks.withdrawn",
       actorId: user!.id,
@@ -1037,11 +1107,13 @@ export async function setElectiveAction(input: {
 
     const courseCode = offering.course.courseCode
     let details: Record<string, unknown>
+    let newlyEnrolled: string[] = []
     if (input.elective) {
       const existing = await getMarksForOffering(input.offeringId)
       const marked = studentsWithMarks(
         new Map(existing.map((m) => [m.studentId, m]))
       )
+      newlyEnrolled = marked
       await enrollInElective({
         courseOfferingId: input.offeringId,
         studentIds: marked,
@@ -1064,6 +1136,20 @@ export async function setElectiveAction(input: {
       details = { courseCode, released, rebatched }
     }
     await setOfferingElective(input.offeringId, input.elective)
+    if (newlyEnrolled.length) {
+      const roster = await getStudentsByClassKeys([cls.classKey])
+      const enrolled = new Set(newlyEnrolled)
+      await notifyUsers(
+        roster
+          .filter((student) => enrolled.has(student.id))
+          .map((student) => student.authUserId),
+        {
+          title: "Elective enrollment",
+          message: `You are enrolled in ${courseCode} — ${offering.course.courseName}.`,
+          type: "action",
+        }
+      )
+    }
     await createAuditLog({
       action: input.elective ? "elective.enabled" : "elective.disabled",
       actorId: user!.id,
@@ -1110,15 +1196,26 @@ export async function enrollElectiveAction(input: {
 
     // The same id twice is still one student.
     const studentIds = [...new Set(input.studentIds)]
-    const roster = new Set(
-      (await getStudentsByClassKeys([cls.classKey])).map((s) => s.id)
-    )
+    const classRoster = await getStudentsByClassKeys([cls.classKey])
+    const roster = new Set(classRoster.map((student) => student.id))
     const scope = studentsInClass(roster, studentIds)
     if (!scope.ok) return { error: scope.reason }
 
+    const existing = await getElectiveMemberIds(input.offeringId)
     await enrollInElective({ courseOfferingId: input.offeringId, studentIds })
+    const newlyEnrolled = new Set(studentIds.filter((id) => !existing.has(id)))
     // Back into the lab batch they were in before they came off it.
     const rebatched = await restoreBatchPlaces(input.offeringId, studentIds)
+    await notifyUsers(
+      classRoster
+        .filter((student) => newlyEnrolled.has(student.id))
+        .map((student) => student.authUserId),
+      {
+        title: "Elective enrollment",
+        message: `You are enrolled in ${offering.course.courseCode} — ${offering.course.courseName}.`,
+        type: "action",
+      }
+    )
     await createAuditLog({
       action: "elective.enrolled",
       actorId: user!.id,
