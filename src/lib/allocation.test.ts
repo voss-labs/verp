@@ -5,6 +5,7 @@ import {
   canWriteOffering,
   classTeacherOptions,
   countClassTeachers,
+  filterCoursesForDepartment,
   inDeptScope,
   type AllocationActor,
 } from "./allocation"
@@ -324,5 +325,72 @@ describe("countClassTeachers", () => {
 
   it("is None only when nobody teaches and nobody is appointed", () => {
     expect(countClassTeachers([], [null, undefined])).toBe(0)
+  })
+})
+
+describe("filterCoursesForDepartment", () => {
+  const catalogue = [
+    {
+      id: "c1",
+      code: "CP31T",
+      name: "Data Structures",
+      departmentCode: "CMPN",
+    },
+    {
+      id: "c2",
+      code: "CP32T",
+      name: "Database Systems",
+      departmentCode: "CMPN",
+    },
+    {
+      id: "c3",
+      code: "EC31T",
+      name: "Signals and Systems",
+      departmentCode: "EXCS",
+    },
+    {
+      id: "c4",
+      code: "ET31T",
+      name: "Analog Circuits",
+      departmentCode: "EXTC",
+    },
+    {
+      id: "c5",
+      code: "HS101",
+      name: "Professional Ethics",
+      departmentCode: null,
+    },
+  ]
+
+  it("only includes courses for the specified faculty department and institute-level courses", () => {
+    const result = filterCoursesForDepartment(catalogue, "CMPN")
+    expect(result.map((c) => c.code)).toEqual(["CP31T", "CP32T", "HS101"])
+  })
+
+  it("excludes courses from other departments", () => {
+    const result = filterCoursesForDepartment(catalogue, "CMPN")
+    expect(result.some((c) => c.code === "EC31T")).toBe(false)
+    expect(result.some((c) => c.code === "ET31T")).toBe(false)
+  })
+
+  it("filters matching department courses by search query across code and name", () => {
+    const byCode = filterCoursesForDepartment(catalogue, "CMPN", "CP31")
+    expect(byCode.map((c) => c.code)).toEqual(["CP31T"])
+
+    const byName = filterCoursesForDepartment(catalogue, "CMPN", "database")
+    expect(byName.map((c) => c.code)).toEqual(["CP32T"])
+  })
+
+  it("returns an empty list when no courses match the department", () => {
+    const result = filterCoursesForDepartment(catalogue, "IT")
+    expect(result.map((c) => c.code)).toEqual(["HS101"])
+
+    const noCommon = catalogue.filter((c) => c.departmentCode !== null)
+    expect(filterCoursesForDepartment(noCommon, "IT")).toEqual([])
+  })
+
+  it("returns all courses if no department code is provided", () => {
+    const result = filterCoursesForDepartment(catalogue, null)
+    expect(result).toHaveLength(catalogue.length)
   })
 })

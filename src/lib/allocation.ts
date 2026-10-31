@@ -120,3 +120,23 @@ export function inDeptScope(
 ): boolean {
   return user.tier === "super_admin" || user.deptCodes.includes(deptCode)
 }
+
+/**
+ * Filter catalogue courses for a faculty member by department and search query.
+ * Courses without a department code are institute-wide and eligible for any department.
+ * Courses with a specific department code are only eligible for that department.
+ */
+export function filterCoursesForDepartment<
+  T extends { departmentCode: string | null; code: string; name: string },
+>(courses: T[], deptCode: string | null | undefined, query: string = ""): T[] {
+  const q = query.trim().toLowerCase()
+  return courses.filter((c) => {
+    if (deptCode && c.departmentCode && c.departmentCode !== deptCode) {
+      return false
+    }
+    if (q && !`${c.code} ${c.name}`.toLowerCase().includes(q)) {
+      return false
+    }
+    return true
+  })
+}

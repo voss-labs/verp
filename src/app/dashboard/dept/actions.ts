@@ -710,6 +710,13 @@ export async function assignSubjectToTeacherAction(input: {
 
     const teacher = await getFacultyById(input.facultyId)
     if (!teacher) return { error: "No such faculty member." }
+    if (
+      course.departmentCode &&
+      teacher.department &&
+      course.departmentCode !== teacher.department
+    ) {
+      return { error: "That course belongs to another department." }
+    }
     if (teacher.department !== cls.departmentCode) {
       // Cross-department teaching is real, but it should be a deliberate act on
       // the class's staff list rather than a side effect of allocating a subject.

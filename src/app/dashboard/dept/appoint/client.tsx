@@ -10,6 +10,7 @@ import { ConfirmAction } from "@/components/confirm-action"
 import { EmptyState } from "@/components/empty-state"
 import { UsersIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { filterCoursesForDepartment } from "@/lib/allocation"
 import {
   assignClassRoleAction,
   removeClassRoleAction,
@@ -101,6 +102,12 @@ export function AppointClient({
       )
     : []
 
+  const availableCourses = filterCoursesForDepartment(
+    courses,
+    selected?.department,
+    courseQuery
+  )
+
   function run(fn: () => Promise<{ error: string | null }>, ok: string) {
     return new Promise<void>((resolve) => {
       start(async () => {
@@ -130,7 +137,10 @@ export function AppointClient({
             <button
               key={f.id}
               type="button"
-              onClick={() => setSelectedId(f.id)}
+              onClick={() => {
+                setSelectedId(f.id)
+                setAddClassId("")
+              }}
               className={cn(
                 "hover:bg-muted flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left",
                 f.id === selectedId && "bg-muted"
@@ -306,51 +316,49 @@ export function AppointClient({
             </div>
 
             <div className="border-border divide-border max-h-64 divide-y overflow-y-auto rounded border">
-              {courses
-                .filter(
-                  (c) =>
-                    !courseQuery.trim() ||
-                    `${c.code} ${c.name}`
-                      .toLowerCase()
-                      .includes(courseQuery.trim().toLowerCase())
-                )
-                .slice(0, 60)
-                .map((c) => (
-                  <div
-                    key={c.id}
-                    className="flex items-center gap-2 px-3 py-2 text-sm"
+              {availableCourses.slice(0, 60).map((c) => (
+                <div
+                  key={c.id}
+                  className="flex items-center gap-2 px-3 py-2 text-sm"
+                >
+                  <Badge variant="outline" className="identifier">
+                    {c.code}
+                  </Badge>
+                  <span className="truncate">{c.name}</span>
+                  {c.year && (
+                    <span className="text-muted-foreground text-xs">
+                      {c.year}
+                    </span>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="ml-auto h-7 px-2 text-xs"
+                    disabled={pending || !addClassId}
+                    onClick={() =>
+                      run(
+                        () =>
+                          assignSubjectToTeacherAction({
+                            classId: addClassId,
+                            facultyId: selected.id,
+                            courseId: c.id,
+                            semester,
+                          }),
+                        `${c.code} assigned to ${selected.name}`
+                      )
+                    }
                   >
-                    <Badge variant="outline" className="identifier">
-                      {c.code}
-                    </Badge>
-                    <span className="truncate">{c.name}</span>
-                    {c.year && (
-                      <span className="text-muted-foreground text-xs">
-                        {c.year}
-                      </span>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="ml-auto h-7 px-2 text-xs"
-                      disabled={pending || !addClassId}
-                      onClick={() =>
-                        run(
-                          () =>
-                            assignSubjectToTeacherAction({
-                              classId: addClassId,
-                              facultyId: selected.id,
-                              courseId: c.id,
-                              semester,
-                            }),
-                          `${c.code} assigned to ${selected.name}`
-                        )
-                      }
-                    >
-                      Assign
-                    </Button>
-                  </div>
-                ))}
+                    Assign
+                  </Button>
+                </div>
+              ))}
+              {availableCourses.length === 0 && (
+                <p className="text-muted-foreground px-3 py-2 text-sm">
+                  {courseQuery.trim()
+                    ? "No courses match that search."
+                    : "No courses catalogued for this department."}
+                </p>
+              )}
             </div>
           </section>
 
